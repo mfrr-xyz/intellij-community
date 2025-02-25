@@ -93,10 +93,6 @@ pc:com.intellij.execution.process.CapturingAnsiEscapesAwareProcessHandler$AnsiEs
 - <init>(com.intellij.execution.process.ProcessOutput):V
 - coloredTextAvailable(java.lang.String,com.intellij.openapi.util.Key):V
 - onTextAvailable(com.intellij.execution.process.ProcessEvent,com.intellij.openapi.util.Key):V
-f:com.intellij.execution.process.ColoredOutputTypeRegistryImpl
-- <init>():V
-- s:getAnsiColorKey(I):com.intellij.openapi.editor.colors.TextAttributesKey
-- getOutputType(java.lang.String,com.intellij.openapi.util.Key):com.intellij.execution.process.ProcessOutputType
 f:com.intellij.execution.process.ConsoleHighlighter
 - sf:BLACK:com.intellij.openapi.editor.colors.TextAttributesKey
 - sf:BLUE:com.intellij.openapi.editor.colors.TextAttributesKey
@@ -292,7 +288,7 @@ f:com.intellij.execution.util.ExecutionErrorDialog
 com.intellij.featureStatistics.ApplicabilityFilter
 - a:getPrefix():java.lang.String
 - a:isApplicable(java.lang.String,com.intellij.openapi.project.Project):Z
-c:com.intellij.featureStatistics.FeatureDescriptor
+f:com.intellij.featureStatistics.FeatureDescriptor
 - <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,I,I,java.util.Set,I,I,com.intellij.featureStatistics.ProductivityFeaturesProvider):V
 - <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,I,I,java.util.Set,I,com.intellij.featureStatistics.ProductivityFeaturesProvider):V
 - adjustUsageInfo(I,J):V
@@ -710,7 +706,6 @@ a:com.intellij.ide.actions.QuickSwitchSchemeAction
 - com.intellij.openapi.actionSystem.AnAction
 - com.intellij.openapi.project.DumbAware
 - p:myActionPlace:java.lang.String
-- psf:ourNotCurrentAction:javax.swing.Icon
 - p:<init>():V
 - p:<init>(Z):V
 - actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
@@ -748,12 +743,6 @@ com.intellij.ide.actions.exclusion.ExclusionHandler
 - a:isNodeExcluded(java.lang.Object):Z
 - a:isNodeExclusionAvailable(java.lang.Object):Z
 - a:onDone(Z):V
-f:com.intellij.ide.actions.exclusion.IncludeTreeNodeAction
-- com.intellij.openapi.actionSystem.AnAction
-- <init>():V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- update(com.intellij.openapi.actionSystem.AnActionEvent):V
 e:com.intellij.ide.browsers.BrowserFamily
 - java.lang.Enum
 - com.intellij.openapi.util.Iconable
@@ -1223,6 +1212,8 @@ f:com.intellij.ide.util.treeView.TreeState
 - s:createOn(javax.swing.JTree,javax.swing.tree.DefaultMutableTreeNode):com.intellij.ide.util.treeView.TreeState
 - s:createOn(javax.swing.JTree,javax.swing.tree.TreePath):com.intellij.ide.util.treeView.TreeState
 - s:createOn(javax.swing.JTree,Z,Z):com.intellij.ide.util.treeView.TreeState
+- s:defaultPathElementId(java.lang.Object):java.lang.String
+- s:defaultPathElementType(java.lang.Object):java.lang.String
 - s:expand(javax.swing.JTree,java.util.function.Consumer):V
 - isEmpty():Z
 - readExternal(org.jdom.Element):V
@@ -1703,6 +1694,7 @@ f:com.intellij.openapi.actionSystem.Separator
 - <init>(java.util.function.Supplier):V
 - s:create():com.intellij.openapi.actionSystem.Separator
 - s:create(java.lang.String):com.intellij.openapi.actionSystem.Separator
+- equals(java.lang.Object):Z
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - s:getInstance():com.intellij.openapi.actionSystem.Separator
 - getText():java.lang.String
@@ -1917,9 +1909,6 @@ a:com.intellij.openapi.components.AbstractProjectComponent
 - p:<init>(com.intellij.openapi.project.Project):V
 com.intellij.openapi.components.SettingsSavingComponent
 - a:save():V
-f:com.intellij.openapi.concurrency.PromiseUtilKt
-- sf:awaitPromise-8Mi8wO0(org.jetbrains.concurrency.Promise,J,kotlin.coroutines.Continuation):java.lang.Object
-- sf:waitForPromise-HG0u8IE(org.jetbrains.concurrency.Promise,J):java.lang.Object
 a:com.intellij.openapi.diagnostic.ErrorReportSubmitter
 - com.intellij.openapi.extensions.PluginAware
 - <init>():V
@@ -1934,8 +1923,11 @@ a:com.intellij.openapi.diagnostic.ErrorReportSubmitter
 c:com.intellij.openapi.diagnostic.IdeaLoggingEvent
 - <init>(java.lang.String,java.lang.Throwable):V
 - <init>(java.lang.String,java.lang.Throwable,java.lang.Object):V
+- <init>(java.lang.String,java.lang.Throwable,java.util.List,com.intellij.ide.plugins.IdeaPluginDescriptor,java.lang.Object):V
+- getAttachments():java.util.List
 - getData():java.lang.Object
 - getMessage():java.lang.String
+- getPlugin():com.intellij.ide.plugins.IdeaPluginDescriptor
 - getThrowable():java.lang.Throwable
 - getThrowableText():java.lang.String
 c:com.intellij.openapi.diagnostic.SubmittedReportInfo
@@ -2212,9 +2204,15 @@ com.intellij.openapi.fileChooser.FileChooserPanel
 - a:toggleProjectDetection():Z
 c:com.intellij.openapi.fileChooser.FileSaverDescriptor
 - com.intellij.openapi.fileChooser.FileChooserDescriptor
+- <init>(com.intellij.openapi.fileChooser.FileChooserDescriptor):V
 - <init>(java.lang.String,java.lang.String):V
 - <init>(java.lang.String,java.lang.String,java.lang.String):V
 - <init>(java.lang.String,java.lang.String,java.lang.String[]):V
+- withDescription(java.lang.String):com.intellij.openapi.fileChooser.FileSaverDescriptor
+- withTitle(java.lang.String):com.intellij.openapi.fileChooser.FileSaverDescriptor
+f:com.intellij.openapi.fileChooser.FileSaverDescriptorFactory
+- sf:INSTANCE:com.intellij.openapi.fileChooser.FileSaverDescriptorFactory
+- sf:createSingleFileNoJarsDescriptor():com.intellij.openapi.fileChooser.FileSaverDescriptor
 com.intellij.openapi.fileChooser.FileSaverDialog
 - a:save(com.intellij.openapi.vfs.VirtualFile,java.lang.String):com.intellij.openapi.vfs.VirtualFileWrapper
 - save(java.lang.String):com.intellij.openapi.vfs.VirtualFileWrapper
@@ -2379,7 +2377,14 @@ com.intellij.openapi.keymap.Keymap
 com.intellij.openapi.keymap.KeymapExtension
 - sf:EXTENSION_POINT_NAME:com.intellij.openapi.extensions.ExtensionPointName
 - a:createGroup(com.intellij.openapi.util.Condition,com.intellij.openapi.project.Project):com.intellij.openapi.keymap.KeymapGroup
+- getGroupLocation():com.intellij.openapi.keymap.KeymapExtension$KeymapLocation
 - skipPluginGroup(com.intellij.openapi.extensions.PluginId):Z
+e:com.intellij.openapi.keymap.KeymapExtension$KeymapLocation
+- java.lang.Enum
+- sf:OTHER:com.intellij.openapi.keymap.KeymapExtension$KeymapLocation
+- sf:TOP_LEVEL:com.intellij.openapi.keymap.KeymapExtension$KeymapLocation
+- s:valueOf(java.lang.String):com.intellij.openapi.keymap.KeymapExtension$KeymapLocation
+- s:values():com.intellij.openapi.keymap.KeymapExtension$KeymapLocation[]
 com.intellij.openapi.keymap.KeymapGroup
 - a:addActionId(java.lang.String):V
 - a:addGroup(com.intellij.openapi.keymap.KeymapGroup):V
@@ -2506,273 +2511,6 @@ f:com.intellij.openapi.keymap.NationalKeyboardSupport
 f:com.intellij.openapi.keymap.NationalKeyboardSupport$OptionSet
 - enabled:Z
 - <init>():V
-f:com.intellij.openapi.observable.dispatcher.PromiseUtilKt
-- sf:getPromise(com.intellij.openapi.observable.dispatcher.SingleEventDispatcher0,com.intellij.openapi.Disposable):org.jetbrains.concurrency.Promise
-- sf:getPromise(com.intellij.openapi.observable.dispatcher.SingleEventDispatcher2,com.intellij.openapi.Disposable):org.jetbrains.concurrency.Promise
-- sf:getPromise(com.intellij.openapi.observable.dispatcher.SingleEventDispatcher,com.intellij.openapi.Disposable):org.jetbrains.concurrency.Promise
-com.intellij.openapi.observable.dispatcher.SingleEventDispatcher0
-- a:getDelegateDispatcher():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher
-- a:onceWhenEventHappened(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- onceWhenEventHappened(kotlin.jvm.functions.Function0):V
-- a:whenEventHappened(I,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- whenEventHappened(I,kotlin.jvm.functions.Function0):V
-- a:whenEventHappened(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- whenEventHappened(kotlin.jvm.functions.Function0):V
-com.intellij.openapi.observable.dispatcher.SingleEventDispatcher0$Multicaster
-- com.intellij.openapi.observable.dispatcher.SingleEventDispatcher0
-- a:fireEvent():V
-com.intellij.openapi.observable.dispatcher.SingleEventDispatcher2
-- a:filterEvents(kotlin.jvm.functions.Function2):com.intellij.openapi.observable.dispatcher.SingleEventDispatcher2
-- a:getDelegateDispatcher():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher
-- a:ignoreParameters():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher0
-- a:mapParameters(kotlin.jvm.functions.Function2):com.intellij.openapi.observable.dispatcher.SingleEventDispatcher2
-- a:mapParameters(kotlin.jvm.functions.Function2):com.intellij.openapi.observable.dispatcher.SingleEventDispatcher
-- a:onceWhenEventHappened(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function2):V
-- onceWhenEventHappened(kotlin.jvm.functions.Function2):V
-- a:whenEventHappened(I,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function2):V
-- whenEventHappened(I,kotlin.jvm.functions.Function2):V
-- a:whenEventHappened(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function2):V
-- whenEventHappened(kotlin.jvm.functions.Function2):V
-com.intellij.openapi.observable.dispatcher.SingleEventDispatcher2$Multicaster
-- com.intellij.openapi.observable.dispatcher.SingleEventDispatcher2
-- a:fireEvent(java.lang.Object,java.lang.Object):V
-com.intellij.openapi.observable.operation.OperationExecutionContext
-- sf:Companion:com.intellij.openapi.observable.operation.OperationExecutionContext$Companion
-- a:findData(com.intellij.openapi.observable.operation.OperationExecutionContext$ContextKey):java.lang.Object
-- a:getData(com.intellij.openapi.observable.operation.OperationExecutionContext$ContextKey):java.lang.Object
-com.intellij.openapi.observable.operation.OperationExecutionContext$Builder
-- com.intellij.openapi.observable.operation.OperationExecutionContext
-- putData(com.intellij.openapi.observable.operation.OperationExecutionContext$ContextKey,java.lang.Object):V
-- a:putData(com.intellij.openapi.observable.operation.OperationExecutionContext$ContextKey,java.lang.Object,com.intellij.openapi.Disposable):V
-f:com.intellij.openapi.observable.operation.OperationExecutionContext$Companion
-- f:create(kotlin.jvm.functions.Function1):com.intellij.openapi.observable.operation.OperationExecutionContext
-- f:createKey(java.lang.String):com.intellij.openapi.observable.operation.OperationExecutionContext$ContextKey
-- bs:createKey$default(com.intellij.openapi.observable.operation.OperationExecutionContext$Companion,java.lang.String,I,java.lang.Object):com.intellij.openapi.observable.operation.OperationExecutionContext$ContextKey
-com.intellij.openapi.observable.operation.OperationExecutionContext$ContextKey
-com.intellij.openapi.observable.operation.OperationExecutionId
-- sf:Companion:com.intellij.openapi.observable.operation.OperationExecutionId$Companion
-- a:getExecutionContext():com.intellij.openapi.observable.operation.OperationExecutionContext
-f:com.intellij.openapi.observable.operation.OperationExecutionId$Companion
-- f:createId(java.lang.String,com.intellij.openapi.observable.operation.OperationExecutionContext):com.intellij.openapi.observable.operation.OperationExecutionId
-- f:createId(java.lang.String,kotlin.jvm.functions.Function1):com.intellij.openapi.observable.operation.OperationExecutionId
-- bs:createId$default(com.intellij.openapi.observable.operation.OperationExecutionId$Companion,java.lang.String,com.intellij.openapi.observable.operation.OperationExecutionContext,I,java.lang.Object):com.intellij.openapi.observable.operation.OperationExecutionId
-- bs:createId$default(com.intellij.openapi.observable.operation.OperationExecutionId$Companion,java.lang.String,kotlin.jvm.functions.Function1,I,java.lang.Object):com.intellij.openapi.observable.operation.OperationExecutionId
-- f:getNONE():com.intellij.openapi.observable.operation.OperationExecutionId
-com.intellij.openapi.observable.operation.OperationExecutionStatus
-- sf:Companion:com.intellij.openapi.observable.operation.OperationExecutionStatus$Companion
-f:com.intellij.openapi.observable.operation.OperationExecutionStatus$Cancel
-- com.intellij.openapi.observable.operation.OperationExecutionStatus
-- sf:INSTANCE:com.intellij.openapi.observable.operation.OperationExecutionStatus$Cancel
-f:com.intellij.openapi.observable.operation.OperationExecutionStatus$Companion
-- f:getKEY():com.intellij.openapi.actionSystem.DataKey
-f:com.intellij.openapi.observable.operation.OperationExecutionStatus$Failure
-- com.intellij.openapi.observable.operation.OperationExecutionStatus
-- <init>():V
-- <init>(java.lang.String):V
-- <init>(java.lang.Throwable):V
-- f:getCause():java.lang.Throwable
-- f:getMessage():java.lang.String
-f:com.intellij.openapi.observable.operation.OperationExecutionStatus$Success
-- com.intellij.openapi.observable.operation.OperationExecutionStatus
-- sf:INSTANCE:com.intellij.openapi.observable.operation.OperationExecutionStatus$Success
-com.intellij.openapi.observable.operation.core.MutableOperationTrace
-- com.intellij.openapi.observable.operation.core.ObservableTaskOperationTrace
-- a:detach(com.intellij.openapi.observable.operation.OperationExecutionId):V
-- bs:detach$default(com.intellij.openapi.observable.operation.core.MutableOperationTrace,com.intellij.openapi.observable.operation.OperationExecutionId,I,java.lang.Object):V
-- a:detachAll():V
-- a:traceFinish(com.intellij.openapi.observable.operation.OperationExecutionId,com.intellij.openapi.observable.operation.OperationExecutionStatus):V
-- bs:traceFinish$default(com.intellij.openapi.observable.operation.core.MutableOperationTrace,com.intellij.openapi.observable.operation.OperationExecutionId,com.intellij.openapi.observable.operation.OperationExecutionStatus,I,java.lang.Object):V
-- a:traceSchedule(com.intellij.openapi.observable.operation.OperationExecutionId):V
-- bs:traceSchedule$default(com.intellij.openapi.observable.operation.core.MutableOperationTrace,com.intellij.openapi.observable.operation.OperationExecutionId,I,java.lang.Object):V
-- a:traceStart(com.intellij.openapi.observable.operation.OperationExecutionId):V
-- bs:traceStart$default(com.intellij.openapi.observable.operation.core.MutableOperationTrace,com.intellij.openapi.observable.operation.OperationExecutionId,I,java.lang.Object):V
-com.intellij.openapi.observable.operation.core.ObservableOperationState
-- a:component1():com.intellij.openapi.observable.operation.core.ObservableOperationStatus
-- a:component2():java.util.Map
-- a:component3():java.util.Map
-- a:getScheduled():java.util.Map
-- a:getStarted():java.util.Map
-- a:getStatus():com.intellij.openapi.observable.operation.core.ObservableOperationStatus
-e:com.intellij.openapi.observable.operation.core.ObservableOperationStatus
-- java.lang.Enum
-- sf:COMPLETED:com.intellij.openapi.observable.operation.core.ObservableOperationStatus
-- sf:IN_PROGRESS:com.intellij.openapi.observable.operation.core.ObservableOperationStatus
-- sf:SCHEDULED:com.intellij.openapi.observable.operation.core.ObservableOperationStatus
-- s:getEntries():kotlin.enums.EnumEntries
-- s:valueOf(java.lang.String):com.intellij.openapi.observable.operation.core.ObservableOperationStatus
-- s:values():com.intellij.openapi.observable.operation.core.ObservableOperationStatus[]
-f:com.intellij.openapi.observable.operation.core.ObservableOperationTraceUtil
-- sf:onceWhenOperationFinished(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:onceWhenOperationFinished(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-- sf:onceWhenOperationScheduled(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:onceWhenOperationScheduled(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-- sf:onceWhenOperationStarted(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:onceWhenOperationStarted(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-- sf:whenOperationFinished(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,I,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:whenOperationFinished(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,I,kotlin.jvm.functions.Function0):V
-- sf:whenOperationFinished(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:whenOperationFinished(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-- sf:whenOperationScheduled(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,I,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:whenOperationScheduled(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,I,kotlin.jvm.functions.Function0):V
-- sf:whenOperationScheduled(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:whenOperationScheduled(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-- sf:whenOperationStarted(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,I,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:whenOperationStarted(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,I,kotlin.jvm.functions.Function0):V
-- sf:whenOperationStarted(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:whenOperationStarted(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-- sf:withCompletedOperation(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:withCompletedOperation(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-- sf:withScheduledOperation(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:withScheduledOperation(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-- sf:withStartedOperation(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:withStartedOperation(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,kotlin.jvm.functions.Function0):V
-com.intellij.openapi.observable.operation.core.ObservableTaskOperationTrace
-- com.intellij.openapi.observable.operation.core.ObservableOperationTrace
-- a:getDetachTaskObservable():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher
-- a:getFinishTaskObservable():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher2
-- a:getScheduleTaskObservable():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher
-- a:getStartTaskObservable():com.intellij.openapi.observable.dispatcher.SingleEventDispatcher
-- a:getState():com.intellij.openapi.observable.operation.core.ObservableOperationState
-f:com.intellij.openapi.observable.operation.core.OperationUtilKt
-- sf:getOperationInProgressProperty(com.intellij.openapi.observable.operation.core.ObservableOperationTrace):com.intellij.openapi.observable.properties.ObservableBooleanProperty
-- sf:isOperationCompleted(com.intellij.openapi.observable.operation.core.ObservableOperationTrace):Z
-- sf:isOperationInProgress(com.intellij.openapi.observable.operation.core.ObservableOperationTrace):Z
-- sf:isOperationScheduled(com.intellij.openapi.observable.operation.core.ObservableOperationTrace):Z
-- sf:traceRun(com.intellij.openapi.observable.operation.core.MutableOperationTrace,com.intellij.openapi.observable.operation.OperationExecutionId,kotlin.jvm.functions.Function0):java.lang.Object
-- bs:traceRun$default(com.intellij.openapi.observable.operation.core.MutableOperationTrace,com.intellij.openapi.observable.operation.OperationExecutionId,kotlin.jvm.functions.Function0,I,java.lang.Object):java.lang.Object
-f:com.intellij.openapi.observable.operation.core.PromiseUtilKt
-- sf:awaitOperation-jKevqZI(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,J,J,kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
-- sf:awaitOperationCompletion-8Mi8wO0(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,J,kotlin.coroutines.Continuation):java.lang.Object
-- sf:getOperationCompletionPromise(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable):org.jetbrains.concurrency.Promise
-- sf:getOperationFinishPromise(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable):org.jetbrains.concurrency.Promise
-- sf:getOperationSchedulePromise(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable):org.jetbrains.concurrency.Promise
-- sf:getOperationStartPromise(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,com.intellij.openapi.Disposable):org.jetbrains.concurrency.Promise
-- sf:waitForOperation-vLdBGDU(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,J,J,com.intellij.openapi.util.ThrowableComputable):java.lang.Object
-- sf:waitForOperationCompletion-HG0u8IE(com.intellij.openapi.observable.operation.core.ObservableOperationTrace,J):V
-f:com.intellij.openapi.observable.operation.core.ResultUtilKt
-- sf:onFailureCatching(java.lang.Object,kotlin.jvm.functions.Function1):java.lang.Object
-Fa:com.intellij.openapi.observable.properties.AbstractObservableBooleanProperty
-- com.intellij.openapi.observable.properties.AbstractObservableProperty
-- com.intellij.openapi.observable.properties.ObservableBooleanProperty
-- <init>():V
-- afterReset(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- afterSet(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-a:com.intellij.openapi.observable.properties.AbstractObservableClearableProperty
-- com.intellij.openapi.observable.properties.AbstractObservableProperty
-- com.intellij.openapi.observable.properties.ObservableClearableProperty
-- <init>():V
-- afterReset(kotlin.jvm.functions.Function0):V
-- afterReset(kotlin.jvm.functions.Function0,com.intellij.openapi.Disposable):V
-- pf:fireResetEvent():V
-Fa:com.intellij.openapi.observable.properties.AbstractObservableProperty
-- com.intellij.openapi.observable.properties.ObservableProperty
-- <init>():V
-- afterChange(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1):V
-f:com.intellij.openapi.observable.properties.AtomicBooleanProperty
-- com.intellij.openapi.observable.properties.AbstractObservableBooleanProperty
-- com.intellij.openapi.observable.properties.AtomicMutableBooleanProperty
-- com.intellij.openapi.observable.properties.BooleanProperty
-- <init>(Z):V
-- afterReset(kotlin.jvm.functions.Function0):V
-- afterReset(kotlin.jvm.functions.Function0,com.intellij.openapi.Disposable):V
-- afterSet(kotlin.jvm.functions.Function0):V
-- afterSet(kotlin.jvm.functions.Function0,com.intellij.openapi.Disposable):V
-- f:compareAndSet(Z,Z):Z
-- get():java.lang.Boolean
-- getAndSet(Z):Z
-- reset():V
-- set():V
-- set(Z):V
-- updateAndGet(kotlin.jvm.functions.Function1):java.lang.Boolean
-Fc:com.intellij.openapi.observable.properties.AtomicLazyProperty
-- com.intellij.openapi.observable.properties.AbstractObservableClearableProperty
-- com.intellij.openapi.observable.properties.ObservableMutableProperty
-- sf:Companion:com.intellij.openapi.observable.properties.AtomicLazyProperty$Companion
-- <init>(kotlin.jvm.functions.Function0):V
-- get():java.lang.Object
-- reset():V
-- set(java.lang.Object):V
-- updateAndGet(kotlin.jvm.functions.Function1):java.lang.Object
-f:com.intellij.openapi.observable.properties.AtomicLazyProperty$Companion
-com.intellij.openapi.observable.properties.AtomicMutableBooleanProperty
-- com.intellij.openapi.observable.properties.MutableBooleanProperty
-- com.intellij.openapi.observable.properties.ObservableMutableProperty
-- a:getAndSet(Z):Z
-f:com.intellij.openapi.observable.properties.AtomicProperty
-- com.intellij.openapi.observable.properties.AbstractObservableClearableProperty
-- com.intellij.openapi.observable.properties.ObservableMutableProperty
-- <init>(java.lang.Object):V
-- get():java.lang.Object
-- reset():V
-- set(java.lang.Object):V
-- updateAndGet(kotlin.jvm.functions.Function1):java.lang.Object
-com.intellij.openapi.observable.properties.BooleanProperty
-- com.intellij.openapi.observable.properties.ObservableClearableProperty
-- a:afterReset(kotlin.jvm.functions.Function0):V
-- a:afterReset(kotlin.jvm.functions.Function0,com.intellij.openapi.Disposable):V
-- a:afterSet(kotlin.jvm.functions.Function0):V
-- a:afterSet(kotlin.jvm.functions.Function0,com.intellij.openapi.Disposable):V
-- a:reset():V
-- a:set():V
-com.intellij.openapi.observable.properties.GraphProperty
-- com.intellij.openapi.observable.properties.ObservableClearableProperty
-- afterPropagation(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- a:afterPropagation(kotlin.jvm.functions.Function0):V
-- afterReset(kotlin.jvm.functions.Function0):V
-- afterReset(kotlin.jvm.functions.Function0,com.intellij.openapi.Disposable):V
-- dependsOn(com.intellij.openapi.observable.properties.ObservableClearableProperty):V
-- b:dependsOn(com.intellij.openapi.observable.properties.ObservableClearableProperty,kotlin.jvm.functions.Function0):V
-- dependsOn(com.intellij.openapi.observable.properties.ObservableProperty,kotlin.jvm.functions.Function0):V
-- dependsOn(com.intellij.openapi.observable.properties.ObservableProperty,Z,kotlin.jvm.functions.Function0):V
-- reset():V
-f:com.intellij.openapi.observable.properties.ListenerUtilKt
-- sf:whenPropertyChanged(com.intellij.openapi.observable.properties.ObservableProperty,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1):V
-- sf:whenPropertyChanged(com.intellij.openapi.observable.properties.ObservableProperty,kotlin.jvm.functions.Function1):V
-- sf:whenPropertyReset(com.intellij.openapi.observable.properties.ObservableBooleanProperty,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:whenPropertyReset(com.intellij.openapi.observable.properties.ObservableBooleanProperty,kotlin.jvm.functions.Function0):V
-- sf:whenPropertySet(com.intellij.openapi.observable.properties.ObservableBooleanProperty,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- sf:whenPropertySet(com.intellij.openapi.observable.properties.ObservableBooleanProperty,kotlin.jvm.functions.Function0):V
-com.intellij.openapi.observable.properties.MutableBooleanProperty
-- com.intellij.openapi.observable.properties.ObservableBooleanProperty
-- com.intellij.openapi.observable.properties.ObservableMutableProperty
-- a:reset():V
-- a:set():V
-com.intellij.openapi.observable.properties.ObservableBooleanProperty
-- com.intellij.openapi.observable.properties.ObservableProperty
-- a:afterReset(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- afterReset(kotlin.jvm.functions.Function0):V
-- a:afterSet(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- afterSet(kotlin.jvm.functions.Function0):V
-com.intellij.openapi.observable.properties.ObservableClearableProperty
-- com.intellij.openapi.observable.properties.ObservableMutableProperty
-- afterReset(kotlin.jvm.functions.Function0):V
-- afterReset(kotlin.jvm.functions.Function0,com.intellij.openapi.Disposable):V
-- reset():V
-com.intellij.openapi.observable.properties.ObservableMutableProperty
-- com.intellij.openapi.observable.properties.ObservableProperty
-- kotlin.properties.ReadWriteProperty
-- getValue(java.lang.Object,kotlin.reflect.KProperty):java.lang.Object
-- a:set(java.lang.Object):V
-- setValue(java.lang.Object,kotlin.reflect.KProperty,java.lang.Object):V
-com.intellij.openapi.observable.properties.ObservableProperty
-- kotlin.properties.ReadOnlyProperty
-- afterChange(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1):V
-- afterChange(kotlin.jvm.functions.Function1):V
-- afterChange(kotlin.jvm.functions.Function1,com.intellij.openapi.Disposable):V
-- bs:afterChange$default(com.intellij.openapi.observable.properties.ObservableProperty,com.intellij.openapi.Disposable,kotlin.jvm.functions.Function1,I,java.lang.Object):V
-- a:get():java.lang.Object
-- getValue(java.lang.Object,kotlin.reflect.KProperty):java.lang.Object
-f:com.intellij.openapi.observable.properties.PropertyGraph
-- <init>():V
-- <init>(java.lang.String,Z):V
-- b:<init>(java.lang.String,Z,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:afterPropagation(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function0):V
-- f:afterPropagation(kotlin.jvm.functions.Function0):V
-- f:dependsOn(com.intellij.openapi.observable.properties.ObservableMutableProperty,com.intellij.openapi.observable.properties.ObservableProperty,Z,kotlin.jvm.functions.Function0):V
-- bs:dependsOn$default(com.intellij.openapi.observable.properties.PropertyGraph,com.intellij.openapi.observable.properties.ObservableMutableProperty,com.intellij.openapi.observable.properties.ObservableProperty,Z,kotlin.jvm.functions.Function0,I,java.lang.Object):V
-- f:lateinitProperty():com.intellij.openapi.observable.properties.GraphProperty
-- f:lazyProperty(kotlin.jvm.functions.Function0):com.intellij.openapi.observable.properties.GraphProperty
-- f:property(java.lang.Object):com.intellij.openapi.observable.properties.GraphProperty
 f:com.intellij.openapi.observable.util.BindUtil
 - sf:bind(com.intellij.openapi.observable.properties.ObservableMutableProperty,com.intellij.openapi.observable.properties.ObservableMutableProperty):V
 - sf:bind(com.intellij.openapi.observable.properties.ObservableMutableProperty,com.intellij.openapi.observable.properties.ObservableProperty):V
@@ -2880,9 +2618,6 @@ f:com.intellij.openapi.observable.util.ModificationTrackerUtilKt
 - sf:createTextModificationTracker(javax.swing.JTextField,com.intellij.openapi.Disposable):com.intellij.openapi.util.ModificationTracker
 - bs:createTextModificationTracker$default(javax.swing.JTextField,com.intellij.openapi.Disposable,I,java.lang.Object):com.intellij.openapi.util.ModificationTracker
 - sf:plus(com.intellij.openapi.util.ModificationTracker,com.intellij.openapi.util.ModificationTracker):com.intellij.openapi.util.ModificationTracker
-f:com.intellij.openapi.observable.util.PromiseUtilKt
-- sf:cancelWhenDisposed(org.jetbrains.concurrency.CancellablePromise,com.intellij.openapi.Disposable):org.jetbrains.concurrency.CancellablePromise
-- sf:getPromise(com.intellij.openapi.Disposable,kotlin.jvm.functions.Function2):org.jetbrains.concurrency.Promise
 f:com.intellij.openapi.observable.util.PropertyOperationUtil
 - sf:and(com.intellij.openapi.observable.properties.ObservableProperty,com.intellij.openapi.observable.properties.ObservableProperty):com.intellij.openapi.observable.properties.ObservableProperty
 - sf:div(com.intellij.openapi.observable.properties.ObservableProperty,com.intellij.openapi.observable.properties.ObservableProperty):com.intellij.openapi.observable.properties.ObservableProperty
@@ -3477,6 +3212,7 @@ c:com.intellij.openapi.ui.ComponentWithBrowseButton
 - addBrowseFolderListener(com.intellij.openapi.project.Project,com.intellij.openapi.ui.ComponentWithBrowseButton$BrowseFolderActionListener):V
 - addBrowseFolderListener(java.lang.String,java.lang.String,com.intellij.openapi.project.Project,com.intellij.openapi.fileChooser.FileChooserDescriptor,com.intellij.openapi.ui.TextComponentAccessor):V
 - addBrowseFolderListener(java.lang.String,java.lang.String,com.intellij.openapi.project.Project,com.intellij.openapi.fileChooser.FileChooserDescriptor,com.intellij.openapi.ui.TextComponentAccessor,Z):V
+- addFileSaverDialog(com.intellij.openapi.project.Project,com.intellij.openapi.fileChooser.FileSaverDescriptor,com.intellij.openapi.ui.TextComponentAccessor):V
 - dispose():V
 - getButton():com.intellij.openapi.ui.FixedSizeButton
 - f:getChildComponent():javax.swing.JComponent
@@ -3571,13 +3307,10 @@ c:com.intellij.openapi.ui.DialogBuilder
 - title(java.lang.String):com.intellij.openapi.ui.DialogBuilder
 com.intellij.openapi.ui.DialogBuilder$ActionDescriptor
 - a:getAction(com.intellij.openapi.ui.DialogWrapper):javax.swing.Action
-c:com.intellij.openapi.ui.DialogBuilder$CancelActionDescriptor
+f:com.intellij.openapi.ui.DialogBuilder$CancelActionDescriptor
 - com.intellij.openapi.ui.DialogBuilder$ActionDescriptor
 - com.intellij.openapi.ui.DialogBuilder$CustomizableAction
-- p:myText:java.lang.String
 - <init>():V
-- getAction(com.intellij.openapi.ui.DialogWrapper):javax.swing.Action
-- setText(java.lang.String):V
 c:com.intellij.openapi.ui.DialogBuilder$CloseDialogAction
 - com.intellij.openapi.ui.DialogBuilder$DialogActionDescriptor
 - <init>():V
@@ -3596,13 +3329,10 @@ a:com.intellij.openapi.ui.DialogBuilder$DialogActionDescriptor
 - pa:createAction(com.intellij.openapi.ui.DialogWrapper):javax.swing.Action
 - getAction(com.intellij.openapi.ui.DialogWrapper):javax.swing.Action
 - setDefault(Z):V
-c:com.intellij.openapi.ui.DialogBuilder$OkActionDescriptor
+f:com.intellij.openapi.ui.DialogBuilder$OkActionDescriptor
 - com.intellij.openapi.ui.DialogBuilder$ActionDescriptor
 - com.intellij.openapi.ui.DialogBuilder$CustomizableAction
-- p:myText:java.lang.String
 - <init>():V
-- getAction(com.intellij.openapi.ui.DialogWrapper):javax.swing.Action
-- setText(java.lang.String):V
 f:com.intellij.openapi.ui.DialogEarthquakeShaker
 - s:shake(java.awt.Window):V
 - startShake():V
@@ -3613,7 +3343,6 @@ f:com.intellij.openapi.ui.DialogPanel
 - f:apply():V
 - f:getApplyCallbacks():java.util.Map
 - f:getComponentValidateCallbacks():java.util.Map
-- f:getCustomValidationRequestors():java.util.Map
 - f:getPreferredFocusedComponent():javax.swing.JComponent
 - f:getResetCallbacks():java.util.Map
 - f:getValidateCallbacks():java.util.List
@@ -3628,7 +3357,6 @@ f:com.intellij.openapi.ui.DialogPanel
 - f:reset():V
 - f:setApplyCallbacks(java.util.Map):V
 - f:setComponentValidateCallbacks(java.util.Map):V
-- f:setCustomValidationRequestors(java.util.Map):V
 - f:setModifiedCallbacks(java.util.Map):V
 - f:setPreferredFocusedComponent(javax.swing.JComponent):V
 - f:setResetCallbacks(java.util.Map):V
@@ -3658,6 +3386,7 @@ a:com.intellij.openapi.ui.DialogWrapper
 - p:<init>(com.intellij.openapi.project.Project):V
 - p:<init>(com.intellij.openapi.project.Project,java.awt.Component,Z,com.intellij.openapi.ui.DialogWrapper$IdeModalityType):V
 - p:<init>(com.intellij.openapi.project.Project,java.awt.Component,Z,com.intellij.openapi.ui.DialogWrapper$IdeModalityType,Z):V
+- p:<init>(com.intellij.openapi.project.Project,java.awt.Component,Z,com.intellij.openapi.ui.DialogWrapper$IdeModalityType,Z,Z):V
 - p:<init>(com.intellij.openapi.project.Project,Z):V
 - p:<init>(com.intellij.openapi.project.Project,Z,com.intellij.openapi.ui.DialogWrapper$IdeModalityType):V
 - p:<init>(com.intellij.openapi.project.Project,Z,Z):V
@@ -3674,7 +3403,9 @@ a:com.intellij.openapi.ui.DialogWrapper
 - centerRelativeToParent():V
 - clickDefaultButton():V
 - f:close(I):V
+- f:close(I,com.intellij.openapi.ui.ExitActionType):V
 - f:close(I,Z):V
+- f:close(I,Z,com.intellij.openapi.ui.ExitActionType):V
 - p:continuousValidation():Z
 - p:createActions():javax.swing.Action[]
 - p:createButtonsPanel(java.util.List):javax.swing.JPanel
@@ -3716,6 +3447,7 @@ a:com.intellij.openapi.ui.DialogWrapper
 - p:getCancelAction():javax.swing.Action
 - getContentPane():java.awt.Container
 - getContentPanel():javax.swing.JComponent
+- p:getContinuousValidationThreadToUse():com.intellij.util.Alarm$ThreadToUse
 - f:getDimensionKey():java.lang.String
 - p:getDimensionServiceKey():java.lang.String
 - f:getDisposable():com.intellij.openapi.Disposable
@@ -3737,7 +3469,6 @@ a:com.intellij.openapi.ui.DialogWrapper
 - getSize():java.awt.Dimension
 - p:getStyle():com.intellij.openapi.ui.DialogWrapper$DialogStyle
 - getTitle():java.lang.String
-- p:getValidationThreadToUse():com.intellij.util.Alarm$ThreadToUse
 - f:getVerticalStretch():F
 - getWindow():java.awt.Window
 - p:hasErrors(javax.swing.JComponent):Z
@@ -4187,6 +3918,7 @@ Fc:com.intellij.openapi.ui.Messages
 - s:showDialog(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,java.lang.String[],I,javax.swing.Icon,com.intellij.openapi.ui.DialogWrapper$DoNotAskOption):I
 - s:showDialog(java.awt.Component,java.lang.String,java.lang.String,java.lang.String[],I,javax.swing.Icon):I
 - s:showDialog(java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DialogWrapper$DoNotAskOption):I
+- s:showDialog(java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DialogWrapper$DoNotAskOption,java.lang.String):I
 - s:showDialog(java.lang.String,java.lang.String,java.lang.String[],I,javax.swing.Icon):I
 - s:showDialog(java.lang.String,java.lang.String,java.lang.String[],I,javax.swing.Icon,com.intellij.openapi.ui.DialogWrapper$DoNotAskOption):I
 - s:showEditableChooseDialog(java.lang.String,java.lang.String,javax.swing.Icon,java.lang.String[],java.lang.String,com.intellij.openapi.ui.InputValidator):java.lang.String
@@ -4609,6 +4341,7 @@ f:com.intellij.openapi.ui.cellvalidators.ValidationUtils
 c:com.intellij.openapi.ui.messages.MessageDialog
 - com.intellij.openapi.ui.DialogWrapper
 - p:myDefaultOptionIndex:I
+- p:myExitActionTypes:com.intellij.openapi.ui.ExitActionType[]
 - p:myFocusedOptionIndex:I
 - p:myIcon:javax.swing.Icon
 - p:myMessage:java.lang.String
@@ -4617,10 +4350,12 @@ c:com.intellij.openapi.ui.messages.MessageDialog
 - p:<init>(com.intellij.openapi.project.Project):V
 - <init>(com.intellij.openapi.project.Project,java.awt.Component,java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DoNotAskOption,Z):V
 - <init>(com.intellij.openapi.project.Project,java.awt.Component,java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DoNotAskOption,Z,java.lang.String):V
+- <init>(com.intellij.openapi.project.Project,java.awt.Component,java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DoNotAskOption,Z,java.lang.String,java.lang.String,com.intellij.openapi.ui.ExitActionType[]):V
 - <init>(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,java.lang.String[],I,javax.swing.Icon,Z):V
 - <init>(com.intellij.openapi.project.Project,Z):V
 - <init>(java.lang.String,java.lang.String,java.lang.String[],I,javax.swing.Icon):V
 - p:_init(java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DoNotAskOption,java.lang.String):V
+- p:_init(java.lang.String,java.lang.String,java.lang.String[],I,I,javax.swing.Icon,com.intellij.openapi.ui.DoNotAskOption,java.lang.String,java.lang.String,com.intellij.openapi.ui.ExitActionType[]):V
 - p:createActions():javax.swing.Action[]
 - p:createCenterPanel():javax.swing.JComponent
 - p:createIconPanel():javax.swing.JPanel
@@ -5299,6 +5034,7 @@ a:com.intellij.openapi.wm.BannerStartPagePromoter
 - pa:getHeaderLabel():java.lang.String
 - pa:getPromoImage():javax.swing.Icon
 - getPromotion(Z):javax.swing.JComponent
+- p:onBannerHide():V
 - p:onBannerShown():V
 - pa:runAction():V
 com.intellij.openapi.wm.CustomStatusBarWidget
@@ -5457,6 +5193,7 @@ a:com.intellij.openapi.wm.ToolWindowManager
 - sf:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.wm.ToolWindowManager
 - a:getLastActiveToolWindowId():java.lang.String
 - getLocationIcon(java.lang.String,javax.swing.Icon):javax.swing.Icon
+- getShowInFindToolWindowIcon():javax.swing.Icon
 - a:getToolWindow(java.lang.String):com.intellij.openapi.wm.ToolWindow
 - a:getToolWindowBalloon(java.lang.String):com.intellij.openapi.ui.popup.Balloon
 - a:getToolWindowIdSet():java.util.Set
@@ -5601,10 +5338,6 @@ c:com.intellij.projectImport.ProjectSetProcessor$Context
 f:com.intellij.psi.PsiBundle
 - <init>():V
 - s:message(java.lang.String,java.lang.Object[]):java.lang.String
-a:com.intellij.reporting.FreezeLogger
-- <init>():V
-- s:getInstance():com.intellij.reporting.FreezeLogger
-- a:runUnderPerformanceMonitor(com.intellij.openapi.project.Project,java.lang.Runnable):V
 a:com.intellij.ui.AbstractFieldPanel
 - javax.swing.JPanel
 - p:myButtons:java.util.ArrayList
@@ -5852,6 +5585,7 @@ c:com.intellij.ui.CheckboxTreeBase
 - setNodeState(com.intellij.ui.CheckedTreeNode,Z):V
 c:com.intellij.ui.CheckboxTreeBase$CheckPolicy
 - <init>(Z,Z,Z,Z):V
+- <init>(Z,Z,Z,Z,Z):V
 c:com.intellij.ui.CheckboxTreeBase$CheckboxTreeCellRendererBase
 - javax.swing.JPanel
 - javax.swing.tree.TreeCellRenderer
@@ -6178,6 +5912,7 @@ a:com.intellij.ui.EditorNotifications
 - <init>():V
 - s:getInstance(com.intellij.openapi.project.Project):com.intellij.ui.EditorNotifications
 - getStoredFileLevelIntentions(com.intellij.openapi.fileEditor.FileEditor):java.util.List
+- removeNotificationsForProvider(com.intellij.ui.EditorNotificationProvider):V
 - s:updateAll():V
 - a:updateAllNotifications():V
 - a:updateNotifications(com.intellij.openapi.vfs.VirtualFile):V
@@ -7086,9 +6821,6 @@ a:com.intellij.ui.ScrollingUtil$ListScrollAction
 - com.intellij.openapi.project.DumbAwareAction
 - com.intellij.ui.ScrollingUtil$ScrollingAction
 - p:<init>(com.intellij.openapi.actionSystem.ShortcutSet,javax.swing.JComponent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- p:isEnabled():Z
-- update(com.intellij.openapi.actionSystem.AnActionEvent):V
 com.intellij.ui.ScrollingUtil$ScrollingAction
 - com.intellij.openapi.project.DumbAware
 c:com.intellij.ui.SearchTextField
@@ -7891,6 +7623,7 @@ c:com.intellij.ui.components.JBScrollBar
 - <init>(I,I,I,I,I):V
 - p:addImpl(java.awt.Component,java.lang.Object,I):V
 - canBePreprocessed(java.awt.event.MouseEvent):Z
+- s:createDefaultUI():javax.swing.plaf.ScrollBarUI
 - s:createUI(javax.swing.JComponent):javax.swing.plaf.ScrollBarUI
 - s:createUI(javax.swing.JComponent,Z):javax.swing.plaf.ScrollBarUI
 - getBlockIncrement(I):I
@@ -8803,18 +8536,6 @@ e:com.intellij.ui.dsl.gridLayout.HorizontalAlign
 - s:getEntries():kotlin.enums.EnumEntries
 - s:valueOf(java.lang.String):com.intellij.ui.dsl.gridLayout.HorizontalAlign
 - s:values():com.intellij.ui.dsl.gridLayout.HorizontalAlign[]
-f:com.intellij.ui.dsl.gridLayout.HorizontalGaps
-- <init>():V
-- <init>(I,I):V
-- b:<init>(I,I,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:component1():I
-- f:component2():I
-- f:copy(I,I):com.intellij.ui.dsl.gridLayout.HorizontalGaps
-- bs:copy$default(com.intellij.ui.dsl.gridLayout.HorizontalGaps,I,I,I,java.lang.Object):com.intellij.ui.dsl.gridLayout.HorizontalGaps
-- equals(java.lang.Object):Z
-- f:getLeft():I
-- f:getRight():I
-- hashCode():I
 com.intellij.ui.dsl.gridLayout.UnscaledGaps
 - sf:Companion:com.intellij.ui.dsl.gridLayout.UnscaledGaps$Companion
 - sf:EMPTY:com.intellij.ui.dsl.gridLayout.UnscaledGaps
@@ -8860,21 +8581,6 @@ e:com.intellij.ui.dsl.gridLayout.VerticalAlign
 - s:getEntries():kotlin.enums.EnumEntries
 - s:valueOf(java.lang.String):com.intellij.ui.dsl.gridLayout.VerticalAlign
 - s:values():com.intellij.ui.dsl.gridLayout.VerticalAlign[]
-f:com.intellij.ui.dsl.gridLayout.VerticalGaps
-- sf:Companion:com.intellij.ui.dsl.gridLayout.VerticalGaps$Companion
-- sf:EMPTY:com.intellij.ui.dsl.gridLayout.VerticalGaps
-- <init>():V
-- <init>(I,I):V
-- b:<init>(I,I,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:component1():I
-- f:component2():I
-- f:copy(I,I):com.intellij.ui.dsl.gridLayout.VerticalGaps
-- bs:copy$default(com.intellij.ui.dsl.gridLayout.VerticalGaps,I,I,I,java.lang.Object):com.intellij.ui.dsl.gridLayout.VerticalGaps
-- equals(java.lang.Object):Z
-- f:getBottom():I
-- f:getTop():I
-- hashCode():I
-f:com.intellij.ui.dsl.gridLayout.VerticalGaps$Companion
 f:com.intellij.ui.dsl.listCellRenderer.BuilderKt
 - sf:listCellRenderer(kotlin.jvm.functions.Function1):javax.swing.ListCellRenderer
 - sf:textListCellRenderer(kotlin.jvm.functions.Function1):javax.swing.ListCellRenderer
@@ -9016,24 +8722,6 @@ c:com.intellij.ui.messager.CalloutComponent
 - p:myTargetWindow:java.awt.Window
 - <init>(javax.swing.JComponent):V
 - show(I,com.intellij.ui.awt.RelativePoint):V
-c:com.intellij.ui.navigation.BackAction
-- com.intellij.openapi.actionSystem.AnAction
-- com.intellij.openapi.project.DumbAware
-- <init>(javax.swing.JComponent,com.intellij.openapi.Disposable):V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- p:doUpdate(com.intellij.openapi.actionSystem.AnActionEvent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- ps:getHistory(com.intellij.openapi.actionSystem.AnActionEvent):com.intellij.ui.navigation.History
-- f:update(com.intellij.openapi.actionSystem.AnActionEvent):V
-c:com.intellij.ui.navigation.ForwardAction
-- com.intellij.openapi.actionSystem.AnAction
-- com.intellij.openapi.project.DumbAware
-- <init>(javax.swing.JComponent,com.intellij.openapi.Disposable):V
-- actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent):V
-- p:doUpdate(com.intellij.openapi.actionSystem.AnActionEvent):V
-- getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
-- ps:getHistory(com.intellij.openapi.actionSystem.AnActionEvent):com.intellij.ui.navigation.History
-- f:update(com.intellij.openapi.actionSystem.AnActionEvent):V
 f:com.intellij.ui.navigation.History
 - sf:KEY:com.intellij.openapi.actionSystem.DataKey
 - <init>(com.intellij.ui.navigation.Place$Navigator):V
@@ -11382,11 +11070,11 @@ a:com.intellij.util.ui.StatusText
 - appendLine(java.lang.String,com.intellij.ui.SimpleTextAttributes,java.awt.event.ActionListener):com.intellij.util.ui.StatusText
 - appendLine(javax.swing.Icon,java.lang.String,com.intellij.ui.SimpleTextAttributes,java.awt.event.ActionListener):com.intellij.util.ui.StatusText
 - appendSecondaryText(java.lang.String,com.intellij.ui.SimpleTextAttributes,java.awt.event.ActionListener):com.intellij.util.ui.StatusText
+- appendText(I,I,java.lang.String,com.intellij.ui.SimpleTextAttributes,java.awt.event.ActionListener):com.intellij.util.ui.StatusText
+- appendText(I,I,javax.swing.Icon,java.lang.String,com.intellij.ui.SimpleTextAttributes,java.awt.event.ActionListener):com.intellij.util.ui.StatusText
 - appendText(java.lang.String):com.intellij.util.ui.StatusText
 - appendText(java.lang.String,com.intellij.ui.SimpleTextAttributes):com.intellij.util.ui.StatusText
 - appendText(java.lang.String,com.intellij.ui.SimpleTextAttributes,java.awt.event.ActionListener):com.intellij.util.ui.StatusText
-- appendText(Z,I,java.lang.String,com.intellij.ui.SimpleTextAttributes,java.awt.event.ActionListener):com.intellij.util.ui.StatusText
-- appendText(Z,I,javax.swing.Icon,java.lang.String,com.intellij.ui.SimpleTextAttributes,java.awt.event.ActionListener):com.intellij.util.ui.StatusText
 - attachTo(java.awt.Component):V
 - attachTo(java.awt.Component,java.awt.Component):V
 - clear():com.intellij.util.ui.StatusText
@@ -11409,9 +11097,9 @@ a:com.intellij.util.ui.StatusText
 - f:setShowAboveCenter(Z):com.intellij.util.ui.StatusText
 - setText(java.lang.String):com.intellij.util.ui.StatusText
 - setText(java.lang.String,com.intellij.ui.SimpleTextAttributes):com.intellij.util.ui.StatusText
+- withUnscaledGapAfter(I):com.intellij.util.ui.StatusText
 pf:com.intellij.util.ui.StatusText$Column
 pf:com.intellij.util.ui.StatusText$Fragment
-- <init>(com.intellij.util.ui.StatusText):V
 a:com.intellij.util.ui.TableViewModel
 - javax.swing.table.AbstractTableModel
 - com.intellij.util.ui.SortableColumnModel
@@ -11536,6 +11224,7 @@ f:com.intellij.util.ui.tree.TreeUtil
 - s:isOverSelection(javax.swing.JTree,java.awt.Point):Z
 - s:listChildren(javax.swing.tree.TreeNode):java.util.List
 - s:makeVisible(javax.swing.JTree,com.intellij.ui.tree.TreeVisitor,java.util.function.Consumer):V
+- s:modelTraverser(javax.swing.tree.TreeModel):com.intellij.util.containers.JBTreeTraverser
 - s:moveDown(javax.swing.JTree):com.intellij.openapi.util.ActionCallback
 - s:movePageDown(javax.swing.JTree):com.intellij.openapi.util.ActionCallback
 - s:movePageUp(javax.swing.JTree):com.intellij.openapi.util.ActionCallback
@@ -11601,9 +11290,6 @@ f:com.intellij.util.ui.tree.TreeUtil
 - s:visitVisibleRows(javax.swing.JTree,java.util.function.Function,java.util.function.Consumer):V
 com.intellij.util.ui.tree.TreeUtil$Traverse
 - a:accept(java.lang.Object):Z
-a:com.intellij.xml.breadcrumbs.BreadcrumbsInfoProvider
-- com.intellij.ui.breadcrumbs.BreadcrumbsProvider
-- <init>():V
 a:com.intellij.xml.breadcrumbs.BreadcrumbsItem
 - <init>():V
 - a:getDisplayText():java.lang.String

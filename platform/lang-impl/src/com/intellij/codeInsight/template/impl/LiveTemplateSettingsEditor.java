@@ -50,8 +50,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 
 @ApiStatus.Internal
 public final class LiveTemplateSettingsEditor extends JPanel {
@@ -303,7 +303,7 @@ public final class LiveTemplateSettingsEditor extends JPanel {
         if (type instanceof EverywhereContextType) {
           ownName = CodeInsightBundle.message("dialog.edit.template.context.other");
         }
-        if (sb.length() > 0) {
+        if (!sb.isEmpty()) {
           sb.append(oldPrefix.equals(prefix) ? ", " : "; ");
         }
         if (!oldPrefix.equals(prefix)) {
@@ -316,7 +316,7 @@ public final class LiveTemplateSettingsEditor extends JPanel {
       String contexts = CodeInsightBundle.message("dialog.edit.template.applicable.in.contexts", sb.toString());
       change.setText(CodeInsightBundle.message("link.change.context"));
 
-      final boolean noContexts = sb.length() == 0;
+      final boolean noContexts = sb.isEmpty();
       if (noContexts) {
         contexts = CodeInsightBundle.message("dialog.edit.template.no.applicable.contexts");
         ctxLabel.setIcon(AllIcons.General.BalloonWarning);
@@ -430,8 +430,7 @@ public final class LiveTemplateSettingsEditor extends JPanel {
     return Pair.create(panel, checkboxTree);
   }
 
-  @Unmodifiable
-  private static @NotNull List<TemplateContextType> sortContexts(Collection<? extends TemplateContextType> contextTypes) {
+  private static @Unmodifiable @NotNull List<TemplateContextType> sortContexts(Collection<? extends TemplateContextType> contextTypes) {
     return ContainerUtil.sorted(contextTypes, (o1, o2) -> StringUtil.compare(presentableName(o1), presentableName(o2), true));
   }
 

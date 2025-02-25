@@ -1,8 +1,8 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.inspections
 
-import com.intellij.codeInspection.IntentionWrapper
+import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.PsiElementVisitor
@@ -46,7 +46,7 @@ class CanBeValInspection : AbstractKotlinInspection() {
                     KotlinBundle.message("variable.is.never.modified.and.can.be.declared.immutable.using.val"),
                     ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
                     isOnTheFly,
-                    IntentionWrapper(ChangeVariableMutabilityFix(declaration, false))
+                    LocalQuickFix.from(ChangeVariableMutabilityFix(declaration, false))!!
                 )
                 holder.registerProblem(problemDescriptor)
             }

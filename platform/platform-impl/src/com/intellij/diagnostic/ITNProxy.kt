@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.diagnostic
 
 import com.intellij.errorreport.error.InternalEAPException
@@ -9,12 +9,15 @@ import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.IdeaLoggingEvent
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.updateSettings.impl.UpdateSettings
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.BufferExposingByteArrayOutputStream
-import com.intellij.openapi.util.text.StringUtil
+import com.intellij.platform.buildData.productInfo.CustomPropertyNames
+import com.intellij.platform.ide.productInfo.IdeProductInfo
 import com.intellij.platform.util.coroutines.childScope
+import com.intellij.ui.JBAccountInfoService
 import com.intellij.util.system.CpuArch
 import com.intellij.util.system.OS
 import kotlinx.coroutines.*
@@ -48,6 +51,8 @@ internal object ITNProxy {
 
   internal val DEVICE_ID: String = DeviceIdManager.getOrGenerateId(object : DeviceIdManager.DeviceIdToken {}, "EA")
 
+  private val LOG = logger<ITNProxy>()
+
   private val TEMPLATE: Map<String, String?> by lazy {
     val template = LinkedHashMap<String, String?>()
     template["protocol.version"] = "1.1"
@@ -75,6 +80,9 @@ internal object ITNProxy {
     template["app.build.date.release"] = appInfo.majorReleaseBuildDate.time.time.toString()
     template["app.product.code"] = build.productCode
     template["app.build.number"] = buildNumberWithAllDetails
+    IdeProductInfo.getInstance().currentProductInfo.customProperties
+      .find { it.key == CustomPropertyNames.GIT_REVISION }
+      ?.let { template["app.source.revision"] = it.value }
     template
   }
 
@@ -86,7 +94,6 @@ internal object ITNProxy {
     val pluginName: String?,
     val pluginVersion: String?,
     val lastActionId: String?,
-    val previousException: Int
   )
 
   fun getBrowseUrl(threadId: Int): String? =
@@ -123,7 +130,9 @@ internal object ITNProxy {
       throw InternalEAPException(responseText.substring(8))
     }
     try {
-      return responseText.trim().toInt()
+      val reportId = responseText.trim()
+      LOG.info("report ID: ${reportId}, host ID: ${DEVICE_ID}")
+      return reportId.toInt()
     }
     catch (_: NumberFormatException) {
       throw InternalEAPException(DiagnosticBundle.message("error.itn.returns.wrong.data"))
@@ -157,6 +166,9 @@ internal object ITNProxy {
 
     append(builder, "user.login", DEFAULT_USER)
     append(builder, "user.password", DEFAULT_PASS)
+    JBAccountInfoService.getInstance()?.userData?.email?.takeIf { it.endsWith("@jetbrains.com", ignoreCase = true) }?.let {
+      append(builder, "user.email", it)
+    }
 
     val updateSettings = UpdateSettings.getInstance()
     append(builder, "update.channel.status", updateSettings.selectedChannelStatus.code)
@@ -165,39 +177,17 @@ internal object ITNProxy {
     append(builder, "plugin.name", error.pluginName)
     append(builder, "plugin.version", error.pluginVersion)
     append(builder, "last.action", error.lastActionId)
-    if (error.previousException > 0) {
-      append(builder, "previous.exception", error.previousException.toString())
-    }
 
-    var message = error.event.message?.trim { it <= ' ' } ?: ""
-    val stacktrace = error.event.throwableText
-    var redacted = false
-    if (error.event is IdeaReportingEvent) {
-      val originalMessage = error.event.originalMessage?.trim { it <= ' ' } ?: ""
-      val originalStacktrace = error.event.originalThrowableText
-      val messagesDiffer = message != originalMessage
-      val tracesDiffer = stacktrace != originalStacktrace
-      if (messagesDiffer || tracesDiffer) {
-        var summary = ""
-        if (messagesDiffer) summary += "*** message was redacted (" + diff(originalMessage, message) + ")\n"
-        if (tracesDiffer) summary += "*** stacktrace was redacted (" + diff(originalStacktrace, stacktrace) + ")\n"
-        message = if (!message.isEmpty()) "$summary\n$message"
-        else summary.trim { it <= ' ' }
-        redacted = true
-      }
-    }
-    append(builder, "error.message", message)
-    append(builder, "error.stacktrace", stacktrace)
+    append(builder, "error.message", error.event.message?.trim { it <= ' ' } ?: "")
+    append(builder, "error.stacktrace", error.event.throwableText)
     append(builder, "error.description", error.comment)
-    if (redacted) {
-      append(builder, "error.redacted", java.lang.Boolean.toString(true))
+    if (error.event.throwable is RecoveredThrowable) {
+      append(builder, "error.redacted", "true")
     }
 
-    if (eventData is AbstractMessage) {
-      for (attachment in eventData.includedAttachments) {
-        append(builder, "attachment.name", attachment.name)
-        append(builder, "attachment.value", attachment.encodedBytes)
-      }
+    for (attachment in error.event.attachments) {
+      append(builder, "attachment.name", attachment.name)
+      append(builder, "attachment.value", attachment.encodedBytes)
     }
     return builder
   }
@@ -207,16 +197,6 @@ internal object ITNProxy {
       if (builder.isNotEmpty()) builder.append('&')
       builder.append(key).append('=').append(URLEncoder.encode(value, StandardCharsets.UTF_8))
     }
-  }
-
-  private fun diff(original: String, redacted: String): String {
-    return "original:" + wc(original) + " submitted:" + wc(redacted)
-  }
-
-  private fun wc(s: String): String {
-    return if (s.isEmpty()) "-"
-    else StringUtil.splitByLines(s).size.toString() + "/" +
-         s.split("[^\\w']+".toRegex()).dropLastWhile { it.isEmpty() }.size + "/" + s.length
   }
 
   @Throws(Exception::class)

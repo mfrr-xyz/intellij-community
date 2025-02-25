@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.xdebugger.impl.ui;
 
 import com.intellij.codeInsight.hint.HintUtil;
@@ -46,6 +46,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointListener;
 import com.intellij.xdebugger.breakpoints.XBreakpointManager;
 import com.intellij.xdebugger.frame.XFullValueEvaluator;
+import com.intellij.xdebugger.frame.XValue;
 import com.intellij.xdebugger.frame.XValueModifier;
 import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import com.intellij.xdebugger.impl.XDebuggerUtilImpl;
@@ -70,7 +71,7 @@ import java.awt.event.*;
 import static com.intellij.openapi.wm.IdeFocusManager.getGlobalInstance;
 
 public final class DebuggerUIUtil {
-  @NonNls public static final String FULL_VALUE_POPUP_DIMENSION_KEY = "XDebugger.FullValuePopup";
+  public static final @NonNls String FULL_VALUE_POPUP_DIMENSION_KEY = "XDebugger.FullValuePopup";
 
   private DebuggerUIUtil() {
   }
@@ -96,8 +97,7 @@ public final class DebuggerUIUtil {
     ApplicationManager.getApplication().invokeLater(runnable);
   }
 
-  @Nullable
-  public static RelativePoint getPositionForPopup(@NotNull Editor editor, int line) {
+  public static @Nullable RelativePoint getPositionForPopup(@NotNull Editor editor, int line) {
     if (line > -1) {
       Point p = editor.logicalPositionToXY(new LogicalPosition(line + 1, 0));
       boolean isRemoteEditor = !ClientId.isLocal(ClientEditorManager.getClientId(editor));
@@ -223,19 +223,19 @@ public final class DebuggerUIUtil {
   }
 
   public static void showXBreakpointEditorBalloon(final Project project,
-                                                  @Nullable final Point point,
+                                                  final @Nullable Point point,
                                                   final JComponent component,
                                                   final boolean showAllOptions,
-                                                  @NotNull final XBreakpoint breakpoint) {
+                                                  final @NotNull XBreakpoint breakpoint) {
     showXBreakpointEditorBalloon(project, point, component, showAllOptions, showAllOptions, breakpoint);
   }
 
   public static void showXBreakpointEditorBalloon(final Project project,
-                                                  @Nullable final Point point,
+                                                  final @Nullable Point point,
                                                   final JComponent component,
                                                   final boolean showActionOptions,
                                                   final boolean showAllOptions,
-                                                  @NotNull final XBreakpoint breakpoint) {
+                                                  final @NotNull XBreakpoint breakpoint) {
     final XBreakpointManager breakpointManager = XDebuggerManager.getInstance(project).getBreakpointManager();
     final XLightBreakpointPropertiesPanel propertiesPanel =
       new XLightBreakpointPropertiesPanel(project, breakpointManager, (XBreakpointBase)breakpoint,
@@ -300,7 +300,7 @@ public final class DebuggerUIUtil {
   public static Balloon showBreakpointEditor(Project project, final JComponent mainPanel,
                                              final Point whereToShow,
                                              final JComponent component,
-                                             @Nullable final Runnable showMoreOptions, Object breakpoint) {
+                                             final @Nullable Runnable showMoreOptions, Object breakpoint) {
     final BreakpointEditor editor = new BreakpointEditor();
     editor.setPropertiesPanel(mainPanel);
     editor.setShowMoreOptionsLink(true);
@@ -374,18 +374,15 @@ public final class DebuggerUIUtil {
     return balloon;
   }
 
-  @NotNull
-  public static EditorColorsScheme getColorScheme() {
+  public static @NotNull EditorColorsScheme getColorScheme() {
     return EditorColorsUtil.getGlobalOrDefaultColorScheme();
   }
 
-  @NotNull
-  public static EditorColorsScheme getColorScheme(@Nullable JComponent component) {
+  public static @NotNull EditorColorsScheme getColorScheme(@Nullable JComponent component) {
     return EditorColorsUtil.getColorSchemeForComponent(component);
   }
 
-  @Nullable
-  public static String getNodeRawValue(@NotNull XValueNodeImpl valueNode) {
+  public static @Nullable String getNodeRawValue(@NotNull XValueNodeImpl valueNode) {
     String res = null;
     if (valueNode.getValueContainer() instanceof XValueTextProvider) {
       res = ((XValueTextProvider)valueNode.getValueContainer()).getValueText();
@@ -397,15 +394,19 @@ public final class DebuggerUIUtil {
   }
 
   public static void addToWatches(@NotNull XWatchesView watchesView, @NotNull XValueNodeImpl node) {
-    node.calculateEvaluationExpression().onSuccess(expression -> {
+    addToWatches(watchesView, node.getValueContainer());
+  }
+
+  @ApiStatus.Internal
+  public static void addToWatches(@NotNull XWatchesView watchesView, @NotNull XValue value) {
+    value.calculateEvaluationExpression().onSuccess(expression -> {
       if (expression != null) {
         invokeLater(() -> watchesView.addWatchExpression(expression, -1, false));
       }
     });
   }
 
-  @Nullable
-  public static XWatchesView getWatchesView(@NotNull AnActionEvent e) {
+  public static @Nullable XWatchesView getWatchesView(@NotNull AnActionEvent e) {
     XWatchesView view = e.getData(XWatchesView.DATA_KEY);
     Project project = e.getProject();
     if (view == null && project != null) {
@@ -443,14 +444,12 @@ public final class DebuggerUIUtil {
     }
   }
 
-  @NotNull
-  public static @NlsContexts.PopupAdvertisement String getSelectionShortcutsAdText(String... actionNames) {
+  public static @NotNull @NlsContexts.PopupAdvertisement String getSelectionShortcutsAdText(String... actionNames) {
     String text = StreamEx.of(actionNames).map(DebuggerUIUtil::getActionShortcutText).nonNull().collect(NlsMessages.joiningOr());
     return StringUtil.isEmpty(text) ? "" : XDebuggerBundle.message("ad.extra.selection.shortcut", text);
   }
 
-  @Nullable
-  public static String getActionShortcutText(String actionName) {
+  public static @Nullable String getActionShortcutText(String actionName) {
     KeyStroke stroke = KeymapUtil.getKeyStroke(ActionManager.getInstance().getAction(actionName).getShortcutSet());
     if (stroke != null) {
       return KeymapUtil.getKeystrokeText(stroke);
@@ -481,7 +480,7 @@ public final class DebuggerUIUtil {
       }
 
       @Override
-      public void errorOccurred(@NotNull final String errorMessage) {
+      public void errorOccurred(final @NotNull String errorMessage) {
         AppUIUtil.invokeOnEdt(() -> {
           tree.rebuildAndRestore(treeState);
           errorConsumer.consume(errorMessage);
@@ -495,8 +494,7 @@ public final class DebuggerUIUtil {
     return event.getData(XDebugSessionTab.TAB_KEY) == null;
   }
 
-  @Nullable
-  public static XDebugSessionData getSessionData(AnActionEvent e) {
+  public static @Nullable XDebugSessionData getSessionData(AnActionEvent e) {
     XDebugSessionData data = e.getData(XDebugSessionData.DATA_KEY);
     if (data == null) {
       XDebugSession session = getSession(e);
@@ -507,8 +505,7 @@ public final class DebuggerUIUtil {
     return data;
   }
 
-  @Nullable
-  public static XDebugSession getSession(@NotNull AnActionEvent e) {
+  public static @Nullable XDebugSession getSession(@NotNull AnActionEvent e) {
     XDebugSession session = e.getData(XDebugSession.DATA_KEY);
     if (session == null) {
       Project project = e.getProject();

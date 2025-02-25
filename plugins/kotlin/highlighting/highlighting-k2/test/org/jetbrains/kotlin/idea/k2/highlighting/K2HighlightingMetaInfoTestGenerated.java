@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.highlighting;
 
@@ -140,6 +140,11 @@ public abstract class K2HighlightingMetaInfoTestGenerated extends AbstractK2High
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
         }
 
+        @TestMetadata("JavaClassWithStaticStarImport.kt")
+        public void testJavaClassWithStaticStarImport() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/jvm/JavaClassWithStaticStarImport.kt");
+        }
+
         @TestMetadata("javaFields.kt")
         public void testJavaFields() throws Exception {
             runTest("../../idea/tests/testData/highlighterMetaInfo/jvm/javaFields.kt");
@@ -173,6 +178,11 @@ public abstract class K2HighlightingMetaInfoTestGenerated extends AbstractK2High
         @TestMetadata("KotlinInjection.kt")
         public void testKotlinInjection() throws Exception {
             runTest("../../idea/tests/testData/highlighterMetaInfo/jvm/KotlinInjection.kt");
+        }
+
+        @TestMetadata("KotlinOperatorFunctionInjection.kt")
+        public void testKotlinOperatorFunctionInjection() throws Exception {
+            runTest("../../idea/tests/testData/highlighterMetaInfo/jvm/KotlinOperatorFunctionInjection.kt");
         }
 
         @TestMetadata("KotlinSimpleInjection.kt")

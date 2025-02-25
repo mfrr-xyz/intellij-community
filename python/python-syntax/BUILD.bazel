@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.python.syntax` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "syntax_resources",
@@ -12,15 +11,14 @@ jvm_library(
   name = "syntax",
   module_name = "intellij.python.syntax",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "//platform/analysis-api:analysis",
     "//platform/core-api:core",
     "//python/python-parser:parser",
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//python/python-syntax-core:syntax-core",
+    "//platform/platform-impl:ide-impl",
     "//python/python-ast:ast",
     "//platform/lang-impl",
     "//platform/editor-ui-ex:editor-ex",

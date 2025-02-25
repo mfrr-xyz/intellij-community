@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.quickfix.tests;
 
@@ -1778,6 +1778,11 @@ public abstract class K2QuickFixTestGenerated extends AbstractK2QuickFixTest {
             runTest("../../../idea/tests/testData/quickfix/optIn/forbiddenTargetsExpression2.kt");
         }
 
+        @TestMetadata("forbiddenTargetsExpression3.kt")
+        public void testForbiddenTargetsExpression3() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/optIn/forbiddenTargetsExpression3.kt");
+        }
+
         @TestMetadata("forbiddenTargetsInAnnotation.kt")
         public void testForbiddenTargetsInAnnotation() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/optIn/forbiddenTargetsInAnnotation.kt");
@@ -2341,6 +2346,65 @@ public abstract class K2QuickFixTestGenerated extends AbstractK2QuickFixTest {
         @TestMetadata("toSet.kt")
         public void testToSet() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/typeMismatch/wrapWithCollectionLiteral/toSet.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix")
+    public static class RedundantInterpolationPrefix extends AbstractK2QuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("prefix1.kt")
+        public void testPrefix1() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix1.kt");
+        }
+
+        @TestMetadata("prefix1Interpolation.kt")
+        public void testPrefix1Interpolation() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix1Interpolation.kt");
+        }
+
+        @TestMetadata("prefix2.kt")
+        public void testPrefix2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix2.kt");
+        }
+
+        @TestMetadata("prefix2Interpolation.kt")
+        public void testPrefix2Interpolation() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix2Interpolation.kt");
+        }
+
+        @TestMetadata("prefix2InterpolationUnresolvedReference.kt")
+        public void testPrefix2InterpolationUnresolvedReference() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix2InterpolationUnresolvedReference.kt");
+        }
+
+        @TestMetadata("prefix2NonInterpolationDollars1.kt")
+        public void testPrefix2NonInterpolationDollars1() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix2NonInterpolationDollars1.kt");
+        }
+
+        @TestMetadata("prefix2NonInterpolationDollars2.kt")
+        public void testPrefix2NonInterpolationDollars2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix2NonInterpolationDollars2.kt");
+        }
+
+        @TestMetadata("prefix8.kt")
+        public void testPrefix8() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix8.kt");
+        }
+
+        @TestMetadata("prefix8Interpolation.kt")
+        public void testPrefix8Interpolation() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInterpolationPrefix/prefix8Interpolation.kt");
         }
     }
 

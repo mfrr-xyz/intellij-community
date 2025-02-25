@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.refactoring.move;
 
@@ -33,6 +33,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
     @TestMetadata("java/moveTopLevelClassToAnotherPackage/moveTopLevelClassToAnotherPackage.test")
     public void testJava_moveTopLevelClassToAnotherPackage_MoveTopLevelClassToAnotherPackage() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/java/moveTopLevelClassToAnotherPackage/moveTopLevelClassToAnotherPackage.test");
+    }
+
+    @TestMetadata("kotlin/accessorNames/accessorNames.test")
+    public void testKotlin_accessorNames_AccessorNames() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/accessorNames/accessorNames.test");
     }
 
     @TestMetadata("kotlin/avoidCapturingOuterName/avoidCapturingOuterName.test")
@@ -275,6 +280,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveClassWithJavaAnnotation/moveClassWithJavaAnnotation.test");
     }
 
+    @TestMetadata("kotlin/moveClassWithJavaReference/moveClassWithJavaReference.test")
+    public void testKotlin_moveClassWithJavaReference_MoveClassWithJavaReference() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveClassWithJavaReference/moveClassWithJavaReference.test");
+    }
+
     @TestMetadata("kotlin/moveClassWithLongFunction/moveClassWithLongFunction.test")
     public void testKotlin_moveClassWithLongFunction_MoveClassWithLongFunction() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveClassWithLongFunction/moveClassWithLongFunction.test");
@@ -483,6 +493,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
     @TestMetadata("kotlin/protectedConstructorRefInSuperListEntry/protectedConstructorRefInSuperListEntry.test")
     public void testKotlin_protectedConstructorRefInSuperListEntry_ProtectedConstructorRefInSuperListEntry() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/protectedConstructorRefInSuperListEntry/protectedConstructorRefInSuperListEntry.test");
+    }
+
+    @TestMetadata("kotlin/protectedJavaClassReference/protectedJavaClassReference.test")
+    public void testKotlin_protectedJavaClassReference_ProtectedJavaClassReference() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/protectedJavaClassReference/protectedJavaClassReference.test");
     }
 
     @TestMetadata("kotlin/protectedMemberFromJavaSuperClass/protectedMemberFromJavaSuperClass.test")

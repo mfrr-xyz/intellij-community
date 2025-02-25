@@ -190,7 +190,10 @@ internal class KtCompilerPluginsProviderIdeImpl(
 
             with(pluginRegistrar) {
                 try {
-                    storage.registerExtensions(compilerConfiguration)
+                    val configuration = KotlinFirCompilerPluginConfigurationForIdeProvider.getCompilerConfigurationWithCustomOptions(
+                        pluginRegistrar, compilerConfiguration
+                    ) ?: compilerConfiguration
+                    storage.registerExtensions(configuration)
                 }
                 catch (e : ProcessCanceledException) {
                     throw e
@@ -244,7 +247,7 @@ internal class KtCompilerPluginsProviderIdeImpl(
     private fun substitutePluginJar(userSuppliedPluginJar: Path): Path? {
         ProgressManager.checkCanceled()
 
-        val bundledPlugin = KotlinBundledFirCompilerPluginProvider.provideBundledPluginJar(userSuppliedPluginJar)
+        val bundledPlugin = KotlinBundledFirCompilerPluginProvider.provideBundledPluginJar(project, userSuppliedPluginJar)
         if (bundledPlugin != null) return bundledPlugin
 
         return userSuppliedPluginJar.takeUnless { onlyBundledPluginsEnabled }

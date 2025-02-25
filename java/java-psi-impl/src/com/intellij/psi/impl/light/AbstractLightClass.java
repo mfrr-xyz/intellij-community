@@ -99,6 +99,11 @@ public abstract class AbstractLightClass extends LightElement implements PsiClas
   }
 
   @Override
+  public @Nullable PsiReferenceList getPermitsList() {
+    return getDelegate().getPermitsList();
+  }
+
+  @Override
   public @Nullable PsiReferenceList getImplementsList() {
     return getDelegate().getImplementsList();
   }
@@ -207,14 +212,12 @@ public abstract class AbstractLightClass extends LightElement implements PsiClas
   }
 
   @Override
-  @Unmodifiable
-  public @NotNull List<Pair<PsiMethod, PsiSubstitutor>> findMethodsAndTheirSubstitutorsByName(@NonNls @NotNull String name, boolean checkBases) {
+  public @Unmodifiable @NotNull List<Pair<PsiMethod, PsiSubstitutor>> findMethodsAndTheirSubstitutorsByName(@NonNls @NotNull String name, boolean checkBases) {
     return PsiClassImplUtil.findMethodsAndTheirSubstitutorsByName(this, name, checkBases);
   }
 
   @Override
-  @Unmodifiable
-  public @NotNull List<Pair<PsiMethod, PsiSubstitutor>> getAllMethodsAndTheirSubstitutors() {
+  public @Unmodifiable @NotNull List<Pair<PsiMethod, PsiSubstitutor>> getAllMethodsAndTheirSubstitutors() {
     return PsiClassImplUtil.getAllWithSubstitutorsByMap(this, PsiClassImplUtil.MemberType.METHOD);
   }
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.completion.test;
 
@@ -313,6 +313,16 @@ public class MultiFileJvmBasicCompletionTestGenerated extends AbstractMultiFileJ
     @TestMetadata("KTIJ_32378")
     public void testKTIJ_32378() throws Exception {
         runTest("../testData/basic/multifile/KTIJ_32378/");
+    }
+
+    @TestMetadata("KTIJ_32792")
+    public void testKTIJ_32792() throws Exception {
+        runTest("../testData/basic/multifile/KTIJ_32792/");
+    }
+
+    @TestMetadata("KTIJ_32930")
+    public void testKTIJ_32930() throws Exception {
+        runTest("../testData/basic/multifile/KTIJ_32930/");
     }
 
     @TestMetadata("MoreSpecificExtensionGeneric")

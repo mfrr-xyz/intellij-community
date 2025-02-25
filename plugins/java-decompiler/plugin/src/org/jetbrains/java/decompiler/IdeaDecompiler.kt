@@ -12,6 +12,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.options.advanced.AdvancedSettings
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.ui.DialogWrapper
@@ -39,23 +40,22 @@ import java.util.jar.Manifest
 
 const val IDEA_DECOMPILER_BANNER: String = "//\n// Source code recreated from a .class file by IntelliJ IDEA\n// (powered by FernFlower decompiler)\n//\n\n"
 
+private const val LEGAL_NOTICE_ACCEPTED_KEY = "decompiler.legal.notice.accepted"
+private const val POSTPONE_EXIT_CODE = DialogWrapper.CANCEL_EXIT_CODE
+private const val DECLINE_EXIT_CODE = DialogWrapper.NEXT_USER_EXIT_CODE
+
+private val TASK_KEY: Key<Future<CharSequence>> = Key.create("java.decompiler.optimistic.task")
+
 class IdeaDecompiler : ClassFileDecompilers.Light() {
   internal class LegalBurden : FileEditorManagerListener.Before {
-    private var showNotice: Boolean? = null
+    private var showNotice: Boolean = true
 
     override fun beforeFileOpened(source: FileEditorManager, file: VirtualFile) {
-      showNotice?.let {
-        if (!it) {
-          return
-        }
-      }
-
-      // fileType is cached per file, it is a cheap call, so, check before PropertiesComponent
-      if (file.fileType !== JavaClassFileType.INSTANCE) {
+      if (!showNotice || file.fileType !== JavaClassFileType.INSTANCE) {
         return
       }
 
-      if (PropertiesComponent.getInstance().isValueSet(LEGAL_NOTICE_KEY)) {
+      if (PropertiesComponent.getInstance().isValueSet(LEGAL_NOTICE_ACCEPTED_KEY)) {
         showNotice = false
         return
       }
@@ -76,7 +76,7 @@ class IdeaDecompiler : ClassFileDecompilers.Light() {
       when (result) {
         DialogWrapper.OK_EXIT_CODE -> {
           showNotice = false
-          PropertiesComponent.getInstance().setValue(LEGAL_NOTICE_KEY, true)
+          PropertiesComponent.getInstance().setValue(LEGAL_NOTICE_ACCEPTED_KEY, true)
           ApplicationManager.getApplication().invokeLater { FileContentUtilCore.reparseFiles(file) }
         }
 
@@ -106,20 +106,13 @@ class IdeaDecompiler : ClassFileDecompilers.Light() {
 
   override fun accepts(file: VirtualFile): Boolean = true
 
-  override fun getText(file: VirtualFile): CharSequence {
-    if (ApplicationManager.getApplication().isUnitTestMode || PropertiesComponent.getInstance().isValueSet(LEGAL_NOTICE_KEY)) {
-      val previous = TASK_KEY.pop(file)?.get()
-      if (previous != null) {
-        return previous
-      }
-      else {
-        return decompile(file)
-      }
+  override fun getText(file: VirtualFile): CharSequence =
+    if (ApplicationManager.getApplication().isUnitTestMode || PropertiesComponent.getInstance().isValueSet(LEGAL_NOTICE_ACCEPTED_KEY)) {
+      TASK_KEY.pop(file)?.get() ?: decompile(file)
     }
     else {
-      return ClsFileImpl.decompile(file)
+      ClsFileImpl.decompile(file)
     }
-  }
 
   private fun decompile(file: VirtualFile): CharSequence {
     val indicator = ProgressManager.getInstance().progressIndicator
@@ -138,13 +131,14 @@ class IdeaDecompiler : ClassFileDecompilers.Light() {
       if (Registry.`is`("decompiler.dump.original.lines")) {
         options[IFernflowerPreferences.DUMP_ORIGINAL_LINES] = "1"
       }
+      options[IFernflowerPreferences.MAX_DIRECT_NODES_COUNT] = AdvancedSettings.getInt("decompiler.max.direct.nodes.count")
+      options[IFernflowerPreferences.MAX_DIRECT_VARIABLE_NODE_COUNT] = AdvancedSettings.getInt("decompiler.max.variable.nodes.count")
 
       val provider = MyBytecodeProvider(files)
       val saver = MyResultSaver()
 
       val maxSecProcessingMethod = options[IFernflowerPreferences.MAX_PROCESSING_METHOD]?.toString()?.toIntOrNull() ?: 0
-      val decompiler = BaseDecompiler(provider, saver, options, myLogger.value,
-                                      IdeaCancellationManager(maxSecProcessingMethod))
+      val decompiler = BaseDecompiler(provider, saver, options, myLogger.value, IdeaCancellationManager(maxSecProcessingMethod))
       files.forEach { decompiler.addSource(File(it.path)) }
       try {
         decompiler.decompileContext()
@@ -218,10 +212,3 @@ class IdeaDecompiler : ClassFileDecompilers.Light() {
     return value
   }
 }
-
-private const val LEGAL_NOTICE_KEY = "decompiler.legal.notice.accepted"
-
-private const val POSTPONE_EXIT_CODE = DialogWrapper.CANCEL_EXIT_CODE
-private const val DECLINE_EXIT_CODE = DialogWrapper.NEXT_USER_EXIT_CODE
-
-private val TASK_KEY: Key<Future<CharSequence>> = Key.create("java.decompiler.optimistic.task")

@@ -103,7 +103,8 @@ interface Driver : AutoCloseable {
   fun <T : Any> service(clazz: KClass<T>, project: ProjectRef?, rdTarget: RdTarget = RdTarget.DEFAULT): T
 
   /**
-   * @return new remote proxy for a utility class or a class with static methods
+   * @param clazz utility class, class with static methods, Kotlin class with a companion object or Kotlin object
+   * @return new remote proxy for a [clazz]
    */
   @Contract(pure = true)
   fun <T : Any> utility(clazz: KClass<T>, rdTarget: RdTarget = RdTarget.DEFAULT): T
@@ -162,11 +163,11 @@ interface ProjectRef : PolymorphRef
 inline fun <reified T : Any> Driver.service(rdTarget: RdTarget = RdTarget.DEFAULT): T = service(T::class, rdTarget)
 
 /**
- * @return new remote proxy for a [Remote] application service interface
+ * @return new remote proxy for a [Remote] project-level service interface
  */
 inline fun <reified T : Any> Driver.service(project: ProjectRef, rdTarget: RdTarget = RdTarget.DEFAULT): T = service(T::class, project, rdTarget)
 
 /**
- * @return new remote proxy for a utility class or a class with static methods
+ * @return new remote proxy for a utility class, class with static methods, Kotlin class with a companion object or Kotlin object
  */
 inline fun <reified T : Any> Driver.utility(rdTarget: RdTarget = RdTarget.DEFAULT): T = utility(T::class, rdTarget)

@@ -1,6 +1,5 @@
 ### auto-generated section `build kotlin.coverage` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "coverage_resources",
@@ -12,19 +11,18 @@ jvm_library(
   name = "coverage",
   module_name = "kotlin.coverage",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_kotlin-jps-common",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-kotlin-jps-common",
     "//plugins/kotlin/base/frontend-agnostic:kotlin-base-frontend-agnostic",
     "//plugins/kotlin/base/util:kotlin-base-util",
     "//plugins/kotlin/base/project-structure:kotlin-base-project-structure",
     "//plugins/kotlin/base/analysis:kotlin-base-analysis",
     "//plugins/kotlin/base/facet:kotlin-base-facet",
     "//plugins/kotlin/run-configurations/jvm:kotlin-run-configurations-jvm",
+    "//plugins/coverage-common/intellij.platform.coverage.agent:coverage-agent",
     "//platform/core-impl",
     "//platform/execution-impl",
     "//java/execution/impl:java-execution-impl",

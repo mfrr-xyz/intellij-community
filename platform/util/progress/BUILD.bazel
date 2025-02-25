@@ -1,10 +1,10 @@
 ### auto-generated section `build intellij.platform.util.progress` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "1.8",
+  jvm_target = 8,
   opt_in = ["org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction"]
 )
 
@@ -12,10 +12,8 @@ jvm_library(
   name = "progress",
   module_name = "intellij.platform.util.progress",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j8",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
-  plugins = ["@lib//:serialization_plugin"],
   deps = [
     "@lib//:jetbrains-annotations",
     "@lib//:kotlin-stdlib",
@@ -33,19 +31,17 @@ jvm_library(
 
 ### auto-generated section `build intellij.platform.util.progress.tests` start
 load("@rules_java//java:defs.bzl", "java_library")
-load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_test")
 
 java_library(
   name = "progress-tests",
   visibility = ["//visibility:public"]
 )
 
-kt_jvm_test(
-  name = "progress-tests_test",
+jvm_library(
+  name = "progress-tests_test_lib",
   visibility = ["//visibility:public"],
-  srcs = glob(["tests/**/*.kt", "tests/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["tests/**/*.kt", "tests/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinx-coroutines-core",
@@ -53,8 +49,14 @@ kt_jvm_test(
     "//platform/util/progress",
     "//platform/testFramework/common",
     "//platform/util",
+    "@lib//:junit4",
     "//platform/testFramework",
-    "//platform/testFramework:testFramework_test",
+    "//platform/testFramework:testFramework_test_lib",
   ]
+)
+
+jvm_test(
+  name = "progress-tests_test",
+  runtime_deps = [":progress-tests_test_lib"]
 )
 ### auto-generated section `build intellij.platform.util.progress.tests` end

@@ -3,10 +3,15 @@
 
 package org.jetbrains.intellij.build.bazel
 
+import com.intellij.openapi.util.JDOMUtil
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.jdom.Namespace
+import org.jetbrains.intellij.build.dependencies.BuildDependenciesConstants
+import org.jetbrains.intellij.build.dependencies.TeamCityHelper
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -16,7 +21,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.security.MessageDigest
 import java.util.*
-import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.moveTo
 
@@ -25,28 +29,91 @@ internal data class CacheEntry(
   @JvmField val path: String,
   @JvmField val url: String,
   @JvmField val sha256: String,
+  @Transient @JvmField var used: Boolean = false,
 )
 
 internal data class JarRepository(@JvmField val url: String, @JvmField val isPrivate: Boolean)
 
-private val authHeaderValue by lazy {
-  val netrcPath = Paths.get(System.getProperty("user.home"), ".netrc")
-  require(netrcPath.isRegularFile()) {
-    ".netrc not found - please configure auth to access private repositories"
-  }
-  val machine = "packages.jetbrains.team"
-  val credentials = parseNetrc(netrcPath, machine)
-  require(credentials != null) {
-    "No credentials found for machine: $machine"
+private fun getAuthFromSystemProperties(): Pair<String, String>? {
+  val username = System.getProperty(BuildDependenciesConstants.JPS_AUTH_SPACE_USERNAME)
+                 ?: TeamCityHelper.allProperties[BuildDependenciesConstants.JPS_AUTH_SPACE_USERNAME]
+  val password = System.getProperty(BuildDependenciesConstants.JPS_AUTH_SPACE_PASSWORD)
+                 ?: TeamCityHelper.allProperties[BuildDependenciesConstants.JPS_AUTH_SPACE_PASSWORD]
+  if (username.isNullOrBlank() || password.isNullOrBlank()) {
+    println("DEBUG: ${BuildDependenciesConstants.JPS_AUTH_SPACE_USERNAME} or ${BuildDependenciesConstants.JPS_AUTH_SPACE_PASSWORD} is empty in system properties - skipping auth from system properties")
+    return null
   }
 
+  println("DEBUG: got authentication from ${BuildDependenciesConstants.JPS_AUTH_SPACE_USERNAME} and ${BuildDependenciesConstants.JPS_AUTH_SPACE_PASSWORD}")
+  return username to password
+}
+
+private fun getAuthFromMavenSettingsXml(): Pair<String, String>? {
+  val settingsXmlFile = Paths.get(System.getProperty("user.home"), ".m2/settings.xml")
+  if (!settingsXmlFile.isRegularFile()) {
+    println("DEBUG: settings.xml not found at $settingsXmlFile - skipping auth from maven settings.xml")
+    return null
+  }
+
+  @Suppress("HttpUrlsUsage")
+  val mavenNamespace = Namespace.getNamespace("http://maven.apache.org/SETTINGS/1.0.0")
+
+  val root = JDOMUtil.load(settingsXmlFile)
+  val servers = root.getChild("servers", mavenNamespace) ?: run {
+    println("DEBUG: no <servers> in ${settingsXmlFile} - skipping auth from maven settings.xml")
+    return null
+  }
+
+  for (element in servers.getChildren("server", mavenNamespace)) {
+    if (element.getChildTextTrim("id", mavenNamespace) != "intellij-private-dependencies") {
+      continue
+    }
+
+    val username: String? = element.getChildTextTrim("username", mavenNamespace)
+    val password: String? = element.getChildTextTrim("password", mavenNamespace)
+    if (username.isNullOrBlank() || password.isNullOrBlank()) {
+      println("DEBUG: username or password is empty in ${settingsXmlFile} for section <id>intellij-private-dependencies</id> - skipping auth from maven settings.xml")
+      continue
+    }
+
+    println("DEBUG: got authentication from <id>intellij-private-dependencies</id> of $settingsXmlFile")
+    return username to password
+  }
+
+  println("DEBUG: no section <id>intellij-private-dependencies</id> in ${settingsXmlFile} - skipping auth from maven settings.xml")
+  return null
+}
+
+private fun getAuthFromNetrc(): Pair<String, String>? {
+  val netrcPath = Paths.get(System.getProperty("user.home"), ".netrc")
+  if (!netrcPath.isRegularFile()) {
+    println("DEBUG: .netrc not found at $netrcPath - skipping auth from .netrc")
+    return null
+  }
+
+  val machine = "packages.jetbrains.team"
+  val credentials = parseNetrc(netrcPath, machine)
+  if (credentials == null) {
+    println("DEBUG: credentials for $machine are missing in $netrcPath - skipping auth from .netrc")
+    return null
+  }
+
+  println("DEBUG: got credentials for $machine from $netrcPath")
+  return credentials
+}
+
+private val authHeaderValue by lazy {
+  val credentials = getAuthFromSystemProperties() ?: getAuthFromMavenSettingsXml() ?: getAuthFromNetrc()
+                    ?: error("Unable to get credentials from system properties, settings.xml, and .netrc")
   "Basic " + Base64.getEncoder().encodeToString("${credentials.first}:${credentials.second}".toByteArray())
 }
 
-internal class UrlCache(private val cacheFile: Path) {
+internal class UrlCache(val cacheFile: Path) {
+  private val httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build()
+
   private val cache: MutableMap<String, CacheEntry> by lazy {
-    if (cacheFile.exists()) {
-      Json.decodeFromString<List<CacheEntry>>(Files.readString(cacheFile)).associateTo(HashMap()) { it.path to it}
+    if (Files.exists(cacheFile)) {
+      Json.decodeFromString<List<CacheEntry>>(Files.readString(cacheFile)).associateByTo(HashMap()) { it.path }
     }
     else {
       HashMap<String, CacheEntry>()
@@ -55,7 +122,7 @@ internal class UrlCache(private val cacheFile: Path) {
 
   @OptIn(ExperimentalSerializationApi::class)
   fun save() {
-    val entries = cache.values.toTypedArray()
+    val entries = cache.values.filter { it.used }.toTypedArray()
     entries.sortBy { it.path }
     val tempFile = Files.createTempFile(cacheFile.fileName.toString(), ".tmp")
     @Suppress("JSON_FORMAT_REDUNDANT")
@@ -66,16 +133,13 @@ internal class UrlCache(private val cacheFile: Path) {
     tempFile.moveTo(target = cacheFile, overwrite = true)
   }
 
-  fun getEntry(jarPath: String): CacheEntry? = cache.get(jarPath)
+  fun getEntry(jarPath: String): CacheEntry? = cache.get(jarPath)?.also { it.used = true }
 
-  fun putUrl(jarPath: String, url: String, repo: JarRepository): CacheEntry {
-    val hash = calculateHash(url, repo)
-    val entry = CacheEntry(path = jarPath, url = url, sha256 = hash)
+  fun putUrl(jarPath: String, url: String, hash: String): CacheEntry {
+    val entry = CacheEntry(path = jarPath, url = url, sha256 = hash, used = true)
     cache.put(jarPath, entry)
     return entry
   }
-
-  private val httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build()
 
   fun checkUrl(url: String, repo: JarRepository): Boolean {
     val requestBuilder = HttpRequest.newBuilder()
@@ -91,6 +155,7 @@ internal class UrlCache(private val cacheFile: Path) {
     return statusCode == 200
   }
 
+  @Suppress("DuplicatedCode")
   fun calculateHash(url: String, repo: JarRepository): String {
     val digest = MessageDigest.getInstance("SHA-256")
     println("Downloading '$url'")
@@ -98,9 +163,15 @@ internal class UrlCache(private val cacheFile: Path) {
       .uri(URI.create(url))
       .GET()
     addAuthIfNeeded(repo, requestBuilder)
+
     val response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofInputStream())
+    if (response.statusCode() != 200) {
+      val body = response.body().use { it.readAllBytes() }.decodeToString()
+      error("Cannot download $url: ${response.statusCode()}\n$body")
+    }
+
     response.body().use { inputStream ->
-      val buffer = ByteArray(4096)
+      val buffer = ByteArray(8192)
       var bytesRead: Int
       while (inputStream.read(buffer).also { bytesRead = it } != -1) {
         digest.update(buffer, 0, bytesRead)

@@ -9,10 +9,12 @@ import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.fs.*
 import com.intellij.platform.eel.path.EelPath
-import com.intellij.platform.eel.impl.utils.awaitProcessResult
+import com.intellij.platform.eel.provider.asNioPath
+import com.intellij.platform.eel.provider.upgradeBlocking
+import com.intellij.platform.eel.provider.utils.awaitProcessResult
+import com.intellij.platform.eel.provider.utils.stdoutString
 import com.intellij.util.suspendingLazy
 import kotlinx.coroutines.CoroutineScope
-import java.io.IOException
 import java.nio.file.Path
 
 private class EelSystemInfoProvider(private val eel: EelApi) : JavaHomeFinder.SystemInfoProvider() {
@@ -28,19 +30,19 @@ private class EelSystemInfoProvider(private val eel: EelApi) : JavaHomeFinder.Sy
   }
 
   override fun getPath(path: String, vararg more: String): Path =
-    eel.mapper.toNioPath(EelPath.Absolute.parse(eel.fs.pathOs, path, *more))
+    more.fold(EelPath.parse(path, eel.descriptor), EelPath::resolve).asNioPath()
 
   override fun getUserHome(): Path? = with(eel) {
-    mapper.toNioPath(fs.user.home)
+    fs.user.home.asNioPath()
   }
 
   override fun getFsRoots(): Collection<Path> = runBlockingMaybeCancellable {
     val paths = when (val fs = eel.fs) {
-      is EelFileSystemPosixApi -> listOf(EelPath.Absolute.build("/"))
+      is EelFileSystemPosixApi -> listOf(EelPath.build(listOf("/"), eel.descriptor))
       is EelFileSystemWindowsApi -> fs.getRootDirectories()
       else -> error(fs)
     }
-    paths.map(eel.mapper::toNioPath)
+    paths.map { it.asNioPath() }
   }
 
   override fun getPathSeparator(): String? =
@@ -74,7 +76,8 @@ private class EelSystemInfoProvider(private val eel: EelApi) : JavaHomeFinder.Sy
   }
 }
 
-internal fun javaHomeFinderEel(eel: EelApi): JavaHomeFinderBasic {
+internal fun javaHomeFinderEel(descriptor: EelDescriptor): JavaHomeFinderBasic {
+  val eel = descriptor.upgradeBlocking()
   val systemInfoProvider = EelSystemInfoProvider(eel)
 
   val parentFinder = when (eel.platform) {
@@ -94,7 +97,7 @@ internal fun javaHomeFinderEel(eel: EelApi): JavaHomeFinderBasic {
             if (result.exitCode != 0) {
               return@runBlockingMaybeCancellable ""
             }
-            result.stdout
+            result.stdoutString
           }
         }
       )
@@ -104,7 +107,7 @@ internal fun javaHomeFinderEel(eel: EelApi): JavaHomeFinderBasic {
     is EelPlatform.Linux -> {
       val checkPaths = JavaHomeFinder.DEFAULT_JAVA_LINUX_PATHS.toMutableSet()
       val userHome = eel.fs.user.home
-      checkPaths.add(eel.mapper.toNioPath(userHome.resolve(EelPath.Relative.build(".jdks"))).toString())
+      checkPaths.add(userHome.resolve(".jdks").asNioPath().toString())
       JavaHomeFinderBasic(systemInfoProvider).checkSpecifiedPaths(*checkPaths.toTypedArray())
     }
 

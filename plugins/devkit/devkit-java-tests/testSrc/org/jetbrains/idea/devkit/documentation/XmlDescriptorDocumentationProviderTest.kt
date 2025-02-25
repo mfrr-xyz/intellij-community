@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.devkit.documentation
 
 import com.intellij.lang.documentation.ide.IdeDocumentationTargetProvider
@@ -37,6 +37,7 @@ class XmlDescriptorDocumentationProviderTest : CodeInsightFixtureTestCase<Module
       "<li><a href=\"psi_element://#element:root__deprecatedElement\"><code>&lt;deprecatedElement&gt;</code></a></li>" +
       "<li><a href=\"psi_element://#element:root__elementWithDeprecatedAttribute\"><code>&lt;elementWithDeprecatedAttribute&gt;</code></a></li>" +
       "<li><a href=\"psi_element://#element:root__elementWithCallouts\"><code>&lt;elementWithCallouts&gt;</code></a></li>" +
+      "<li><a href=\"psi_element://#element:root__elementWithChildrenDescription\"><code>&lt;elementWithChildrenDescription&gt;</code></a></li>" +
       "</ul>"
     )
   }
@@ -252,6 +253,64 @@ class XmlDescriptorDocumentationProviderTest : CodeInsightFixtureTestCase<Module
       "</blockquote>" +
       "<h5>Requirement</h5>" +
       "<p>Required: no"
+    )
+  }
+
+  fun `test element with children description`() {
+    doTestDocContains(
+      """
+        <root>
+          <elementWith<caret>ChildrenDescription/>
+        </root>
+      """.trimIndent(),
+      "<p><a href=\"psi_element://#element:root\"><code>&lt;root&gt;</code></a> / <b><code>&lt;elementWithChildrenDescription&gt;</code></b><hr/>\n" +
+      "any" +
+      "<h5>Children</h5>" +
+      "<p>Test children description."
+    )
+  }
+
+  fun `test attribute of a wildcard element`() {
+    doTestDocContains(
+      """
+        <root>
+          <anyNameElement attribute<caret>UnderWildcard="any"/>
+        </root>
+      """.trimIndent(),
+      "<p><a href=\"psi_element://#element:root\"><code>&lt;root&gt;</code></a> / <code>*</code> / <b><code>@attributeUnderWildcard</code></b><hr/>\n" +
+      "Description of <code>attributeUnderWildcard</code>."
+    )
+  }
+
+  fun `test element under wildcard element`() {
+    doTestDocContains(
+      """
+        <root>
+          <anyNameElement>
+            <childUnder<caret>Wildcard/>
+          </anyNameElement>
+        </root>
+      """.trimIndent(),
+      "<p><a href=\"psi_element://#element:root\"><code>&lt;root&gt;</code></a> / <code>*</code> / <b><code>&lt;childUnderWildcard&gt;</code></b><hr/>\n" +
+      "Description of <code>childUnderWildcard</code>." +
+      "<h5>Attributes</h5>" +
+      "<ul>" +
+      "<li><a href=\"psi_element://#attribute:root__*__childUnderWildcard__attributeOfElementUnderWildcard\"><code>attributeOfElementUnderWildcard</code></a></li>" +
+      "</ul>"
+    )
+  }
+
+  fun `test attribute of element under wildcard element`() {
+    doTestDocContains(
+      """
+        <root>
+          <anyNameElement>
+            <childUnderWildcard attribute<caret>OfElementUnderWildcard="any"/>
+          </anyNameElement>
+        </root>
+      """.trimIndent(),
+      "<p><a href=\"psi_element://#element:root\"><code>&lt;root&gt;</code></a> / <code>*</code> / <a href=\"psi_element://#element:root__*__childUnderWildcard\"><code>&lt;childUnderWildcard&gt;</code></a> / <b><code>@attributeOfElementUnderWildcard</code></b><hr/>\n" +
+      "Description of <code>attributeOfElementUnderWildcard</code>."
     )
   }
 

@@ -1,8 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.progress.impl
 
 import com.intellij.codeWithMe.ClientId
 import com.intellij.concurrency.resetThreadContext
+import com.intellij.ide.IdeBundle
 import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.consumeUnrelatedEvent
 import com.intellij.openapi.application.EDT
@@ -30,14 +31,16 @@ import com.intellij.openapi.wm.ex.WindowManagerEx
 import com.intellij.openapi.wm.impl.status.IdeStatusBarImpl
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager
 import com.intellij.platform.ide.progress.*
+import com.intellij.platform.ide.progress.suspender.*
 import com.intellij.platform.kernel.withKernel
 import com.intellij.platform.util.coroutines.flow.throttle
 import com.intellij.platform.util.progress.ProgressPipe
 import com.intellij.platform.util.progress.ProgressState
 import com.intellij.platform.util.progress.createProgressPipe
+import com.intellij.util.AwaitCancellationAndInvoke
 import com.intellij.util.awaitCancellationAndInvoke
 import fleet.kernel.rete.collect
-import fleet.kernel.tryWithEntities
+import fleet.kernel.rete.filter
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -84,29 +87,60 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
     project: Project,
     title: @ProgressTitle String,
     cancellation: TaskCancellation,
-    action: suspend CoroutineScope.() -> T
+    suspender: TaskSuspender?,
+    action: suspend CoroutineScope.() -> T,
   ): T = coroutineScope {
     if (!isRhizomeProgressEnabled) {
-      return@coroutineScope withBackgroundProgressInternalOld(project, title, cancellation, action)
+      return@coroutineScope withBackgroundProgressInternalOld(project, title, cancellation, suspender, action)
     }
 
     LOG.trace { "Task received: title=$title, project=$project" }
 
-    val context = currentCoroutineContext()
-    val taskStorage = TaskStorage.getInstance()
-
+    val taskSuspender = retrieveSuspender(suspender)
     val pipe = cs.createProgressPipe()
 
-    val taskInfoEntity = taskStorage.addTask(project, title, cancellation)
+    val taskContext = currentCoroutineContext()
+    val taskInfoEntityJob = cs.createTaskInfoEntity(project, title, cancellation, taskSuspender, taskContext, pipe)
+
+    try {
+      taskSuspender?.attachTask()
+      withContext(taskSuspender?.asContextElement() ?: EmptyCoroutineContext) {
+        pipe.collectProgressUpdates(action)
+      }
+    }
+    finally {
+      LOG.trace { "Task finished: title=$title" }
+      taskSuspender?.detachTask()
+      taskInfoEntityJob.cancel()
+    }
+  }
+
+  private fun TaskSuspender?.getSuspendableInfo(): TaskSuspension {
+    return when (this) {
+      is TaskSuspenderImpl -> TaskSuspension.Suspendable(defaultSuspendedReason)
+      is BridgeTaskSuspender -> isSuspendable.value
+      else -> TaskSuspension.NonSuspendable
+    }
+  }
+
+  private fun CoroutineScope.createTaskInfoEntity(
+    project: Project,
+    title: String,
+    cancellation: TaskCancellation,
+    suspender: TaskSuspender?,
+    taskContext: CoroutineContext,
+    pipe: ProgressPipe,
+  ): Job = launch {
+    val taskStorage = TaskStorage.getInstance()
+
+    val taskInfoEntity = taskStorage.addTask(project, title, cancellation, suspender.getSuspendableInfo()) ?: return@launch
     val entityId = taskInfoEntity.eid
     LOG.trace { "Task added to storage: entityId=$entityId, title=$title" }
 
     try {
-      subscribeToTask(taskInfoEntity, context, pipe)
-      pipe.collectProgressUpdates(action)
+      subscribeToTask(taskInfoEntity, taskContext, suspender, pipe)
     }
     finally {
-      LOG.trace { "Task finished: entityId=$entityId, title=$title" }
       withContext(NonCancellable) {
         taskStorage.removeTask(taskInfoEntity)
         LOG.trace { "Task removed from storage: entityId=$entityId, title=$title" }
@@ -114,37 +148,114 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
     }
   }
 
-  private fun CoroutineScope.subscribeToTask(taskInfo: TaskInfoEntity, taskContext: CoroutineContext, pipe: ProgressPipe) {
-    launch {
+  private suspend fun subscribeToTask(
+    taskInfo: TaskInfoEntity,
+    taskContext: CoroutineContext,
+    taskSuspender: TaskSuspender?,
+    pipe: ProgressPipe,
+  ) {
+    coroutineScope {
       withKernel {
-        tryWithEntities(taskInfo) {
-          subscribeToTaskStatus(taskInfo, taskContext)
-          subscribeToTaskUpdates(taskInfo, pipe)
+        subscribeToTaskCancellation(taskInfo, taskContext)
+        subscribeToTaskSuspensionChanges(taskInfo, taskSuspender)
+        subscribeToTaskUpdates(taskInfo, pipe)
+      }
+    }
+  }
+
+  private fun CoroutineScope.subscribeToTaskCancellation(
+    taskInfo: TaskInfoEntity,
+    context: CoroutineContext,
+  ) {
+    val title = taskInfo.title
+    val entityId = taskInfo.eid
+
+    launch {
+      taskInfo.statuses
+        .filter { it is TaskStatus.Canceled }
+        .collect {
+          LOG.trace { "Task was cancelled, entityId=$entityId, title=$title" }
+          context.cancel()
+        }
+    }
+  }
+
+  private fun CoroutineScope.subscribeToTaskSuspensionChanges(
+    taskInfo: TaskInfoEntity,
+    taskSuspender: TaskSuspender?,
+  ) {
+    if (taskSuspender == null) return
+
+    // Task suspension is not going to change, we can subscribe directly to statuses
+    @Suppress("DEPRECATION")
+    if (taskSuspender !is BridgeTaskSuspender) {
+      subscribeToTaskStatus(taskInfo, taskSuspender)
+      return
+    }
+
+    val title = taskInfo.title
+    val entityId = taskInfo.eid
+    val taskStorage = TaskStorage.getInstance()
+    launch {
+      taskSuspender.isSuspendable.collectLatest { suspension ->
+        LOG.trace { "Task suspension changed to $suspension, entityId=$entityId, title=$title" }
+
+        taskStorage.updateTask(taskInfo) {
+          taskInfo[TaskInfoEntity.TaskSuspensionType] = suspension
+        }
+
+        if (suspension is TaskSuspension.Suspendable) {
+          // Ensure that subscribeToTaskStatus is canceled when we receive a new isSuspendable value
+          coroutineScope {
+            subscribeToTaskStatus(taskInfo, taskSuspender)
+          }
+        } else {
+          // Set status to Active in case the task was paused when isSuspendable changed
+          TaskManager.resumeTask(taskInfo, TaskStatus.Source.SYSTEM)
         }
       }
     }
   }
 
-  private fun CoroutineScope.subscribeToTaskStatus(taskInfo: TaskInfoEntity, context: CoroutineContext) {
+  private fun CoroutineScope.subscribeToTaskStatus(
+    taskInfo: TaskInfoEntity,
+    taskSuspender: TaskSuspender?,
+  ) {
+    val title = taskInfo.title
+    val entityId = taskInfo.eid
+
     launch {
-      val title = taskInfo.title
-      val entityId = taskInfo.eid
-      taskInfo.statuses.collect { status ->
-        LOG.trace { "Task status changed to $status, entityId=$entityId, title=$title" }
-        when (status) {
-          TaskStatus.RUNNING -> { /* TODO RDCT-1620 */ }
-          TaskStatus.PAUSED -> { /* TODO RDCT-1620 */ }
-          TaskStatus.CANCELED -> context.cancel()
+      taskSuspender?.state?.collectLatest { state ->
+        LOG.trace { "Task suspender state changed to $state, entityId=$entityId, title=$title" }
+        when (state) {
+          TaskSuspenderState.Active -> TaskManager.resumeTask(taskInfo, TaskStatus.Source.SYSTEM)
+          is TaskSuspenderState.Paused -> TaskManager.pauseTask(taskInfo, state.suspendedReason, TaskStatus.Source.SYSTEM)
         }
       }
+    }
+
+    launch {
+      // We shouldn't process events generated by TaskSuspender to avoid infinite update cycles
+      taskInfo.statuses
+        .filter { it.source != TaskStatus.Source.SYSTEM }
+        .collect { status ->
+          LOG.trace { "Task status changed to $status, entityId=$entityId, title=$title" }
+          when (status) {
+            is TaskStatus.Running -> taskSuspender?.resume()
+            is TaskStatus.Paused -> taskSuspender?.pause(status.reason)
+            is TaskStatus.Canceled -> { /* do nothing, processed by subscribeToTaskCancellation */ }
+          }
+        }
     }
   }
 
   private fun CoroutineScope.subscribeToTaskUpdates(taskInfo: TaskInfoEntity, pipe: ProgressPipe) {
     val taskStorage = TaskStorage.getInstance()
     launch {
-      pipe.progressUpdates().collect {
-        taskStorage.updateTask(taskInfo, it)
+      pipe.progressUpdates().collect { state ->
+        taskStorage.updateTask(taskInfo) {
+          taskInfo[TaskInfoEntity.ProgressStateType] = state
+        }
       }
     }
   }
@@ -153,19 +264,57 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
     project: Project,
     title: @ProgressTitle String,
     cancellation: TaskCancellation,
-    action: suspend CoroutineScope.() -> T
+    providedSuspender: TaskSuspender?,
+    action: suspend CoroutineScope.() -> T,
   ): T = coroutineScope {
     val taskJob = coroutineContext.job
     val pipe = cs.createProgressPipe()
     val indicator = coroutineCancellingIndicator(taskJob)
+
+    val taskSuspender = retrieveSuspender(providedSuspender)
+    taskSuspender?.attachTask()
+
+    // has to be called before showIndicator to avoid the indicator being stopped by ProgressManager.runProcess
+    val suspenderSynchronizer = indicator.markSuspendableIfNeeded(taskSuspender)
+
     val showIndicatorJob = cs.showIndicator(project, indicator, taskInfo(title, cancellation), pipe.progressUpdates())
+
     try {
       progressStarted(title, cancellation, pipe.progressUpdates())
-      pipe.collectProgressUpdates(action)
+      withContext(taskSuspender?.asContextElement() ?: EmptyCoroutineContext) {
+        pipe.collectProgressUpdates(action)
+      }
     }
     finally {
       showIndicatorJob.cancel()
+      suspenderSynchronizer?.stop()
+      taskSuspender?.detachTask()
     }
+  }
+
+  private fun CoroutineScope.retrieveSuspender(providedSuspender: TaskSuspender?): TaskSuspender? {
+    return providedSuspender
+           ?: coroutineContext[TaskSuspenderElementKey]?.taskSuspender
+           ?: coroutineContext[CoroutineSuspenderElementKey]?.coroutineSuspender?.let {
+             TaskSuspenderImpl(IdeBundle.message("progress.text.paused"), it as CoroutineSuspenderImpl)
+           }
+  }
+
+  private fun TaskSuspender.attachTask() {
+    (this as? TaskSuspenderImpl)?.attachTask(cs)
+  }
+
+  private fun TaskSuspender.detachTask() {
+    (this as? TaskSuspenderImpl)?.detachTask()
+  }
+
+  private fun ProgressIndicatorEx.markSuspendableIfNeeded(taskSuspender: TaskSuspender?): TaskToProgressSuspenderSynchronizer? {
+    if (taskSuspender !is TaskSuspenderImpl) return null
+
+    @Suppress("UsagesOfObsoleteApi")
+    val progressSuspender = ProgressManager.getInstance().runProcess<ProgressSuspender>(
+      { ProgressSuspender.markSuspendable(this, taskSuspender.defaultSuspendedReason) }, this)
+    return TaskToProgressSuspenderSynchronizer(cs, taskSuspender, progressSuspender)
   }
 
   override suspend fun <T> withModalProgressInternal(
@@ -218,12 +367,12 @@ class PlatformTaskSupport(private val cs: CoroutineScope) : TaskSupport {
       val pipe = cs.createProgressPipe()
       val permitCtx = getLockPermitContext(true)
       val taskJob = async(dispatcherCtx + modalityContext + permitCtx) {
-          progressStarted(descriptor.title, descriptor.cancellation, pipe.progressUpdates())
-          // an unhandled exception in `async` can kill the entire computation tree
-          // we need to propagate the exception to the caller, since they may have some way to handle it.
-          runCatching {
-            pipe.collectProgressUpdates(action)
-          }
+        progressStarted(descriptor.title, descriptor.cancellation, pipe.progressUpdates())
+        // an unhandled exception in `async` can kill the entire computation tree
+        // we need to propagate the exception to the caller, since they may have some way to handle it.
+        runCatching {
+          pipe.collectProgressUpdates(action)
+        }
       }
       val modalJob = cs.launch(modalityContext) {
         val showIndicatorJob = showModalIndicator(taskJob, descriptor, pipe.progressUpdates(), deferredDialog)
@@ -279,9 +428,10 @@ internal fun CoroutineScope.showIndicator(
     delay(DEFAULT_PROGRESS_DIALOG_POSTPONE_TIME_MILLIS.toLong())
     withContext(progressManagerTracer.span("Progress: ${taskInfo.title}")) {
       withContext(Dispatchers.EDT) {
-        LOG.trace { "Showing indicator for task: $taskInfo" }
-        val indicatorAdded = showIndicatorInUI(project, taskInfo, indicator)
         try {
+          LOG.trace { "Showing indicator for task: ${taskInfo.title}" }
+          val indicatorAdded = showIndicatorInUI(project, taskInfo, indicator)
+
           indicator.start() // must be after showIndicatorInUI
           try {
             if (indicatorAdded) {
@@ -413,6 +563,7 @@ private suspend fun doShowModalIndicator(
       },
     )
 
+    @OptIn(AwaitCancellationAndInvoke::class)
     awaitCancellationAndInvoke {
       dialog.close(DialogWrapper.OK_EXIT_CODE)
     }
@@ -439,6 +590,7 @@ private suspend fun doShowModalIndicator(
       val previousFocusOwner = SwingUtilities.getWindowAncestor(focusComponent)?.mostRecentFocusOwner
       focusComponent.requestFocusInWindow()
       if (previousFocusOwner != null) {
+        @OptIn(AwaitCancellationAndInvoke::class)
         awaitCancellationAndInvoke {
           // TODO: don't move focus back if the focus owner was changed
           //if (focusComponent.isFocusOwner)

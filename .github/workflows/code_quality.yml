@@ -1,5 +1,9 @@
 name: Qodana
-on: workflow_dispatch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
 
 jobs:
   qodana:
@@ -16,6 +20,6 @@ jobs:
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2024.2
         with:
-          args: --ide,QDJVM
+          use-caches: false
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}

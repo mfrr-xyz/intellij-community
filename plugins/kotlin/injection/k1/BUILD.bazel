@@ -1,11 +1,9 @@
 ### auto-generated section `build kotlin.injection.k1` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   context_receivers = True
 )
 
@@ -19,13 +17,12 @@ jvm_library(
   name = "kotlin-injection-k1",
   module_name = "kotlin.injection.k1",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_kotlin-compiler-fe10",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-kotlin-compiler-fe10",
     "//plugins/kotlin/injection/base:kotlin-base-injection",
     "//plugins/kotlin/base/project-structure:kotlin-base-project-structure",
     "//plugins/kotlin/base/analysis:kotlin-base-analysis",
@@ -34,7 +31,7 @@ jvm_library(
     "//plugins/kotlin/core",
     "//plugins/kotlin/frontend-independent:fir-frontend-independent",
     "//plugins/kotlin/idea",
-    "//plugins/kotlin/jvm",
+    "//plugins/kotlin/jvm/shared:kotlin-jvm-shared",
     "//plugins/IntelliLang:langInjection",
     "//platform/lang-impl",
   ],

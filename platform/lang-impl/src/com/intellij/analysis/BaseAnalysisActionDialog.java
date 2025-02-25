@@ -14,6 +14,7 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.psi.PsiElement;
 import com.intellij.refactoring.util.RadioUpDownListener;
+import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -106,8 +107,11 @@ public class BaseAnalysisActionDialog extends DialogWrapper {
     preselectButton();
     RadioUpDownListener.installOn(radioButtons.toArray(new JRadioButton[0]));
 
-    panel.setPreferredSize(panel.getMinimumSize());
-    return panel;
+    final var scrollPane = new JBScrollPane(panel);
+    scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+    scrollPane.setBorder(null);
+    scrollPane.setPreferredSize(panel.getMinimumSize());
+    return scrollPane;
   }
 
   public void setShowInspectInjectedCode(boolean showInspectInjectedCode) {
@@ -230,11 +234,10 @@ public class BaseAnalysisActionDialog extends DialogWrapper {
     return CodeInsightBundle.message("action.analyze.verb");
   }
 
-  @Unmodifiable
-  public static @NotNull List<ModelScopeItem> standardItems(@NotNull Project project,
-                                                            @NotNull AnalysisScope scope,
-                                                            @Nullable Module module,
-                                                            @Nullable PsiElement context) {
+  public static @Unmodifiable @NotNull List<ModelScopeItem> standardItems(@NotNull Project project,
+                                                                          @NotNull AnalysisScope scope,
+                                                                          @Nullable Module module,
+                                                                          @Nullable PsiElement context) {
     return ContainerUtil.mapNotNull(
       ModelScopeItemPresenter.EP_NAME.getExtensionList(),
       presenter -> presenter.tryCreate(project, scope, module, context));

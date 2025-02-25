@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.treeStructure;
 
 import com.intellij.ide.ActivityTracker;
@@ -116,6 +116,10 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
 
   public Tree(TreeModel treemodel) {
     super(treemodel);
+    // An ugly hijacking: SmartExpander can't access advanced settings by itself, so we use the Tree constructor
+    // as a convenient place to put this code somewhere where it'll be surely executed by the time it's needed.
+    // We also update this setting in com.intellij.ui.tree.RecursiveExpandSettingListener.
+    SmartExpander.setRecursiveCollapseEnabled(AdvancedSettings.getBoolean("ide.tree.collapse.recursively"));
     expandImpl = new ExpandImpl();
     myEmptyText = new StatusText(this) {
       @Override
@@ -1079,14 +1083,14 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
         getCellRenderer().getTreeCellRendererComponent(this, eachNode, false, false, false, getRowForPath(eachPath), false);
 
       if (c != null) {
-        if (nodesText.length() > 0) {
+        if (!nodesText.isEmpty()) {
           nodesText.append(";");
         }
         nodesText.append(c);
       }
     }
 
-    if (nodesText.length() > 0) {
+    if (!nodesText.isEmpty()) {
       info.put("selectedNodes", nodesText.toString());
     }
   }
@@ -1473,7 +1477,8 @@ public class Tree extends JTree implements ComponentWithEmptyText, ComponentWith
             markPathExpanded(path);
             fireTreeExpanded(path);
             var parent = path.getParentPath();
-            if (parent == null || !toExpand.contains(parent)) {
+            // Limit expanded roots to 5 to prevent too many announcements and performance issues caused by it.
+            if (expandRoots.size() < 5 && (parent == null || !toExpand.contains(parent))) {
               expandRoots.add(path);
             }
           }

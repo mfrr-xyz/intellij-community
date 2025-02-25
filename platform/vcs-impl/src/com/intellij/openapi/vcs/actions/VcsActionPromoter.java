@@ -18,8 +18,7 @@ import java.util.List;
 @ApiStatus.Internal
 public final class VcsActionPromoter implements ActionPromoter {
   @Override
-  @Unmodifiable
-  public List<AnAction> promote(@NotNull @Unmodifiable List<? extends AnAction> actions, @NotNull DataContext context) {
+  public @Unmodifiable List<AnAction> promote(@NotNull @Unmodifiable List<? extends AnAction> actions, @NotNull DataContext context) {
     ActionManager am = ActionManager.getInstance();
     List<AnAction> reorderedActions = new ArrayList<>(actions);
     List<String> reorderedIds = new ArrayList<>(ContainerUtil.map(reorderedActions, it -> am.getId(it)));
@@ -27,6 +26,7 @@ public final class VcsActionPromoter implements ActionPromoter {
     reorderActionPair(reorderedActions, reorderedIds, "Vcs.MoveChangedLinesToChangelist", "ChangesView.Move");
     reorderActionPair(reorderedActions, reorderedIds, "Vcs.RollbackChangedLines", "ChangesView.Revert");
     reorderActionPair(reorderedActions, reorderedIds, "Vcs.ShowDiffChangedLines", "Diff.ShowDiff");
+    reorderActionPair(reorderedActions, reorderedIds, "Compare.SameVersion", "CompareTwoFiles");
 
     boolean isInMessageEditor = isCommitMessageEditor(context);
     for (AnAction action : actions) {

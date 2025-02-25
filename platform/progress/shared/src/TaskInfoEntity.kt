@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.progress
 
+import com.intellij.platform.ide.progress.suspender.TaskSuspension
 import com.intellij.platform.project.ProjectEntity
 import com.intellij.platform.project.asProject
 import com.intellij.platform.project.asProjectOrNull
@@ -28,7 +29,7 @@ data class TaskInfoEntity(override val eid: EID) : Entity {
   /**
    * Human-readable title of a task, which is used to display the task in UI
    */
-  val title: String by Title
+  val title: String by TitleType
 
   /**
    * Specifies whether the task can be canceled.
@@ -40,6 +41,16 @@ data class TaskInfoEntity(override val eid: EID) : Entity {
    *   customizable button and tooltip text.
    */
   val cancellation: TaskCancellation by TaskCancellationType
+
+  /**
+   * Specifies whether the task can be suspended and resumed.
+   *
+   * Possible values are:
+   *
+   * - [TaskSuspension.NonSuspendable]: The task cannot be suspended, and no pause button should be displayed in the UI.
+   * - [TaskSuspension.Suspendable]: The task can be suspended, and a pause button should be displayed
+   */
+  val suspension: TaskSuspension by TaskSuspensionType
 
   /**
    * Represents the current progress state of the task.
@@ -58,9 +69,9 @@ data class TaskInfoEntity(override val eid: EID) : Entity {
    * Indicates the current status of the task.
    *
    * The task can have one of the following statuses defined by [TaskStatus]:
-   * - [TaskStatus.RUNNING]: The task is currently in progress.
-   * - [TaskStatus.PAUSED]: The task has been temporarily paused.
-   * - [TaskStatus.CANCELED]: The task has been requested to stop, though it might still be running until it can be safely aborted.
+   * - [TaskStatus.Running]: The task is currently in progress.
+   * - [TaskStatus.Paused]: The task has been temporarily paused.
+   * - [TaskStatus.Canceled]: The task has been requested to stop, though it might still be running until it can be safely aborted.
    *
    * The status can be changed based on certain conditions:
    * - A running task can be suspended or canceled.
@@ -77,10 +88,11 @@ data class TaskInfoEntity(override val eid: EID) : Entity {
     "com.intellij.platform.ide.progress",
     ::TaskInfoEntity
   ) {
-    var Title: Required<String> = requiredValue("title", String.serializer())
-    var TaskCancellationType: Required<TaskCancellation> = requiredValue("taskCancellation", TaskCancellation.serializer())
-    var ProgressStateType: Optional<ProgressState> = optionalValue("progressState", ProgressState.serializer())
-    var TaskStatusType: Required<TaskStatus> = requiredValue("taskStatus", TaskStatus.serializer())
+    val TitleType: Required<String> = requiredValue("title", String.serializer())
+    val TaskCancellationType: Required<TaskCancellation> = requiredValue("taskCancellation", TaskCancellation.serializer())
+    val TaskSuspensionType: Required<TaskSuspension> = requiredValue("isSuspendable", TaskSuspension.serializer())
+    val ProgressStateType: Optional<ProgressState> = optionalValue("progressState", ProgressState.serializer())
+    val TaskStatusType: Required<TaskStatus> = requiredValue("taskStatus", TaskStatus.serializer())
     val ProjectEntityType: Optional<ProjectEntity> = optionalRef<ProjectEntity>("project", RefFlags.CASCADE_DELETE_BY)
   }
 }

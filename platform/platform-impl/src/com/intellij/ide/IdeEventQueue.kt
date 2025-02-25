@@ -1,10 +1,10 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("JAVA_MODULE_DOES_NOT_EXPORT_PACKAGE")
 package com.intellij.ide
 
 import com.intellij.codeWithMe.ClientId
 import com.intellij.codeWithMe.ClientId.Companion.currentOrNull
-import com.intellij.codeWithMe.ClientId.Companion.withClientId
+import com.intellij.codeWithMe.ClientId.Companion.withExplicitClientId
 import com.intellij.concurrency.*
 import com.intellij.diagnostic.EventWatcher
 import com.intellij.diagnostic.LoadingState
@@ -24,6 +24,7 @@ import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.editor.impl.ad.ThreadLocalRhizomeDB
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.keymap.impl.IdeKeyEventDispatcher
 import com.intellij.openapi.keymap.impl.IdeMouseEventDispatcher
@@ -42,7 +43,6 @@ import com.intellij.openapi.wm.impl.FocusManagerImpl
 import com.intellij.platform.ide.bootstrap.StartupErrorReporter
 import com.intellij.ui.ComponentUtil
 import com.intellij.ui.speedSearch.SpeedSearchSupply
-import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.concurrency.unwrapContextRunnable
 import com.intellij.util.containers.ContainerUtil
@@ -106,11 +106,8 @@ class IdeEventQueue private constructor() : EventQueue() {
   private val eventsPosted = AtomicLong()
   private val eventsReturned = AtomicLong()
 
-  private var isInInputEvent = false
   var trueCurrentEvent: AWTEvent = InvocationEvent(this, EmptyRunnable.getInstance())
     private set
-
-  private var currentSequencedEvent: AWTEvent? = null
 
   @Volatile
   private var lastActiveTime = System.nanoTime()
@@ -248,7 +245,7 @@ class IdeEventQueue private constructor() : EventQueue() {
     try {
       performanceWatcher?.edtEventStarted()
       eventWatcher?.edtEventStarted(event, startedAt)
-      fixNestedSequenceEvent(event)
+      SequencedEventNestedFieldHolder.fixNestedSequenceEvent(event)
       // Add code below if you need
 
       // Update EDT if it changes (might happen after Application disposal)
@@ -289,8 +286,6 @@ class IdeEventQueue private constructor() : EventQueue() {
         disableAltGrUnsupportedOnMac(event)
       }
 
-      val wasInputEvent = isInInputEvent
-      isInInputEvent = isInputEvent(event)
       val oldEvent = trueCurrentEvent
       trueCurrentEvent = event
       val finalEvent = event
@@ -303,7 +298,7 @@ class IdeEventQueue private constructor() : EventQueue() {
           val progressManager = ProgressManager.getInstanceOrNull()
           try {
             runCustomProcessors(finalEvent, preProcessors)
-            performActivity(finalEvent, !nakedRunnable && isCoroutineWILEnabled && !threadingSupport.isInsideUnlockedWriteIntentLock()) {
+            performActivity(finalEvent, !nakedRunnable && isPureSwingEventWilEnabled && !threadingSupport.isInsideUnlockedWriteIntentLock()) {
               if (progressManager == null) {
                 _dispatchEvent(finalEvent)
               }
@@ -319,11 +314,8 @@ class IdeEventQueue private constructor() : EventQueue() {
             processException(t)
           }
           finally {
-            isInInputEvent = wasInputEvent
             trueCurrentEvent = oldEvent
-            if (currentSequencedEvent === finalEvent) {
-              currentSequencedEvent = null
-            }
+            SequencedEventNestedFieldHolder.eventDispatched(finalEvent)
             runCustomProcessors(finalEvent, postProcessors)
             if (finalEvent is KeyEvent) {
               maybeReady()
@@ -365,18 +357,6 @@ class IdeEventQueue private constructor() : EventQueue() {
       catch (t: Throwable) {
         processException(t)
       }
-    }
-  }
-
-  // Fixes IDEA-218430: nested sequence events cause deadlock
-  private fun fixNestedSequenceEvent(e: AWTEvent) {
-    if (e.javaClass == SequencedEventNestedFieldHolder.SEQUENCED_EVENT_CLASS) {
-      if (currentSequencedEvent != null) {
-        val sequenceEventToDispose = currentSequencedEvent!!
-        currentSequencedEvent = null // Set to null BEFORE dispose b/c `dispose` can dispatch events internally
-        SequencedEventNestedFieldHolder.invokeDispose(sequenceEventToDispose)
-      }
-      currentSequencedEvent = e
     }
   }
 
@@ -469,7 +449,7 @@ class IdeEventQueue private constructor() : EventQueue() {
     if (isUserActivityEvent(e)) {
       ActivityTracker.getInstance().inc()
     }
-    if (popupManager.isPopupActive && popupManager.dispatch(e)) {
+    if (popupManager.isPopupActive && threadingSupport.runWriteIntentReadAction<Boolean, Throwable> { popupManager.dispatch(e) }) {
       if (keyEventDispatcher.isWaitingForSecondKeyStroke) {
         keyEventDispatcher.state = KeyState.STATE_INIT
       }
@@ -480,7 +460,9 @@ class IdeEventQueue private constructor() : EventQueue() {
       // app activation can call methods that need write intent (like project saving)
       threadingSupport.runWriteIntentReadAction<Unit, Throwable> { processAppActivationEvent(e) }
     }
-    if (dispatchByCustomDispatchers(e)) {
+
+    // IJPL-177735 Remove Write-Intent lock from IdeEventQueue.EventDispatcher
+    if (threadingSupport.runWriteIntentReadAction<Boolean, Throwable> { dispatchByCustomDispatchers(e) }) {
       return
     }
     if (e is InputMethodEvent && SystemInfoRt.isMac && keyEventDispatcher.isWaitingForSecondKeyStroke) {
@@ -589,7 +571,8 @@ class IdeEventQueue private constructor() : EventQueue() {
     return false
   }
 
-  private fun defaultDispatchEvent(e: AWTEvent) {
+  @Internal
+  fun defaultDispatchEvent(e: AWTEvent) {
     try {
       maybeReady()
       val me = e as? MouseEvent
@@ -790,7 +773,7 @@ class IdeEventQueue private constructor() : EventQueue() {
   }
 
   private fun withAttachedClientId(event: AWTEvent): AccessToken {
-    return if (event is ClientIdAwareEvent) withClientId(event.clientId) else AccessToken.EMPTY_ACCESS_TOKEN
+    return if (event is ClientIdAwareEvent) withExplicitClientId(event.clientId) else AccessToken.EMPTY_ACCESS_TOKEN
   }
 
   @Deprecated("Does nothing currently")
@@ -955,6 +938,8 @@ internal fun performActivity(e: AWTEvent, needWIL: Boolean, runnable: () -> Unit
     }
   }
 
+  setImplicitThreadLocalRhizomeIfEnabled()
+
   if (transactionGuard == null) {
     runnable()
   }
@@ -962,15 +947,9 @@ internal fun performActivity(e: AWTEvent, needWIL: Boolean, runnable: () -> Unit
     val runnableWithWIL =
       if (needWIL) {
         {
-            WriteIntentReadAction.run {
-              ThreadingAssertions.setImplicitLockOnEDT(true)
-              try {
-                runnable()
-              }
-              finally {
-                ThreadingAssertions.setImplicitLockOnEDT(false)
-              }
-            }
+          WriteIntentReadAction.run {
+            runnable()
+          }
         }
       }
       else {
@@ -1068,18 +1047,35 @@ internal fun consumeUnrelatedEvent(modalComponent: Component?, event: AWTEvent):
 }
 
 private object SequencedEventNestedFieldHolder {
-  private val DISPOSE_METHOD: MethodHandle
 
-  @JvmField
-  val SEQUENCED_EVENT_CLASS: Class<*> = SequencedEventNestedFieldHolder::class.java.classLoader.loadClass("java.awt.SequencedEvent")
+  private val SEQUENCED_EVENT_CLASS: Class<*> = javaClass.classLoader.loadClass("java.awt.SequencedEvent")
 
-  fun invokeDispose(event: AWTEvent) {
+  private val DISPOSE_METHOD: MethodHandle = MethodHandles
+    .privateLookupIn(SEQUENCED_EVENT_CLASS, MethodHandles.lookup())
+    .findVirtual(SEQUENCED_EVENT_CLASS, "dispose", MethodType.methodType(Void.TYPE))
+
+  private fun invokeDispose(event: AWTEvent) {
     DISPOSE_METHOD.invoke(event)
   }
 
-  init {
-    DISPOSE_METHOD = MethodHandles.privateLookupIn(SEQUENCED_EVENT_CLASS, MethodHandles.lookup())
-      .findVirtual(SEQUENCED_EVENT_CLASS, "dispose", MethodType.methodType(Void.TYPE))
+  private var currentSequencedEvent: AWTEvent? = null
+
+  // Fixes IDEA-218430: nested sequence events cause deadlock
+  fun fixNestedSequenceEvent(e: AWTEvent) {
+    if (e.javaClass == SEQUENCED_EVENT_CLASS) {
+      val sequenceEventToDispose = currentSequencedEvent
+      if (sequenceEventToDispose != null) {
+        currentSequencedEvent = null // Set to null BEFORE dispose b/c `dispose` can dispatch events internally
+        invokeDispose(sequenceEventToDispose)
+      }
+      currentSequencedEvent = e
+    }
+  }
+
+  fun eventDispatched(e: AWTEvent) {
+    if (currentSequencedEvent === e) {
+      currentSequencedEvent = null
+    }
   }
 }
 
@@ -1202,4 +1198,17 @@ private fun abracadabraDaberBoreh(eventQueue: IdeEventQueue) {
     .findConstructor(aClass, MethodType.methodType(Void.TYPE, EventQueue::class.java))
   val postEventQueue = constructor.invoke(eventQueue)
   AppContext.getAppContext().put("PostEventQueue", postEventQueue)
+}
+
+private fun setImplicitThreadLocalRhizomeIfEnabled() {
+  if (isRhizomeAdEnabled) {
+    // It is a workaround on tricky `updateDbInTheEventDispatchThread()` where
+    // the thread local DB is reset by `fleet.kernel.DbSource.ContextElement.restoreThreadContext`
+    try {
+      ThreadLocalRhizomeDB.setThreadLocalDb(ThreadLocalRhizomeDB.lastKnownDb())
+    }
+    catch (e: Exception) {
+      Logs.LOG.error(e)
+    }
+  }
 }

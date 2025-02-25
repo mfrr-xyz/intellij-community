@@ -17,11 +17,13 @@ import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
+import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
 import org.jetbrains.kotlin.analysis.api.signatures.KaFunctionSignature
 import org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.builtins.StandardNames
+import org.jetbrains.kotlin.idea.base.analysis.api.utils.findSamSymbolOrNull
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.isPossiblySubTypeOf
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferencesInRange
 import org.jetbrains.kotlin.idea.base.analysis.withRootPrefixIfNeeded
@@ -30,6 +32,7 @@ import org.jetbrains.kotlin.idea.completion.contributors.helpers.insertString
 import org.jetbrains.kotlin.idea.completion.handlers.isCharAt
 import org.jetbrains.kotlin.idea.completion.impl.k2.weighers.TrailingLambdaWeigher.hasTrailingLambda
 import org.jetbrains.kotlin.idea.completion.lookups.*
+import org.jetbrains.kotlin.idea.completion.lookups.factories.FunctionCallLookupObject.Companion.hasReceiver
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtFile
@@ -47,15 +50,14 @@ internal object FunctionLookupElementFactory {
     ): LookupElementBuilder {
         val valueParameters = signature.valueParameters
 
+        val symbol = signature.symbol
         val lookupObject = FunctionCallLookupObject(
             shortName = shortName,
             options = options,
             renderedDeclaration = CompletionShortNamesRenderer.renderFunctionParameters(valueParameters),
+            hasReceiver = signature.hasReceiver,
             inputValueArgumentsAreRequired = valueParameters.isNotEmpty(),
-            inputTypeArgumentsAreRequired = !FunctionInsertionHelper.functionCanBeCalledWithoutExplicitTypeArguments(
-                symbol = signature.symbol,
-                expectedType = expectedType
-            ),
+            inputTypeArgumentsAreRequired = !FunctionInsertionHelper.functionCanBeCalledWithoutExplicitTypeArguments(symbol, expectedType),
         )
 
         return createLookupElement(signature, lookupObject)
@@ -64,9 +66,12 @@ internal object FunctionLookupElementFactory {
     context(KaSession)
     internal fun getTrailingFunctionSignature(
         signature: KaFunctionSignature<*>,
+        checkDefaultValues: Boolean = true,
     ): KaVariableSignature<KaValueParameterSymbol>? {
         val valueParameters = signature.valueParameters
-        if (!valueParameters.dropLast(1).all { it.symbol.hasDefaultValue }) return null
+        if (checkDefaultValues &&
+            !valueParameters.dropLast(1).all { it.symbol.hasDefaultValue }
+        ) return null
 
         return valueParameters.lastOrNull()
             ?.takeUnless { it.symbol.isVararg }
@@ -77,7 +82,7 @@ internal object FunctionLookupElementFactory {
         trailingFunctionSignature: KaVariableSignature<KaValueParameterSymbol>,
     ): TrailingFunctionDescriptor? {
         return when (val type = trailingFunctionSignature.returnType.lowerBoundIfFlexible()) {
-            is KaFunctionType -> TrailingFunctionDescriptor(type)
+            is KaFunctionType -> TrailingFunctionDescriptor.Function(type)
             is KaUsualClassType -> {
                 val functionClassSymbol = type.symbol as? KaNamedClassSymbol
                     ?: return null
@@ -91,26 +96,18 @@ internal object FunctionLookupElementFactory {
                     ?.let { it as? KaFunctionType }
                     ?: return null
 
-                // TODO this is a workaround
-                // FIX pass KaCallableMemberCall.typeArgumentsMapping from the resolve result
-                val mappings = type.typeArguments
-                    .mapNotNull { it.type }
-                    .zip(samConstructor.typeParameters)
-                    .associate { (parameterSymbol, typeProjection) ->
-                        typeProjection to parameterSymbol
-                    }
+                val mappings = samConstructor.typeParameters
+                        .zip(type.typeArguments.mapNotNull { it.type })
+                        .toMap()
 
                 val functionType = (@OptIn(KaExperimentalApi::class) createSubstitutor(mappings)
                     .substitute(samConstructorType)) as? KaFunctionType
                     ?: return null
 
-                val samSymbol = functionClassSymbol.samSymbol
+                val samSymbol = functionClassSymbol.findSamSymbolOrNull()
                     ?: return null
 
-                TrailingFunctionDescriptor(
-                    functionType = functionType,
-                    suggestedParameterNames = samSymbol.valueParameters.map { it.name },
-                )
+                TrailingFunctionDescriptor.SamConstructor(functionType, samSymbol)
             }
 
             else -> null
@@ -127,13 +124,15 @@ internal object FunctionLookupElementFactory {
         val trailingFunctionSignature = getTrailingFunctionSignature(signature)
             ?: return null
 
-        val (trailingFunctionType, _) = createTrailingFunctionDescriptor(trailingFunctionSignature)
+        val trailingFunctionType = createTrailingFunctionDescriptor(trailingFunctionSignature)
+            ?.functionType
             ?: return null
 
         val lookupObject = FunctionCallLookupObject(
             shortName = shortName,
             options = options,
             renderedDeclaration = CompletionShortNamesRenderer.renderTrailingFunction(trailingFunctionSignature, trailingFunctionType),
+            hasReceiver = signature.hasReceiver,
             inputTrailingLambdaIsRequired = true,
         )
 
@@ -166,7 +165,7 @@ internal object FunctionLookupElementFactory {
         return when (insertionStrategy) {
             CallableInsertionStrategy.AsCall -> builder.withInsertHandler(FunctionInsertionHandler)
             CallableInsertionStrategy.AsIdentifier -> builder.withInsertHandler(CallableIdentifierInsertionHandler())
-            is CallableInsertionStrategy.AsIdentifierCustom -> builder.withInsertHandler(object : QuotedNamesAwareInsertionHandler() {
+            is CallableInsertionStrategy.AsIdentifierCustom -> builder.withInsertHandler(object : CallableIdentifierInsertionHandler() {
                 override fun handleInsert(context: InsertionContext, item: LookupElement) {
                     super.handleInsert(context, item)
                     insertionStrategy.insertionHandlerAction(context)
@@ -270,10 +269,19 @@ internal data class FunctionCallLookupObject(
     override val shortName: Name,
     override val options: CallableInsertionOptions,
     override val renderedDeclaration: String,
+    val hasReceiver: Boolean, // todo find a better solution
     val inputValueArgumentsAreRequired: Boolean = false,
     val inputTypeArgumentsAreRequired: Boolean = false,
     val inputTrailingLambdaIsRequired: Boolean = false,
-) : KotlinCallableLookupObject()
+) : KotlinCallableLookupObject() {
+
+    companion object {
+
+        val KaCallableSignature<*>.hasReceiver: Boolean
+            get() = receiverType != null
+                    || callableId?.classId != null
+    }
+}
 
 internal object FunctionInsertionHandler : QuotedNamesAwareInsertionHandler() {
 
@@ -409,20 +417,36 @@ internal object FunctionInsertionHandler : QuotedNamesAwareInsertionHandler() {
     }
 }
 
-internal data class TrailingFunctionDescriptor(
-    val functionType: KaFunctionType,
-    val suggestedParameterNames: List<Name?> = functionType.parameterTypes.map { it.extractParameterName() },
-)
+internal sealed interface TrailingFunctionDescriptor {
 
-context(KaSession)
-private val KaNamedClassSymbol.samSymbol: KaNamedFunctionSymbol?
-    get() = declaredMemberScope.callables
-        .filterIsInstance<KaNamedFunctionSymbol>()
-        .filter { it.modality == KaSymbolModality.ABSTRACT }
-        .singleOrNull()
+    val functionType: KaFunctionType
+
+    fun suggestParameterNameAt(index: Int): Name?
+
+    data class Function(
+        override val functionType: KaFunctionType,
+    ) : TrailingFunctionDescriptor {
+
+        override fun suggestParameterNameAt(index: Int): Name? =
+            functionType.parameterTypes
+                .getOrNull(index)
+                ?.extractParameterName()
+    }
+
+    data class SamConstructor(
+        override val functionType: KaFunctionType,
+        val samSymbol: KaNamedFunctionSymbol,
+    ) : TrailingFunctionDescriptor {
+
+        override fun suggestParameterNameAt(index: Int): Name? =
+            samSymbol.valueParameters
+                .getOrNull(index)
+                ?.name
+    }
+}
 
 /**
- * @see org.jetbrains.kotlin.analysis.api.signatures.KaVariableSignature.getValueFromParameterNameAnnotation
+ * @see KaVariableSignature.getValueFromParameterNameAnnotation
  */
 private fun KaType.extractParameterName(): Name? =
     annotations.find { it.classId?.asSingleFqName() == StandardNames.FqNames.parameterName }

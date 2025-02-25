@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.idea.base.psi.KotlinPsiHeuristics
 import org.jetbrains.kotlin.idea.debugger.base.util.ClassNameCalculator
 import org.jetbrains.kotlin.idea.debugger.base.util.KotlinDebuggerConstants
+import org.jetbrains.kotlin.idea.debugger.base.util.dumbAction
 import org.jetbrains.kotlin.idea.debugger.base.util.getInlineDepth
 import org.jetbrains.kotlin.idea.debugger.evaluate.variables.EvaluatorValueConverter
 import org.jetbrains.kotlin.idea.inspections.dfa.KotlinAnchor
@@ -49,7 +50,7 @@ import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.org.objectweb.asm.Type as AsmType
 
-class K2DfaAssistProvider : DfaAssistProvider {
+private class K2DfaAssistProvider : DfaAssistProvider {
     override fun locationMatches(element: PsiElement, location: Location): Boolean {
         val jdiClassName = location.method().declaringType().name()
         val file = element.containingFile
@@ -89,7 +90,9 @@ class K2DfaAssistProvider : DfaAssistProvider {
     ): Value? {
         if (anchor !is KtElement) return null
         if ((dfaVar.descriptor as? KtBaseDescriptor)?.isInlineClassReference() == true) return null
-        return getJdiValueInner(proxy, dfaVar, anchor)
+        return dumbAction(anchor.project, null) {
+            getJdiValueInner(proxy, dfaVar, anchor)
+        }
     }
     
     private fun KtElement.getScope(): KtFunction? {

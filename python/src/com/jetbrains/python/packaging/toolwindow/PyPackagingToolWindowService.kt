@@ -18,15 +18,12 @@ import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.roots.ModuleRootEvent
 import com.intellij.openapi.roots.ModuleRootListener
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.platform.util.progress.reportRawProgress
 import com.jetbrains.python.PyBundle.message
 import com.jetbrains.python.packaging.*
-import com.jetbrains.python.packaging.common.PythonPackageDetails
-import com.jetbrains.python.packaging.common.PythonPackageManagementListener
-import com.jetbrains.python.packaging.common.PythonPackageSpecification
-import com.jetbrains.python.packaging.common.normalizePackageName
-import com.jetbrains.python.packaging.common.runPackagingOperationOrShowErrorDialog
+import com.jetbrains.python.packaging.common.*
 import com.jetbrains.python.packaging.conda.CondaPackage
 import com.jetbrains.python.packaging.management.PythonPackageManager
 import com.jetbrains.python.packaging.management.packagesByRepository
@@ -107,50 +104,62 @@ class PyPackagingToolWindowService(val project: Project, val serviceScope: Corou
 
   suspend fun installPackage(specification: PythonPackageSpecification, options: List<String> = emptyList()) {
     PythonPackagesToolwindowStatisticsCollector.installPackageEvent.log(project)
-
     val result = runPackagingOperationOrShowErrorDialog(manager.sdk, message("python.new.project.install.failed.title", specification.name), specification.name) {
       manager.installPackage(specification, options)
     }
-    if (result.isSuccess) showPackagingNotification(message("python.packaging.notification.installed", specification.name))
+
+    if (result.isSuccess) {
+      handleActionCompleted(message("python.packaging.notification.installed", specification.name))
+    }
   }
 
   suspend fun deletePackage(selectedPackage: InstalledPackage) {
     PythonPackagesToolwindowStatisticsCollector.uninstallPackageEvent.log(project)
-    val result =  runPackagingOperationOrShowErrorDialog(manager.sdk, message("python.packaging.operation.failed.title")) {
+    val result = runPackagingOperationOrShowErrorDialog(manager.sdk, message("python.packaging.operation.failed.title")) {
       manager.uninstallPackage(selectedPackage.instance)
     }
-    if (result.isSuccess) showPackagingNotification(message("python.packaging.notification.deleted", selectedPackage.name))
+
+    if (result.isSuccess) {
+      handleActionCompleted(message("python.packaging.notification.deleted", selectedPackage.name))
+    }
   }
 
   suspend fun updatePackage(specification: PythonPackageSpecification) {
     val result = runPackagingOperationOrShowErrorDialog(manager.sdk, message("python.packaging.notification.update.failed", specification.name), specification.name) {
       manager.updatePackage(specification)
     }
-    if (result.isSuccess) showPackagingNotification(message("python.packaging.notification.updated", specification.name, specification.versionSpecs))
+
+    if (result.isSuccess) {
+      handleActionCompleted(message("python.packaging.notification.updated", specification.name, specification.versionSpecs))
+    }
   }
 
   internal suspend fun initForSdk(sdk: Sdk?) {
     if (sdk == null) {
       toolWindowPanel?.packageListController?.setLoadingState(false)
     }
-    if (sdk == currentSdk)
+
+    if (sdk == currentSdk) {
       return
+    }
 
     withContext(Dispatchers.EDT) {
       toolWindowPanel?.startLoadingSdk()
     }
+
     val previousSdk = currentSdk
     currentSdk = sdk
     if (sdk == null) {
       return
     }
-    manager = PythonPackageManager.forSdk(project, currentSdk!!)
+
+    manager = PythonPackageManager.forSdk(project, sdk)
     manager.repositoryManager.initCaches()
     runPackagingOperationOrShowErrorDialog(sdk, message("python.packaging.operation.failed.title")) {
       manager.reloadPackages()
     }
 
-    withContext(Dispatchers.Main) {
+    withContext(Dispatchers.EDT) {
       toolWindowPanel?.contentVisible = currentSdk != null
       if (currentSdk == null || currentSdk != previousSdk) {
         toolWindowPanel?.setEmpty()
@@ -189,7 +198,6 @@ class PyPackagingToolWindowService(val project: Project, val serviceScope: Corou
       }
     })
   }
-
 
   suspend fun refreshInstalledPackages() {
     val packages = manager.installedPackages.map {
@@ -258,6 +266,11 @@ class PyPackagingToolWindowService(val project: Project, val serviceScope: Corou
     }
   }
 
+  private suspend fun handleActionCompleted(text: @Nls String) {
+    VirtualFileManager.getInstance().asyncRefresh()
+    showPackagingNotification(text)
+  }
+
   private suspend fun showPackagingNotification(text: @Nls String) {
     val notification = NotificationGroupManager.getInstance()
       .getNotificationGroup("PythonPackages")
@@ -281,7 +294,8 @@ class PyPackagingToolWindowService(val project: Project, val serviceScope: Corou
       .sortedWith(comparator)
       .limitResultAndFilterOutInstalled(repository, skipItems)
     val exactMatch = shownPackages.indexOfFirst { StringUtil.equalsIgnoreCase(it.name, query) }
-    return PyPackagesViewData(repository, shownPackages, exactMatch, packageNames.size - shownPackages.size)
+    val moreItems = (packageNames.size - (skipItems + PACKAGES_LIMIT)).takeIf { it > 0 } ?: 0
+    return PyPackagesViewData(repository, shownPackages, exactMatch, moreItems)
   }
 
 
@@ -289,7 +303,6 @@ class PyPackagingToolWindowService(val project: Project, val serviceScope: Corou
     searchJob?.cancel()
     serviceScope.cancel()
   }
-
 
   fun reloadPackages() {
     serviceScope.launch(Dispatchers.IO) {
@@ -299,7 +312,7 @@ class PyPackagingToolWindowService(val project: Project, val serviceScope: Corou
             manager.reloadPackages()
           }
           refreshInstalledPackages()
-          manager.repositoryManager.refreshCashes()
+          manager.repositoryManager.refreshCaches()
         }
       }
     }

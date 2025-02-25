@@ -1,6 +1,16 @@
 ### auto-generated section `build kotlin.j2k.k1.old.post-processing` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
+
+create_kotlinc_options(
+  name = "custom",
+  context_receivers = True,
+  opt_in = [
+    "org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
+    "org.jetbrains.kotlin.analysis.api.KaIdeApi",
+    "org.jetbrains.kotlin.analysis.api.KaNonPublicApi",
+  ]
+)
 
 jvm_resources(
   name = "kotlin-j2k-k1-old-post-processing_resources",
@@ -12,14 +22,13 @@ jvm_library(
   name = "kotlin-j2k-k1-old-post-processing",
   module_name = "kotlin.j2k.k1.old.post-processing",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
+  kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_analysis-api",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_kotlin-compiler-fe10",
+    "@lib//:kotlinc-analysis-api",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-kotlin-compiler-fe10",
     "//plugins/kotlin/base/util:kotlin-base-util",
     "//plugins/kotlin/core",
     "//plugins/kotlin/frontend-independent:fir-frontend-independent",
@@ -35,6 +44,8 @@ jvm_library(
     "//platform/lang-impl",
     "//plugins/kotlin/j2k/shared:kotlin-j2k-shared",
     "//plugins/kotlin/j2k/k1.old:kotlin-j2k-k1-old",
+    "//plugins/kotlin/base/analysis-api/analysis-api-utils:kotlin-base-analysis-api-utils",
+    "//plugins/kotlin/code-insight/inspections-shared:kotlin-code-insight-inspections-shared",
   ],
   runtime_deps = [":kotlin-j2k-k1-old-post-processing_resources"]
 )

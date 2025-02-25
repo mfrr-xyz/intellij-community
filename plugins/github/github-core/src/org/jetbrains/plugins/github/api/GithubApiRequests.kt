@@ -12,10 +12,11 @@ import org.jetbrains.plugins.github.api.data.commit.GHCommitFiles
 import org.jetbrains.plugins.github.api.data.pullrequest.GHPullRequestRestIdOnly
 import org.jetbrains.plugins.github.api.data.request.*
 import org.jetbrains.plugins.github.api.util.GithubApiPagesLoader
-import org.jetbrains.plugins.github.api.util.GithubApiSearchQueryBuilder
-import org.jetbrains.plugins.github.api.util.GithubApiUrlQueryBuilder
+import org.jetbrains.plugins.github.api.util.GithubApiSearchQueryBuilder.Companion.searchQuery
+import org.jetbrains.plugins.github.api.util.GithubApiUrlQueryBuilder.Companion.paginationQuery
+import org.jetbrains.plugins.github.api.util.GithubApiUrlQueryBuilder.Companion.urlQuery
 import org.jetbrains.plugins.github.pullrequest.data.GHPRIdentifier
-import org.jetbrains.plugins.github.pullrequest.data.GHPRSearchQuery
+import org.jetbrains.plugins.github.pullrequest.data.GHPRSearchQuery.QualifierName
 import java.awt.image.BufferedImage
 
 /**
@@ -58,28 +59,33 @@ object GithubApiRequests {
       @JvmStatic
       fun pages(
         server: GithubServerPath,
-        type: Type = Type.DEFAULT,
-        visibility: Visibility = Visibility.DEFAULT,
-        affiliation: Affiliation = Affiliation.DEFAULT,
+        type: Type? = null,
+        visibility: Visibility? = null,
+        affiliations: Set<Affiliation>? = null,
         pagination: GithubRequestPagination? = null,
       ) =
-        GithubApiPagesLoader.Request(get(server, type, visibility, affiliation, pagination), ::get)
+        GithubApiPagesLoader.Request(get(server, type, visibility, affiliations, pagination), ::get)
 
       @JvmOverloads
       @JvmStatic
       fun get(
         server: GithubServerPath,
-        type: Type = Type.DEFAULT,
-        visibility: Visibility = Visibility.DEFAULT,
-        affiliation: Affiliation = Affiliation.DEFAULT,
+        type: Type? = null,
+        visibility: Visibility? = null,
+        affiliations: Set<Affiliation>? = null,
         pagination: GithubRequestPagination? = null,
       ): GithubApiRequest<GithubResponsePage<GithubRepo>> {
-        if (type != Type.DEFAULT && (visibility != Visibility.DEFAULT || affiliation != Affiliation.DEFAULT)) {
+        if (type != null && (visibility != null || affiliations != null)) {
           throw IllegalArgumentException("Param 'type' should not be used together with 'visibility' or 'affiliation'")
         }
 
         return get(getUrl(server, CurrentUser.urlSuffix, urlSuffix,
-                          getQuery(type.toString(), visibility.toString(), affiliation.toString(), pagination?.toString().orEmpty())))
+                          urlQuery {
+                            param(Type.KEY, type?.value)
+                            param(Visibility.KEY, visibility?.value)
+                            param(Affiliation.KEY, affiliations?.let(Affiliation::combine))
+                            param(pagination)
+                          }))
       }
 
       @JvmStatic
@@ -102,7 +108,7 @@ object GithubApiRequests {
         GithubApiPagesLoader.Request(get(server, pagination), ::get)
 
       fun get(server: GithubServerPath, pagination: GithubRequestPagination? = null) =
-        get(getUrl(server, CurrentUser.urlSuffix, urlSuffix, getQuery(pagination?.toString().orEmpty())))
+        get(getUrl(server, CurrentUser.urlSuffix, urlSuffix, paginationQuery(pagination)))
 
       fun get(url: String) = Get.jsonPage<GithubOrg>(url)
         .withOperation(GithubApiRequestOperation.RestGetOrganizations)
@@ -120,7 +126,7 @@ object GithubApiRequests {
       @JvmOverloads
       @JvmStatic
       fun get(server: GithubServerPath, organisation: String, pagination: GithubRequestPagination? = null) =
-        get(getUrl(server, Organisations.urlSuffix, "/", organisation, urlSuffix, getQuery(pagination?.toString().orEmpty())))
+        get(getUrl(server, Organisations.urlSuffix, "/", organisation, urlSuffix, paginationQuery(pagination)))
 
       @JvmStatic
       fun get(url: String) = Get.jsonPage<GithubRepo>(url)
@@ -166,13 +172,20 @@ object GithubApiRequests {
       @JvmOverloads
       @JvmStatic
       fun list(server: GithubServerPath, username: String, repoName: String, path: String, ref: String? = null, pagination: GithubRequestPagination) =
-        list(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, "/$path", getQuery(if (ref == null) "" else "ref=$ref", pagination.toString())))
-
+        list(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, "/$path", urlQuery {
+            if (ref != null) {
+              param("ref", ref)
+            }
+            param(pagination)
+          }))
       @JvmOverloads
       @JvmStatic
       fun get(server: GithubServerPath, username: String, repoName: String, path: String, ref: String? = null) =
-        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, "/$path", getQuery(if (ref == null) "" else "ref=$ref")))
-
+        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, "/$path", urlQuery {
+            if (ref != null) {
+              param("ref", ref)
+            }
+          }))
       @JvmStatic
       fun list(url: String) = Get.jsonPage<GithubContent>(url)
         .withOperation(GithubApiRequestOperation.RestGetContents)
@@ -194,7 +207,7 @@ object GithubApiRequests {
       @JvmOverloads
       @JvmStatic
       fun get(server: GithubServerPath, username: String, repoName: String, pagination: GithubRequestPagination? = null) =
-        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, getQuery(pagination?.toString().orEmpty())))
+        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, paginationQuery(pagination)))
 
       @JvmStatic
       fun get(url: String) = Get.jsonPage<GithubBranch>(url)
@@ -210,7 +223,7 @@ object GithubApiRequests {
       @JvmOverloads
       @JvmStatic
       fun get(server: GithubServerPath, username: String, repoName: String, pagination: GithubRequestPagination? = null) =
-        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, getQuery(pagination?.toString().orEmpty())))
+        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, paginationQuery(pagination)))
 
       @JvmStatic
       fun get(url: String) = Get.jsonPage<GithubTagInfo>(url)
@@ -272,7 +285,7 @@ object GithubApiRequests {
       @JvmOverloads
       @JvmStatic
       fun get(server: GithubServerPath, username: String, repoName: String, pagination: GithubRequestPagination? = null) =
-        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, getQuery(pagination?.toString().orEmpty())))
+        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, paginationQuery(pagination)))
 
       @JvmStatic
       fun get(url: String) = Get.jsonPage<GithubRepo>(url)
@@ -289,7 +302,7 @@ object GithubApiRequests {
       @JvmOverloads
       @JvmStatic
       fun get(server: GithubServerPath, username: String, repoName: String, pagination: GithubRequestPagination? = null) =
-        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, getQuery(pagination?.toString().orEmpty())))
+        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, paginationQuery(pagination)))
 
       @JvmStatic
       fun get(url: String) = Get.jsonPage<GithubUser>(url)
@@ -306,7 +319,7 @@ object GithubApiRequests {
       @JvmOverloads
       @JvmStatic
       fun get(server: GithubServerPath, username: String, repoName: String, pagination: GithubRequestPagination? = null) =
-        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, getQuery(pagination?.toString().orEmpty())))
+        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, paginationQuery(pagination)))
 
       @JvmStatic
       fun get(url: String) = Get.jsonPage<GithubIssueLabel>(url)
@@ -323,7 +336,7 @@ object GithubApiRequests {
       @JvmOverloads
       @JvmStatic
       fun get(server: GithubServerPath, username: String, repoName: String, pagination: GithubRequestPagination? = null) =
-        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, getQuery(pagination?.toString().orEmpty())))
+        get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix, paginationQuery(pagination)))
 
       @JvmStatic
       fun get(url: String) = Get.jsonPage<GithubUserWithPermissions>(url)
@@ -369,7 +382,7 @@ object GithubApiRequests {
         state: String? = null, assignee: String? = null, pagination: GithubRequestPagination? = null,
       ) =
         get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", urlSuffix,
-                   GithubApiUrlQueryBuilder.urlQuery { param("state", state); param("assignee", assignee); param(pagination) }))
+                   urlQuery { param("state", state); param("assignee", assignee); param(pagination) }))
 
       @JvmStatic
       fun get(url: String) = Get.jsonPage<GithubIssue>(url)
@@ -426,7 +439,7 @@ object GithubApiRequests {
           pagination: GithubRequestPagination? = null,
         ) =
           get(getUrl(server, Repos.urlSuffix, "/$username/$repoName", Issues.urlSuffix, "/", issueId, urlSuffix,
-                     GithubApiUrlQueryBuilder.urlQuery { param(pagination) }))
+                     urlQuery { param(pagination) }))
 
         @JvmStatic
         fun get(url: String) = Get.jsonPage<GithubIssueCommentWithHtml>(url, GithubApiContentHelper.V3_HTML_JSON_MIME_TYPE)
@@ -453,10 +466,10 @@ object GithubApiRequests {
         baseRef: String? = null,
         headRef: String? = null,
       ): GithubApiRequest<GithubResponsePage<GHPullRequestRestIdOnly>> =
-        Get.jsonPage<GHPullRequestRestIdOnly>(getUrl(repository, urlSuffix, buildQuery {
-          put("state", state?.toString())
-          put("base", baseRef)
-          put("head", headRef)
+        Get.jsonPage<GHPullRequestRestIdOnly>(getUrl(repository, urlSuffix, urlQuery {
+          param("state", state?.toString())
+          param("base", baseRef)
+          param("head", headRef)
         }))
           .withOperation(GithubApiRequestOperation.RestGetPullRequests)
           .withOperationName("find pull requests")
@@ -508,7 +521,7 @@ object GithubApiRequests {
       @JvmStatic
       fun getListETag(server: GithubServerPath, repoPath: GHRepositoryPath) =
         object : Get<String?>(getUrl(server, Repos.urlSuffix, "/$repoPath", urlSuffix,
-                                     GithubApiUrlQueryBuilder.urlQuery { param(GithubRequestPagination(pageSize = 1)) })) {
+                                     urlQuery { param(GithubRequestPagination(pageSize = 1)) })) {
           override fun extractResult(response: GithubApiResponse) = response.findHeader("ETag")
         }
           .withOperation(GithubApiRequestOperation.RestGetPullRequestListETag)
@@ -582,11 +595,11 @@ object GithubApiRequests {
         pagination: GithubRequestPagination? = null,
       ) =
         get(getUrl(server, Search.urlSuffix, urlSuffix,
-                   GithubApiUrlQueryBuilder.urlQuery {
-                     param("q", GithubApiSearchQueryBuilder.searchQuery {
-                       term(GHPRSearchQuery.QualifierName.repo.createTerm(repoPath?.toString().orEmpty()))
-                       term(GHPRSearchQuery.QualifierName.state.createTerm(state.orEmpty()))
-                       term(GHPRSearchQuery.QualifierName.assignee.createTerm(assignee.orEmpty()))
+                   urlQuery {
+                     param("q", searchQuery {
+                       term(QualifierName.repo.createTerm(repoPath?.toString().orEmpty()))
+                       term(QualifierName.state.createTerm(state.orEmpty()))
+                       term(QualifierName.assignee.createTerm(assignee.orEmpty()))
                        query(query)
                      })
                      param(pagination)
@@ -622,25 +635,4 @@ object GithubApiRequests {
     getUrl(repository.serverPath, Repos.urlSuffix, "/", repository.repositoryPath.toString(), *suffixes)
 
   fun getUrl(server: GithubServerPath, vararg suffixes: String) = StringBuilder(server.toApiUrl()).append(*suffixes).toString()
-
-  private fun buildQuery(builder: MutableMap<String, String?>.() -> Unit): String {
-    val parts = mutableMapOf<String, String?>().apply(builder).mapNotNull { (key, value) ->
-      if (value != null) "${key}=${value}"
-      else null
-    }
-    return getQuery(parts)
-  }
-
-  private fun getQuery(vararg queryParts: String): String = getQuery(queryParts.toList())
-
-  private fun getQuery(queryParts: Iterable<String>): String {
-    val builder = StringBuilder()
-    for (part in queryParts) {
-      if (part.isEmpty()) continue
-      if (builder.isEmpty()) builder.append("?")
-      else builder.append("&")
-      builder.append(part)
-    }
-    return builder.toString()
-  }
 }

@@ -1067,7 +1067,9 @@ open class FileEditorManagerImpl(
 
   internal suspend fun checkForbidSplitAndOpenFile(window: EditorWindow, file: VirtualFile, options: FileEditorOpenOptions) {
     if (forbidSplitFor(file) && !window.isFileOpen(file)) {
-      closeFile(file)
+      withContext(Dispatchers.EDT) {
+        closeFile(file)
+      }
     }
 
     if (!ClientId.isCurrentlyUnderLocalId) {
@@ -1483,6 +1485,7 @@ open class FileEditorManagerImpl(
     return result
   }
 
+  @RequiresEdt
   override fun getSelectedTextEditorWithRemotes(): Array<Editor> {
     val result = ArrayList<Editor>()
     for (e in selectedEditorWithRemotes) {
@@ -2143,7 +2146,7 @@ open class FileEditorManagerImpl(
     windowAdded: suspend () -> Unit,
   ) {
     if (items.isEmpty()) {
-      LOG.warn("no files to reopen")
+      LOG.info("no files to reopen")
       return
     }
 
@@ -2312,7 +2315,8 @@ suspend fun waitForFullyCompleted(composite: FileEditorComposite) {
   }
 }
 
-internal fun getOpenMode(event: AWTEvent): FileEditorManagerImpl.OpenMode {
+@Internal
+fun getOpenMode(event: AWTEvent): FileEditorManagerImpl.OpenMode {
   if (event is MouseEvent) {
     val isMouseClick = event.getID() == MouseEvent.MOUSE_CLICKED || event.getID() == MouseEvent.MOUSE_PRESSED || event.getID() == MouseEvent.MOUSE_RELEASED
     val modifiers = event.modifiersEx
@@ -2463,7 +2467,10 @@ private suspend fun updateFileNames(allSplitters: Set<EditorsSplitters>, file: V
 internal fun isSingletonFileEditor(fileEditor: FileEditor?): Boolean = FileEditorManagerKeys.SINGLETON_EDITOR_IN_WINDOW.get(fileEditor, false)
 
 private fun isSingletonDockWindow(window: EditorWindow): Boolean {
-  if (getWindowDockContainer(window) == null) return false
+  val windowDockContainer = getWindowDockContainer(window)
+  if (windowDockContainer == null || windowDockContainer == window.manager.dockContainer) {
+    return false
+  }
   return window.tabCount == 1 && window.composites().all { composite ->
     composite.allEditors.any { isSingletonFileEditor(it) }
   }

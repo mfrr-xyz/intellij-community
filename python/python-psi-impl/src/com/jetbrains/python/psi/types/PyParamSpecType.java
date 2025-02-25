@@ -1,5 +1,6 @@
 package com.jetbrains.python.psi.types;
 
+import com.intellij.openapi.util.Ref;
 import com.jetbrains.python.psi.PyQualifiedNameOwner;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -17,10 +18,10 @@ import java.util.Objects;
  * @see PyConcatenateType
  */
 public final class PyParamSpecType implements PyTypeParameterType, PyCallableParameterVariadicType {
-  @NotNull private final String myName;
-  @Nullable private final PyQualifiedNameOwner myDeclarationElement;
-  @Nullable private final PyCallableParameterVariadicType myDefaultType;
-  @Nullable private final PyQualifiedNameOwner myScopeOwner;
+  private final @NotNull String myName;
+  private final @Nullable PyQualifiedNameOwner myDeclarationElement;
+  private final @Nullable Ref<PyCallableParameterVariadicType> myDefaultType;
+  private final @Nullable PyQualifiedNameOwner myScopeOwner;
 
   public PyParamSpecType(@NotNull String name) {
     this(name, null, null, null);
@@ -28,7 +29,7 @@ public final class PyParamSpecType implements PyTypeParameterType, PyCallablePar
 
   private PyParamSpecType(@NotNull String name,
                           @Nullable PyQualifiedNameOwner declarationElement,
-                          @Nullable PyCallableParameterVariadicType defaultType,
+                          @Nullable Ref<PyCallableParameterVariadicType> defaultType,
                           @Nullable PyQualifiedNameOwner scopeOwner) {
     myName = name;
     myDeclarationElement = declarationElement;
@@ -36,18 +37,15 @@ public final class PyParamSpecType implements PyTypeParameterType, PyCallablePar
     myScopeOwner = scopeOwner;
   }
 
-  @NotNull
-  public PyParamSpecType withDeclarationElement(@Nullable PyQualifiedNameOwner declarationElement) {
+  public @NotNull PyParamSpecType withDeclarationElement(@Nullable PyQualifiedNameOwner declarationElement) {
     return new PyParamSpecType(myName, declarationElement, myDefaultType, myScopeOwner);
   }
 
-  @NotNull
-  public PyParamSpecType withScopeOwner(@Nullable PyQualifiedNameOwner scopeOwner) {
+  public @NotNull PyParamSpecType withScopeOwner(@Nullable PyQualifiedNameOwner scopeOwner) {
     return new PyParamSpecType(myName, myDeclarationElement, myDefaultType, scopeOwner);
   }
 
-  @NotNull
-  public PyParamSpecType withDefaultType(@Nullable PyCallableParameterVariadicType defaultType) {
+  public @NotNull PyParamSpecType withDefaultType(@Nullable Ref<PyCallableParameterVariadicType> defaultType) {
     return new PyParamSpecType(myName, myDeclarationElement, defaultType, myScopeOwner);
   }
 
@@ -56,9 +54,8 @@ public final class PyParamSpecType implements PyTypeParameterType, PyCallablePar
     return myDeclarationElement;
   }
 
-  @NotNull
   @Override
-  public String getName() {
+  public @NotNull String getName() {
     return "**" + myName;
   }
 
@@ -74,13 +71,11 @@ public final class PyParamSpecType implements PyTypeParameterType, PyCallablePar
   }
 
   @Override
-  @Nullable
-  public PyCallableParameterVariadicType getDefaultType() {
+  public @Nullable Ref<PyCallableParameterVariadicType> getDefaultType() {
     return myDefaultType;
   }
 
-  @NotNull
-  public String getVariableName() {
+  public @NotNull String getVariableName() {
     return myName;
   }
 
@@ -99,5 +94,13 @@ public final class PyParamSpecType implements PyTypeParameterType, PyCallablePar
   @Override
   public int hashCode() {
     return myName.hashCode();
+  }
+
+  @Override
+  public <T> T acceptTypeVisitor(@NotNull PyTypeVisitor<T> visitor) {
+    if (visitor instanceof PyTypeVisitorExt<T> visitorExt) {
+      return visitorExt.visitPyParamSpecType(this);
+    }
+    return visitor.visitPyTypeParameterType(this);
   }
 }

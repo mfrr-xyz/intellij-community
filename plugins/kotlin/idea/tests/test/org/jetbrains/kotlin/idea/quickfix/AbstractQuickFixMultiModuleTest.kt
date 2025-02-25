@@ -8,7 +8,6 @@ import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.TestDialog
 import com.intellij.openapi.ui.TestDialogManager
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.testFramework.core.FileComparisonFailedError
 import com.intellij.psi.PsiFile
 import com.intellij.testFramework.IdeaTestUtil
@@ -64,18 +63,7 @@ abstract class AbstractQuickFixMultiModuleTest : AbstractMultiModuleTest(), Quic
         }
     }
 
-    private fun VirtualFile.toIOFile(): File? {
-        val paths = mutableListOf<String>()
-        var vFile: VirtualFile? = this
-        while (vFile != null) {
-            vFile.sourceIOFile()?.let {
-                return File(it, paths.reversed().joinToString("/"))
-            }
-            paths.add(vFile.name)
-            vFile = vFile.parent
-        }
-        return null
-    }
+    protected open val actionPrefix: String? = null
 
     private fun doQuickFixTest(dirPath: String) {
         KotlinTestHelpers.registerChooserInterceptor(testRootDisposable)
@@ -92,7 +80,7 @@ abstract class AbstractQuickFixMultiModuleTest : AbstractMultiModuleTest(), Quic
         project.executeCommand("") {
             var expectedErrorMessage = ""
             try {
-                val actionHint = ActionHint.parse(actionFile, actionFileText)
+                val actionHint = ActionHint.parse(actionFile, actionFileText, actionPrefix?.let { ".*//(?: $it)?" } ?: "//", true)
                 val text = actionHint.expectedText
 
                 val actionShouldBeAvailable = actionHint.shouldPresent()
@@ -121,9 +109,11 @@ abstract class AbstractQuickFixMultiModuleTest : AbstractMultiModuleTest(), Quic
                         editor,
                         actionShouldBeAvailable,
                         actionFileName,
+                        actionHint,
                         this::availableActions,
                         this::doHighlighting,
-                        InTextDirectivesUtils.isDirectiveDefined(actionFile.text, "// SHOULD_BE_AVAILABLE_AFTER_EXECUTION")
+                        pluginMode = pluginMode,
+                        shouldBeAvailableAfterExecution = InTextDirectivesUtils.isDirectiveDefined(actionFile.text, "// SHOULD_BE_AVAILABLE_AFTER_EXECUTION")
                     )
 
                     TypeAccessibilityChecker.testLog.toString()
@@ -178,7 +168,7 @@ abstract class AbstractQuickFixMultiModuleTest : AbstractMultiModuleTest(), Quic
             setActiveEditor(editedFile.findExistingEditor() ?: createEditor(editedFile.virtualFile))
             try {
                 checkResultByFile(afterFileInTestData.relativeTo(File(testDataPath)).path)
-            } catch (e: FileComparisonFailedError) {
+            } catch (_: FileComparisonFailedError) {
                 KotlinTestUtils.assertEqualsToFile(afterFileInTestData, editor)
             }
         }

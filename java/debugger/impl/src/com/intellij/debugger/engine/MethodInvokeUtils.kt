@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.debugger.engine
 
 import com.intellij.debugger.engine.DebuggerUtils.isPrimitiveType
@@ -6,6 +6,7 @@ import com.intellij.debugger.engine.MethodInvokeUtils.getHelperExceptionStackTra
 import com.intellij.debugger.engine.evaluation.EvaluateException
 import com.intellij.debugger.engine.evaluation.EvaluationContextImpl
 import com.intellij.debugger.engine.evaluation.expression.BoxingEvaluator
+import com.intellij.debugger.impl.DebuggerUtilsAsync
 import com.intellij.debugger.impl.DebuggerUtilsEx
 import com.intellij.debugger.impl.DebuggerUtilsEx.isVoid
 import com.intellij.debugger.impl.DebuggerUtilsImpl
@@ -14,31 +15,60 @@ import com.intellij.openapi.diagnostic.Attachment
 import com.intellij.openapi.diagnostic.RuntimeExceptionWithAttachments
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.CommonClassNames
 import com.intellij.rt.debugger.MethodInvoker
 import com.intellij.util.BitUtil.isSet
 import com.sun.jdi.*
 import com.sun.jdi.ObjectReference.INVOKE_NONVIRTUAL
+import org.jetbrains.annotations.ApiStatus
 
+@ApiStatus.Internal
 object MethodInvokeUtils {
   fun getHelperExceptionStackTrace(evaluationContext: EvaluationContextImpl, e: Exception): String? {
-    e as? EvaluateException ?: return null
+    if (e !is EvaluateException) return null
     val exceptionFromTargetVM = e.exceptionFromTargetVM ?: return null
-    var exceptionStack = DebuggerUtilsImpl.getExceptionText(evaluationContext, exceptionFromTargetVM)
-    if (!exceptionStack.isNullOrEmpty()) {
-      // drop user frames
-      val currentStackDepth = DebugProcessImpl.getEvaluationThread(evaluationContext).frameCount()
-      val lines = StringUtil.splitByLines(exceptionStack) // exclude empty lines
-      if (lines.size > currentStackDepth) {
-        return lines.asSequence().take(lines.size - currentStackDepth).joinToString(separator = "\n")
-      }
-      else {
-        logger<MethodInvokeUtils>().error("Invalid helper stack (expected currentStackDepth = ${currentStackDepth}) : ${exceptionStack}")
-        return exceptionStack
-      }
+    val values = DebuggerUtilsImpl.invokeThrowableGetStackTrace(exceptionFromTargetVM, evaluationContext, true)?.values
+    if (values.isNullOrEmpty()) return null
+    // drop user frames
+    val currentStackDepth = DebugProcessImpl.getEvaluationThread(evaluationContext).frameCount()
+    val keepLines = if (values.size <= currentStackDepth) values.size else values.size - currentStackDepth
+    val stackTraceString = getExceptionTextFromStackTraceValues(evaluationContext, exceptionFromTargetVM, values, keepLines)
+    if (values.size <= currentStackDepth) {
+      logger<MethodInvokeUtils>().error("Invalid helper stack (expected currentStackDepth = ${currentStackDepth}) : ${stackTraceString}")
     }
-    return null
+    return stackTraceString
+  }
+
+  /**
+   * Slow implementation and does not include async stack trace, but does not use helpers
+   */
+  @JvmStatic
+  fun getExceptionTextViaArray(evaluationContext: EvaluationContextImpl, exceptionObject: ObjectReference): String? {
+    val values = DebuggerUtilsImpl.invokeThrowableGetStackTrace(exceptionObject, evaluationContext, true)?.values
+    if (values.isNullOrEmpty()) return null
+    return getExceptionTextFromStackTraceValues(evaluationContext, exceptionObject, values)
+  }
+
+  private fun getExceptionTextFromStackTraceValues(
+    evaluationContext: EvaluationContextImpl,
+    exceptionObject: ObjectReference,
+    stackTraceValues: List<Value>,
+    keepLines: Int = Int.MAX_VALUE,
+  ): String? {
+    return DebuggerUtils.getValueAsString(evaluationContext, exceptionObject) + "\n" +
+           stackTraceValues.asSequence()
+             .take(keepLines)
+             .map { "\tat ${DebuggerUtils.getValueAsString(evaluationContext, it)}" }
+             .joinToString(separator = "\n", postfix = "\n")
+  }
+
+  fun getMethodHandlesImplLookup(evaluationContext: EvaluationContextImpl): ObjectReference? {
+    val theClass = evaluationContext.debugProcess.findClass(evaluationContext,
+                                                            "java.lang.invoke.MethodHandles\$Lookup",
+                                                            null)
+    val theField = DebuggerUtils.findField(theClass,
+                                           "IMPL_LOOKUP")
+    return theClass?.getValue(theField) as? ObjectReference
   }
 }
 
@@ -61,18 +91,31 @@ internal fun tryInvokeWithHelper(
     return InvocationResult(false, null)
   }
 
+  val methodDeclaringType = method.declaringType()
+  require(DebuggerUtilsImpl.instanceOf(type, methodDeclaringType)) { "Invalid method" }
+  if (objRef != null) {
+    require(DebuggerUtilsImpl.instanceOf(objRef.referenceType(), methodDeclaringType)) { "Invalid method" }
+  }
+
+  // Class.forName may check getCallerClass which is different if helper is used
+  if (method.name().equals("forName") && methodDeclaringType.name() == CommonClassNames.JAVA_LANG_CLASS) {
+    return InvocationResult(false, null)
+  }
+
   val debugProcess = evaluationContext.debugProcess
   val invokerArgs = mutableListOf<Value?>()
 
-  val lookupClass =
-    debugProcess.findClass(evaluationContext, "java.lang.invoke.MethodHandles\$Lookup", evaluationContext.getClassLoader())
-  val implLookup = lookupClass.getValue(DebuggerUtils.findField(lookupClass, "IMPL_LOOKUP")) as ObjectReference
+  val implLookup = MethodInvokeUtils.getMethodHandlesImplLookup(evaluationContext)
+  if (implLookup == null) {
+    logger<MethodInvokeUtils>().error("Cannot get MethodHandles.Lookup.IMPL_LOOKUP, java version " + evaluationContext.virtualMachineProxy.version())
+    return InvocationResult(false, null)
+  }
 
   invokerArgs.add(implLookup) // lookup
   invokerArgs.add(type.classObject()) // class
   invokerArgs.add(objRef) // object
   invokerArgs.add(DebuggerUtilsEx.mirrorOfString(method.name() + ";" + method.signature(), evaluationContext)) // method name and descriptor
-  invokerArgs.add(method.declaringType().classLoader()) // method's declaring type class loader to be able to resolve parameter types
+  invokerArgs.add(methodDeclaringType.classLoader()) // method's declaring type class loader to be able to resolve parameter types
 
   // argument values
   val boxedArgs = originalArgs.map { BoxingEvaluator.box(it, evaluationContext) as Value? }
@@ -92,7 +135,14 @@ internal fun tryInvokeWithHelper(
   }
 
   try {
-    return InvocationResult(true, DebuggerUtilsImpl.invokeHelperMethod(evaluationContext, MethodInvoker::class.java, helperMethodName, invokerArgs, false))
+    var value = DebuggerUtilsImpl.invokeHelperMethod(evaluationContext, MethodInvoker::class.java, helperMethodName, invokerArgs, false)
+    if (value is ArrayReference) { // wrapped
+      val wrapper = value
+      value = value.getValue(0)
+      DebuggerUtilsAsync.disableCollection(value)
+      wrapper.setValue(0, null) // clear the reference TODO: make async
+    }
+    return InvocationResult(true, value)
   }
   catch (e: Exception) {
     val helperExceptionStackTrace = getHelperExceptionStackTrace(evaluationContext, e)
@@ -105,7 +155,7 @@ internal fun tryInvokeWithHelper(
     }
     if (ApplicationManager.getApplication().isInternal) {
       val attachments = listOfNotNull(helperExceptionStackTrace?.let { Attachment("helper_stack.txt", it).apply { isIncluded = true } }).toTypedArray()
-      DebuggerUtilsImpl.logError("Exception from helper (while evaluating ${method.declaringType().name() + "." + method.name()}): ${e.message}",
+      DebuggerUtilsImpl.logError("Exception from helper (while evaluating ${methodDeclaringType.name() + "." + method.name()}): ${e.message}",
                                  RuntimeExceptionWithAttachments(e, *attachments)) // log helper exception if available
     }
     return InvocationResult(false, null)

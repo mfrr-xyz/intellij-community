@@ -19,7 +19,6 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.FileUtilRt;
-import com.intellij.openapi.util.io.NioPathUtil;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -38,10 +37,7 @@ import org.jetbrains.plugins.gradle.model.data.GradleProjectBuildScriptData;
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings;
 import org.jetbrains.plugins.gradle.settings.GradleSettings;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -82,8 +78,7 @@ public final class GradleUtil {
    * @return gradle wrapper settings should be used with gradle wrapper for the gradle project located at the given path
    * if any; {@code null} otherwise
    */
-  @Nullable
-  public static WrapperConfiguration getWrapperConfiguration(@Nullable Path gradleProjectPath) {
+  public static @Nullable WrapperConfiguration getWrapperConfiguration(@Nullable Path gradleProjectPath) {
     Path wrapperPropertiesFile = findDefaultWrapperPropertiesFile(gradleProjectPath);
     if (wrapperPropertiesFile == null) {
       return null;
@@ -94,16 +89,12 @@ public final class GradleUtil {
   /**
    * @deprecated Use {@link GradleUtil#getWrapperConfiguration(Path)} instead.
    */
-  @Nullable
   @Deprecated
-  public static WrapperConfiguration getWrapperConfiguration(@Nullable String gradleProjectPath) {
+  public static @Nullable WrapperConfiguration getWrapperConfiguration(@Nullable String gradleProjectPath) {
     if (gradleProjectPath == null) {
       return null;
     }
-    Path projectPath = NioPathUtil.toNioPathOrNull(gradleProjectPath);
-    if (projectPath == null) {
-      return null;
-    }
+    Path projectPath = Path.of(gradleProjectPath);
     return getWrapperConfiguration(projectPath);
   }
 
@@ -114,10 +105,16 @@ public final class GradleUtil {
     return configuration;
   }
 
-  public static boolean writeWrapperConfiguration(@NotNull Path targetPath, @NotNull WrapperConfiguration wrapperConfiguration) {
+  public static boolean writeWrapperConfiguration(@NotNull WrapperConfiguration wrapperConfiguration, @NotNull Path targetPath) {
     Properties wrapperProperties = new Properties();
     setFromWrapperConfiguration(wrapperConfiguration, wrapperProperties);
     return writeGradleProperties(wrapperProperties, targetPath);
+  }
+
+  public static byte @NotNull [] writeWrapperConfigurationToByteArray(@NotNull WrapperConfiguration wrapperConfiguration) {
+    Properties wrapperProperties = new Properties();
+    setFromWrapperConfiguration(wrapperConfiguration, wrapperProperties);
+    return writeWrapperConfigurationToByteArray(wrapperProperties);
   }
 
   public static @Nullable WrapperConfiguration readWrapperConfiguration(@NotNull Path wrapperPropertiesFile) {
@@ -162,7 +159,7 @@ public final class GradleUtil {
     }
     catch (IOException e) {
       GradleLog.LOG.warn(
-        String.format("I/O exception on reading gradle properties file at '%s'", propertiesFile.toAbsolutePath()), e);
+        String.format("I/O exception on reading Gradle properties file at '%s'", propertiesFile.toAbsolutePath()), e);
     }
     return null;
   }
@@ -177,6 +174,18 @@ public final class GradleUtil {
         String.format("I/O exception on writing Gradle properties into '%s'", propertiesFile.toAbsolutePath()), e);
     }
     return false;
+  }
+
+  private static byte @NotNull [] writeWrapperConfigurationToByteArray(@NotNull Properties properties) {
+    try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+         BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.ISO_8859_1))) {
+      properties.store(writer, null);
+      return output.toByteArray();
+    }
+    catch (IOException e) {
+      // the ByteArrayOutputStream doesn't throw IOException
+      throw new RuntimeException(e);
+    }
   }
 
   private static void applyPropertyValue(@NotNull Properties props,
@@ -224,8 +233,7 @@ public final class GradleUtil {
    * @param rootProjectPath path to root project's directory which contains 'build.gradle'
    * @return path to the given sub-project's directory which contains 'build.gradle'
    */
-  @NotNull
-  public static String getConfigPath(@NotNull GradleProject subProject, @NotNull String rootProjectPath) {
+  public static @NotNull String getConfigPath(@NotNull GradleProject subProject, @NotNull String rootProjectPath) {
     try {
       GradleScript script = subProject.getBuildScript();
       if (script != null) {
@@ -262,8 +270,7 @@ public final class GradleUtil {
     return buffer.toString();
   }
 
-  @NotNull
-  public static String getLastUsedGradleHome() {
+  public static @NotNull String getLastUsedGradleHome() {
     return PropertiesComponent.getInstance().getValue(LAST_USED_GRADLE_HOME_KEY, "");
   }
 
@@ -274,21 +281,16 @@ public final class GradleUtil {
   /**
    * @deprecated Use {@link GradleUtil#findDefaultWrapperPropertiesFile(Path)} instead.
    */
-  @Nullable
   @Deprecated
-  public static Path findDefaultWrapperPropertiesFile(@Nullable String gradleProjectPath) {
+  public static @Nullable Path findDefaultWrapperPropertiesFile(@Nullable String gradleProjectPath) {
     if (gradleProjectPath == null) {
       return null;
     }
-    Path nioProjectPath = NioPathUtil.toNioPathOrNull(gradleProjectPath);
-    if (nioProjectPath == null) {
-      return null;
-    }
+    Path nioProjectPath = Path.of(gradleProjectPath);
     return findDefaultWrapperPropertiesFile(nioProjectPath);
   }
 
-  @Nullable
-  public static Path findDefaultWrapperPropertiesFile(@Nullable Path root) {
+  public static @Nullable Path findDefaultWrapperPropertiesFile(@Nullable Path root) {
     if (root == null) {
       return null;
     }
@@ -327,8 +329,7 @@ public final class GradleUtil {
     }
   }
 
-  @NotNull
-  public static String determineRootProject(@NotNull String subProjectPath) {
+  public static @NotNull String determineRootProject(@NotNull String subProjectPath) {
     final Path subProject = Paths.get(subProjectPath);
     Path candidate = subProject;
     try {
@@ -366,8 +367,7 @@ public final class GradleUtil {
    * Module 'module.test' -> ModuleData 'module' instead of GradleSourceSetData 'module.test'
    */
   @ApiStatus.Experimental
-  @Nullable
-  public static DataNode<ModuleData> findGradleModuleData(@NotNull Module module) {
+  public static @Nullable DataNode<ModuleData> findGradleModuleData(@NotNull Module module) {
     String projectPath = ExternalSystemApiUtil.getExternalProjectPath(module);
     if (projectPath == null) return null;
     Project project = module.getProject();
@@ -375,8 +375,7 @@ public final class GradleUtil {
   }
 
   @ApiStatus.Experimental
-  @Nullable
-  public static DataNode<ModuleData> findGradleModuleData(@NotNull Project project, @NotNull String projectPath) {
+  public static @Nullable DataNode<ModuleData> findGradleModuleData(@NotNull Project project, @NotNull String projectPath) {
     return ExternalSystemApiUtil.findModuleNode(project, GradleConstants.SYSTEM_ID, projectPath);
   }
 
@@ -426,8 +425,7 @@ public final class GradleUtil {
     return GradleVersionUtil.isGradleAtLeast(gradleVersion, "3.4");
   }
 
-  @Nullable
-  public static VirtualFile getGradleBuildScriptSource(@NotNull Module module) {
+  public static @Nullable VirtualFile getGradleBuildScriptSource(@NotNull Module module) {
     DataNode<? extends ModuleData> moduleData = findGradleModuleData(module);
     if (moduleData == null) return null;
     DataNode<GradleProjectBuildScriptData> dataNode = ExternalSystemApiUtil.find(moduleData, GradleProjectBuildScriptData.KEY);

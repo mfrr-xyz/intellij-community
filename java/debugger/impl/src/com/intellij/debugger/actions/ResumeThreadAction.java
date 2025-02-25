@@ -22,7 +22,7 @@ import java.util.Objects;
 
 public class ResumeThreadAction extends DebuggerAction {
   @Override
-  public void actionPerformed(@NotNull final AnActionEvent e) {
+  public void actionPerformed(final @NotNull AnActionEvent e) {
     DebuggerTreeNodeImpl[] selectedNode = getSelectedNodes(e.getDataContext());
     final DebuggerContextImpl debuggerContext = getDebuggerContext(e.getDataContext());
     final DebugProcessImpl debugProcess = debuggerContext.getDebugProcess();
@@ -41,7 +41,7 @@ public class ResumeThreadAction extends DebuggerAction {
           protected void action() {
             SuspendContextImpl suspendingContext = SuspendManagerUtil.getSuspendingContext(debugProcess.getSuspendManager(), thread);
             if (suspendingContext != null) {
-              debuggerManagerThread.invoke(debugProcess.createResumeThreadCommand(suspendingContext, thread));
+              debuggerManagerThread.invokeNow(debugProcess.createResumeThreadCommand(suspendingContext, thread));
             }
             ApplicationManager.getApplication().invokeLater(() -> debuggerTreeNode.calcValue());
           }

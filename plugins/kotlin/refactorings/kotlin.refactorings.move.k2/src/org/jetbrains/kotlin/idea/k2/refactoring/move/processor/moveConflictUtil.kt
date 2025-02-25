@@ -17,10 +17,12 @@ import org.jetbrains.kotlin.idea.base.projectStructure.toKaSourceModuleForProduc
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.base.util.module
 import org.jetbrains.kotlin.idea.codeinsight.utils.toVisibility
+import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveTargetDescriptor
 import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.conflict.*
 import org.jetbrains.kotlin.idea.k2.refactoring.move.processor.usages.K2MoveRenameUsageInfo
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.psiUtil.isAncestor
@@ -74,19 +76,24 @@ internal fun findAllMoveConflicts(
     allDeclarationsToMove: Collection<KtNamedDeclaration>,
     targetDir: PsiDirectory,
     targetPkg: FqName,
-    usages: List<MoveRenameUsageInfo>
+    usages: List<MoveRenameUsageInfo>,
+    target: K2MoveTargetDescriptor.Declaration<*>? = null
 ): MultiMap<PsiElement, String> {
     val targetIdeaModule = targetDir.module ?: return MultiMap.empty()
     val targetKaModule = targetIdeaModule.toKaSourceModuleForProductionOrTest() ?: return MultiMap.empty()
     return MultiMap<PsiElement, String>().apply {
         putAllValues(checkMoveExpectedDeclarationIntoPlatformCode(topLevelDeclarationsToMove, targetKaModule))
         putAllValues(checkMoveActualDeclarationIntoCommonModule(topLevelDeclarationsToMove, targetKaModule))
-        putAllValues(checkVisibilityConflictsForInternalUsages(topLevelDeclarationsToMove, allDeclarationsToMove, targetPkg, targetDir))
-        putAllValues(checkVisibilityConflictForNonMovedUsages(allDeclarationsToMove, usages, targetDir))
+        putAllValues(checkVisibilityConflictsForInternalUsages(topLevelDeclarationsToMove, allDeclarationsToMove, targetPkg, targetDir, target))
+        putAllValues(checkVisibilityConflictForNonMovedUsages(allDeclarationsToMove, usages, targetDir, target))
+        putAllValues(checkInternalMemberUsages(allDeclarationsToMove, targetDir))
         putAllValues(checkModuleDependencyConflictsForInternalUsages(topLevelDeclarationsToMove, allDeclarationsToMove, targetDir))
         putAllValues(checkModuleDependencyConflictsForNonMovedUsages(allDeclarationsToMove, usages, targetDir))
         putAllValues(checkSealedClassesConflict(allDeclarationsToMove, targetPkg, targetKaModule, targetIdeaModule))
-        putAllValues(checkNameClashConflicts(allDeclarationsToMove, targetPkg, targetKaModule))
+        putAllValues(checkNameClashConflicts(allDeclarationsToMove, targetPkg, targetKaModule, target?.getTarget() as? KtClassOrObject))
+        putAllValues(checkUsedTypeParameterFromParentClassConflict(allDeclarationsToMove, target))
+        putAllValues(checkFunctionOverriddenInSubclassConflict(allDeclarationsToMove))
+        putAllValues(checkRequiresClassInstanceConflict(usages, allDeclarationsToMove, target))
     }
 }
 

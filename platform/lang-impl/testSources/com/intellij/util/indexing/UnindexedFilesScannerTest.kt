@@ -1,11 +1,11 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.util.indexing
 
 import com.google.common.util.concurrent.SettableFuture
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.application.ReadWriteActionSupport
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileTypes.ExtensionFileNameMatcher
 import com.intellij.openapi.fileTypes.FileType
@@ -27,7 +27,6 @@ import com.intellij.testFramework.*
 import com.intellij.testFramework.assertions.Assertions.assertThat
 import com.intellij.util.application
 import com.intellij.util.concurrency.ThreadingAssertions
-import com.intellij.util.indexing.PerProjectIndexingQueue.QueuedFiles
 import com.intellij.util.indexing.diagnostic.ProjectScanningHistory
 import com.intellij.util.indexing.diagnostic.ScanningType
 import com.intellij.util.indexing.diagnostic.dto.JsonScanningStatistics
@@ -60,7 +59,7 @@ class UnindexedFilesScannerTest {
     @JvmStatic
     fun resetRegisteredIndexes() {
       runInEdtAndWait {
-        val tumbler = FileBasedIndexTumbler("test")
+        val tumbler = FileBasedIndexTumbler("UnindexedFilesScannerTest")
         tumbler.turnOff()
         tumbler.turnOn()
       }
@@ -138,7 +137,7 @@ class UnindexedFilesScannerTest {
 
       val latch = CountDownLatch(1)
       async {
-        writeAction {
+        edtWriteAction {
           latch.await()
         }
       }
@@ -212,12 +211,12 @@ class UnindexedFilesScannerTest {
 
     val filesAndDirs = setupSimpleRepresentativeFolderForIndexing()
 
-    val (_, dirtyFiles) = scanFiles(filesAndDirs)
+    scanFiles(filesAndDirs)
     assertThat(indexer.getAndResetIndexedFiles())
       .withFailMessage("Contentless indexes are applied during scanning")
       .isNotEmpty()
 
-    indexFiles(filesAndDirs, dirtyFiles)
+    indexFiles()
     captureIndexingResults(indexer).assertNoIndexerIndexedFiles("Contentless indexes are applied during scanning. Avoid double indexing.")
   }
 
@@ -395,7 +394,7 @@ class UnindexedFilesScannerTest {
   private fun registerIndexers(indexers: Collection<FileBasedIndexExtension<*, *>>) = registerIndexers(*indexers.toTypedArray())
   private fun registerIndexers(vararg indexers: FileBasedIndexExtension<*, *>) {
     runInEdtAndWait {
-      val tumbler = FileBasedIndexTumbler("test")
+      val tumbler = FileBasedIndexTumbler("UnindexedFilesScannerTest")
       tumbler.turnOff()
       indexers.forEach { indexer ->
         application.registerExtension(FileBasedIndexExtension.EXTENSION_POINT_NAME, indexer, testRootDisposable)
@@ -406,13 +405,12 @@ class UnindexedFilesScannerTest {
   }
 
   private fun scanAndIndexFiles(filesAndDirs: SingleRootIndexableFilesIterator) {
-    val (_, dirtyFiles) = scanFiles(filesAndDirs)
-    indexFiles(filesAndDirs, dirtyFiles)
+    scanFiles(filesAndDirs)
+    indexFiles()
   }
 
-  private fun indexFiles(provider: SingleRootIndexableFilesIterator, dirtyFiles: Collection<VirtualFile>) {
-    val files = QueuedFiles.fromFilesCollection(dirtyFiles, emptyList())
-    val indexingTask = UnindexedFilesIndexer(project, files, "Test")
+  private fun indexFiles() {
+    val indexingTask = UnindexedFilesIndexer(project, "Test")
     val indicator = EmptyProgressIndicator()
     ProgressManager.getInstance().runProcess({ indexingTask.perform(indicator) }, indicator)
   }
@@ -424,19 +422,20 @@ class UnindexedFilesScannerTest {
   }
 
   private fun scanFiles(filesAndDirs: SingleRootIndexableFilesIterator): Pair<JsonScanningStatistics, Collection<VirtualFile>> {
-    val (history, dirtyFiles) = scanFiles(filesAndDirs as IndexableFilesIterator)
+    val history = scanFiles(filesAndDirs as IndexableFilesIterator)
 
     assertEquals(1, history.scanningStatistics.size)
     val scanningStat = history.scanningStatistics[0]
+    val dirtyFiles = project.service<PerProjectIndexingQueue>().getQueuedFiles().requests.map(FileIndexingRequest::file)
 
-    return Pair(scanningStat, dirtyFiles.map(FileIndexingRequest::file))
+    return Pair(scanningStat, dirtyFiles)
   }
 
-  private fun scanFiles(filesAndDirs: IndexableFilesIterator): Pair<ProjectScanningHistory, Collection<FileIndexingRequest>> {
-    return project.service<PerProjectIndexingQueue>().getFilesSubmittedDuring {
+  private fun scanFiles(filesAndDirs: IndexableFilesIterator): ProjectScanningHistory {
+    return project.service<PerProjectIndexingQueue>().disableFlushingDuring {
       val parameters = CompletableDeferred(ScanningIterators("Test", listOf(filesAndDirs), null, ScanningType.PARTIAL))
       val scanningTask = UnindexedFilesScanner(project, false, false, null, scanningParameters = parameters)
-      return@getFilesSubmittedDuring scanningTask.queue().get()
+      scanningTask.queue().get()
     }
   }
 

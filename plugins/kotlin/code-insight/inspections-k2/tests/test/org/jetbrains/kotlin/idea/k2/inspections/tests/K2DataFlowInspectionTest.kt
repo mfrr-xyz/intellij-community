@@ -97,6 +97,7 @@ class K2DataFlowInspectionTest : AbstractK2InspectionTest() {
         doTest()
     }
     fun testPrimitiveAndNullK2() = doTest()
+    fun testPrimitiveBound() = doTest()
     fun testProperty() = doTest()
     fun testQualifierK2() = doTest()
     fun testRangeAnnotation() = doTest()
@@ -125,6 +126,7 @@ class K2DataFlowInspectionTest : AbstractK2InspectionTest() {
     fun testWhenInLambdaK2() = doTest()
     fun testWhenIsObject() = doTest()
     fun testWhenGuarded() = doTest()
+    fun testWhenGuardedElse() = doTest()
     fun testWhileLoop() = doTest()
 
     fun doTest(warnOnConstantRefs: Boolean = true) {

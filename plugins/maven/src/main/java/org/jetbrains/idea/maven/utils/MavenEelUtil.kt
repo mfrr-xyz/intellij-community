@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.idea.maven.utils
 
 import com.intellij.execution.wsl.WSLDistribution
@@ -8,7 +8,8 @@ import com.intellij.notification.NotificationListener
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
-import com.intellij.openapi.application.writeAction
+import com.intellij.openapi.application.edtWriteAction
+import com.intellij.openapi.command.impl.DummyProject
 import com.intellij.openapi.components.service
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.progress.*
@@ -28,10 +29,11 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelApi
 import com.intellij.platform.eel.LocalEelApi
 import com.intellij.platform.eel.fs.getPath
-import com.intellij.platform.eel.impl.utils.getEelApi
-import com.intellij.platform.eel.impl.utils.where
+import com.intellij.platform.eel.provider.asNioPath
+import com.intellij.platform.eel.provider.asNioPathOrNull
+import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.utils.fetchLoginShellEnvVariablesBlocking
-import com.intellij.platform.eel.toNioPath
+import com.intellij.platform.eel.provider.utils.where
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.platform.util.progress.withProgressText
@@ -40,32 +42,43 @@ import com.intellij.util.SystemProperties
 import com.intellij.util.text.VersionComparatorUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.io.IOException
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.idea.maven.config.MavenConfig
 import org.jetbrains.idea.maven.config.MavenConfigSettings
 import org.jetbrains.idea.maven.execution.SyncBundle
 import org.jetbrains.idea.maven.project.*
 import org.jetbrains.idea.maven.server.MavenServerManager
+import org.jetbrains.idea.maven.utils.MavenUtil.CONF_DIR
+import org.jetbrains.idea.maven.utils.MavenUtil.DOT_M2_DIR
+import org.jetbrains.idea.maven.utils.MavenUtil.ENV_M2_HOME
+import org.jetbrains.idea.maven.utils.MavenUtil.MAVEN_NOTIFICATION_GROUP
+import org.jetbrains.idea.maven.utils.MavenUtil.MAVEN_REPO_LOCAL
+import org.jetbrains.idea.maven.utils.MavenUtil.PROP_FORCED_M2_HOME
+import org.jetbrains.idea.maven.utils.MavenUtil.REPOSITORY_DIR
+import org.jetbrains.idea.maven.utils.MavenUtil.SETTINGS_XML
+import org.jetbrains.idea.maven.utils.MavenUtil.doResolveLocalRepository
+import org.jetbrains.idea.maven.utils.MavenUtil.getMavenHomePath
+import org.jetbrains.idea.maven.utils.MavenUtil.isEmptyOrSpaces
+import org.jetbrains.idea.maven.utils.MavenUtil.isMavenUnitTestModeEnabled
+import org.jetbrains.idea.maven.utils.MavenUtil.isValidMavenHome
+import org.jetbrains.idea.maven.utils.MavenUtil.resolveGlobalSettingsFile
+import org.jetbrains.idea.maven.utils.MavenUtil.resolveUserSettingsPath
+import java.io.IOException
 import java.nio.file.Path
 import javax.swing.event.HyperlinkEvent
 
-object MavenEelUtil : MavenUtil() {
+object MavenEelUtil  {
   @JvmStatic
   fun EelApi?.resolveM2Dir(): Path {
-    return runBlockingMaybeCancellable { resolveM2DirAsync() }
-  }
-
-  @JvmStatic
-  suspend fun EelApi?.resolveM2DirAsync(): Path {
     val localUserHome = Path.of(SystemProperties.getUserHome())
-    val userHome = if (this != null) fs.user.home.let(mapper::toNioPath) else localUserHome
+    val userHome = if (this != null && this !is LocalEelApi) fs.user.home.asNioPath() else localUserHome
 
     return userHome.resolve(DOT_M2_DIR)
   }
 
   @JvmStatic
   suspend fun Project?.resolveM2DirAsync(): Path {
-    return this?.getEelApi().resolveM2DirAsync()
+    return this?.filterAcceptable()?.getEelDescriptor()?.upgrade().resolveM2Dir()
   }
 
   suspend fun <T> resolveUsingEel(project: Project?, ordinary: suspend () -> T, eel: suspend (EelApi) -> T?): T {
@@ -73,8 +86,10 @@ object MavenEelUtil : MavenUtil() {
       MavenLog.LOG.error("resolveEelAware: Project is null")
     }
 
-    return project?.getEelApi()?.let { eel(it) } ?: ordinary.invoke()
+    return project?.filterAcceptable()?.getEelDescriptor()?.upgrade()?.let { eel(it) } ?: ordinary.invoke()
   }
+
+  private fun Project.filterAcceptable(): Project? = takeIf { !it.isDefault && it !is DummyProject }
 
   @JvmStatic
   fun EelApi.resolveUserSettingsFile(overriddenUserSettingsFile: String?): Path {
@@ -104,7 +119,7 @@ object MavenEelUtil : MavenUtil() {
 
     val m2home = exec.fetchLoginShellEnvVariablesBlocking()[ENV_M2_HOME]
     if (m2home != null && !isEmptyOrSpaces(m2home)) {
-      val homeFromEnv = fs.getPath(m2home).toNioPath(this)
+      val homeFromEnv = fs.getPath(m2home).asNioPath()
       if (isValidMavenHome(homeFromEnv)) {
         MavenLog.LOG.debug("resolved maven home using \$M2_HOME as ${homeFromEnv}")
         result.add(MavenInSpecificPath(m2home))
@@ -115,19 +130,19 @@ object MavenEelUtil : MavenUtil() {
     }
 
 
-    var home = fs.getPath("/usr/share/maven").toNioPath(this)
+    var home = fs.getPath("/usr/share/maven").asNioPath()
     if (isValidMavenHome(home)) {
       MavenLog.LOG.debug("Maven home found at /usr/share/maven")
       result.add(MavenInSpecificPath(home))
     }
 
-    home = fs.getPath("/usr/share/maven2").toNioPath(this)
+    home = fs.getPath("/usr/share/maven2").asNioPath()
     if (isValidMavenHome(home)) {
       MavenLog.LOG.debug("Maven home found at /usr/share/maven2")
       result.add(MavenInSpecificPath(home))
     }
 
-    val path = runBlockingMaybeCancellable { where("mvn") }?.toNioPath(this)?.parent?.parent
+    val path = runBlockingMaybeCancellable { exec.where("mvn") }?.asNioPathOrNull()?.parent?.parent
     if (path != null && isValidMavenHome(path)) {
       result.add(MavenInSpecificPath(path))
     }
@@ -227,7 +242,10 @@ object MavenEelUtil : MavenUtil() {
 
   @JvmStatic
   fun resolveUserSettingsPathBlocking(overriddenUserSettingsFile: String?, project: Project?): Path {
-    return runBlockingMaybeCancellable { resolveUserSettingsPathAsync(overriddenUserSettingsFile, project) }
+    @Suppress("RAW_RUN_BLOCKING")
+    return runBlocking {
+      resolveUserSettingsPathAsync(overriddenUserSettingsFile, project)
+    }
   }
 
   suspend fun resolveLocalRepositoryAsync(
@@ -419,10 +437,10 @@ object MavenEelUtil : MavenUtil() {
   ) {
     MavenCoroutineScopeProvider.getCoroutineScope(project).launch(Dispatchers.IO) {
       withBackgroundProgress(project, MavenProjectBundle.message("wsl.jdk.searching"), cancellable = false) {
-        val eel = project.getEelApi()
+        val eel = project.getEelDescriptor().upgrade()
         val sdkPath = service<JdkFinder>().suggestHomePaths(project).firstOrNull()
         if (sdkPath != null) {
-          writeAction {
+          edtWriteAction {
             val jdkName = SdkConfigurationUtil.createUniqueSdkName(JavaSdk.getInstance(), sdkPath,
                                                                    ProjectJdkTable.getInstance().allJdks.toList())
             val newJdk = JavaSdk.getInstance().createJdk(jdkName, sdkPath)

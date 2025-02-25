@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Unmodifiable;
 import java.util.Arrays;
 import java.util.Collection;
 
-final class IntersectionScope extends GlobalSearchScope implements VirtualFileEnumerationAware {
+final class IntersectionScope extends GlobalSearchScope implements VirtualFileEnumerationAware, CodeInsightContextAwareSearchScope {
   private final GlobalSearchScope myScope1;
   private final GlobalSearchScope myScope2;
 
@@ -48,6 +48,11 @@ final class IntersectionScope extends GlobalSearchScope implements VirtualFileEn
   }
 
   @Override
+  public @NotNull CodeInsightContextInfo getCodeInsightContextInfo() {
+    return CodeInsightContextInfoIntersectionKt.createIntersectionCodeInsightContextInfo(myScope1, myScope2);
+  }
+
+  @Override
   public int compare(@NotNull VirtualFile file1, @NotNull VirtualFile file2) {
     int res1 = myScope1.compare(file1, file2);
     int res2 = myScope2.compare(file1, file2);
@@ -76,8 +81,7 @@ final class IntersectionScope extends GlobalSearchScope implements VirtualFileEn
   }
 
   @Override
-  @Unmodifiable
-  public @NotNull Collection<UnloadedModuleDescription> getUnloadedModulesBelongingToScope() {
+  public @Unmodifiable @NotNull Collection<UnloadedModuleDescription> getUnloadedModulesBelongingToScope() {
     return ContainerUtil.intersection(myScope1.getUnloadedModulesBelongingToScope(), myScope2.getUnloadedModulesBelongingToScope());
   }
 

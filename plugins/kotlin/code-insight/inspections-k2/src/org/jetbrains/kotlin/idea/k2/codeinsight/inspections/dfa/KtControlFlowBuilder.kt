@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.inspections.dfa
 
 import com.intellij.codeInsight.Nullability
@@ -884,27 +884,24 @@ class KtControlFlowBuilder(val factory: DfaValueFactory, val context: KtExpressi
         }
         val endOffset = DeferredOffset()
         for (entry in expr.entries) {
-            if (entry.isElse) {
-                processExpression(entry.expression)
-                addInstruction(GotoInstruction(endOffset))
-            } else {
+            val skipBranch = DeferredOffset()
+            if (entry.elseKeyword == null) {
                 val branchStart = DeferredOffset()
                 for (condition in entry.conditions) {
                     processWhenCondition(dfVar, kotlinType, condition)
                     addInstruction(ConditionalGotoInstruction(branchStart, DfTypes.TRUE))
                 }
-                val skipBranch = DeferredOffset()
                 addInstruction(GotoInstruction(skipBranch))
                 setOffset(branchStart)
-                val guard = entry.guard
-                if (guard != null) {
-                    processExpression(guard.getExpression())
-                    addInstruction(ConditionalGotoInstruction(skipBranch, DfTypes.FALSE))
-                }
-                processExpression(entry.expression)
-                addInstruction(GotoInstruction(endOffset))
-                setOffset(skipBranch)
             }
+            val guard = entry.guard
+            if (guard != null) {
+                processExpression(guard.getExpression())
+                addInstruction(ConditionalGotoInstruction(skipBranch, DfTypes.FALSE))
+            }
+            processExpression(entry.expression)
+            addInstruction(GotoInstruction(endOffset))
+            setOffset(skipBranch)
         }
         pushUnknown()
         setOffset(endOffset)
@@ -1431,7 +1428,7 @@ class KtControlFlowBuilder(val factory: DfaValueFactory, val context: KtExpressi
         val functionCall = expr.resolveToCall()?.singleFunctionCallOrNull() ?: return EventOccurrencesRange.UNKNOWN
         val functionSymbol = functionCall.partiallyAppliedSymbol.symbol as? KaNamedFunctionSymbol ?: return EventOccurrencesRange.UNKNOWN
         val callEffect = functionSymbol.contractEffects
-            .singleOrNull { e -> e is KaContractCallsInPlaceContractEffectDeclaration && e.valueParameterReference.parameterSymbol == parameter }
+            .singleOrNull { e -> e is KaContractCallsInPlaceContractEffectDeclaration && e.valueParameterReference.symbol == parameter }
                 as? KaContractCallsInPlaceContractEffectDeclaration
         if (callEffect != null) {
             return callEffect.occurrencesRange
@@ -1828,7 +1825,7 @@ class KtControlFlowBuilder(val factory: DfaValueFactory, val context: KtExpressi
             addInstruction(WrapDerivedVariableInstruction(expectedType.toDfType().meet(dfType), SpecialField.UNBOX))
         }
         if (actualDfType is DfPrimitiveType && expectedDfType is DfPrimitiveType) {
-            addInstruction(PrimitiveConversionInstruction(expectedType.toPsiPrimitiveType(), null))
+            addInstruction(PrimitiveConversionInstruction(expectedDfType.psiType, null))
         }
     }
 

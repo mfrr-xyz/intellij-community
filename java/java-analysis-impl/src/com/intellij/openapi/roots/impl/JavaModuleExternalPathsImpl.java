@@ -41,9 +41,8 @@ public final class JavaModuleExternalPathsImpl extends JavaModuleExternalPaths {
     }
   }
 
-  @NotNull
   @Override
-  public ModuleExtension getModifiableModel(boolean writable) {
+  public @NotNull ModuleExtension getModifiableModel(boolean writable) {
     return new JavaModuleExternalPathsImpl(myProject, this);
   }
 
@@ -128,7 +127,7 @@ public final class JavaModuleExternalPathsImpl extends JavaModuleExternalPaths {
     List<Element> toWrite = null;
     for (OrderRootType orderRootType : myOrderRootPointerContainers.keySet()) {
       VirtualFilePointerContainer container = myOrderRootPointerContainers.get(orderRootType);
-      if (container != null && container.size() > 0) {
+      if (container != null && !container.isEmpty()) {
         final Element content = new Element(((PersistentOrderRootType)orderRootType).getModulePathsName());
         container.writeExternal(content, ROOT_ELEMENT, false);
         if (toWrite == null) {

@@ -3,55 +3,48 @@ package org.jetbrains.idea.maven.execution
 
 import com.intellij.maven.testFramework.MavenTestCase
 import junit.framework.TestCase
-import java.io.IOException
-import java.nio.file.Path
 
 class MavenExternalParametersVmTest : MavenTestCase() {
-  @Throws(IOException::class)
   fun testGetRunVmOptionsSettingsAndJvm() {
     createProjectSubFile(".mvn/jvm.config", "-Xms800m")
     val runnerSettings = MavenRunnerSettings()
     runnerSettings.setVmOptions("-Xmx400m")
-    val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, projectPath)
+    val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, projectPath.toString())
     TestCase.assertEquals("-Xmx400m", vmOptions)
   }
 
   fun testGetRunVmOptionsSettings() {
     val runnerSettings = MavenRunnerSettings()
     runnerSettings.setVmOptions("-Xmx400m")
-    val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, projectPath)
+    val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, projectPath.toString())
     TestCase.assertEquals("-Xmx400m", vmOptions)
   }
 
-  @Throws(IOException::class)
   fun testGetRunVmOptionsJvm() {
     createProjectSubFile(".mvn/jvm.config", "-Xms800m")
     val runnerSettings = MavenRunnerSettings()
-    val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, projectPath)
+    val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, projectPath.toString())
     TestCase.assertEquals("-Xms800m", vmOptions)
   }
 
-  @Throws(IOException::class)
   fun testGetRunVmOptionsEmpty() {
     val runnerSettings = MavenRunnerSettings()
-    val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, projectPath)
+    val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, projectPath.toString())
     assertEmpty(vmOptions)
   }
 
-  @Throws(IOException::class)
   fun testGetRunVmOptionsSubmoduleConfigParent() {
     createProjectSubFile(".mvn/jvm.config", "-Xms800m")
     val runnerSettings = MavenRunnerSettings()
-    val workingDirPath = Path.of(projectPath).resolve("module").toString()
+    val workingDirPath = projectPath.resolve("module").toString()
     val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, workingDirPath)
     TestCase.assertEquals("", vmOptions)
   }
 
-  @Throws(IOException::class)
   fun testGetRunVmOptionsSubmoduleConfig() {
-    createProjectSubFile("/module/.mvn/jvm.config", "-Xms800m")
+    createProjectSubFile("module/.mvn/jvm.config", "-Xms800m")
     val runnerSettings = MavenRunnerSettings()
-    val workingDirPath = Path.of(projectPath).resolve("module").toString()
+    val workingDirPath = projectPath.resolve("module").toString()
     val vmOptions = MavenExternalParameters.getRunVmOptions(runnerSettings, project, workingDirPath)
     TestCase.assertEquals("-Xms800m", vmOptions)
   }

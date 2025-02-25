@@ -28,7 +28,6 @@ import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.idea.devkit.DevKitBundle;
-import org.jetbrains.idea.devkit.inspections.DescriptionCheckerUtil;
 import org.jetbrains.idea.devkit.inspections.DescriptionType;
 import org.jetbrains.idea.devkit.inspections.DescriptionTypesKt;
 import org.jetbrains.jps.model.java.JavaModuleSourceRootTypes;
@@ -42,8 +41,7 @@ import java.util.List;
  */
 public class CreateHtmlDescriptionFix implements LocalQuickFix, Iconable {
 
-  @NonNls
-  private static final String TEMPLATE_NAME = "InspectionDescription.html";
+  private static final @NonNls String TEMPLATE_NAME = "InspectionDescription.html";
 
   private final String myFilename;
   private final Module myModule;
@@ -52,24 +50,22 @@ public class CreateHtmlDescriptionFix implements LocalQuickFix, Iconable {
   public CreateHtmlDescriptionFix(String filename, Module module, DescriptionType descriptionType) {
     myModule = module;
     myDescriptionType = descriptionType;
-    myFilename = myDescriptionType.hasBeforeAfterTemplateFiles() ? filename : filename + ".html";
+    myFilename = isFixedDescriptionFilename() ? filename : filename + ".html";
   }
 
   @Override
-  @NotNull
-  public String getName() {
+  public @NotNull String getName() {
     return DevKitBundle.message("create.description.file", getNewFileName());
   }
 
   @Override
-  @NotNull
-  public String getFamilyName() {
+  public @NotNull String getFamilyName() {
     return DevKitBundle.message("create.description.file.family.name");
   }
 
   @Override
   public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor descriptor) {
-    final PsiDirectory[] dirs = DescriptionCheckerUtil.getDescriptionsDirs(myModule, myDescriptionType);
+    final PsiDirectory[] dirs = myDescriptionType.getDescriptionFolderDirs(myModule);
     final List<VirtualFile> roots = getPotentialRoots(myModule, dirs);
     if (roots.size() == 1) {
       ApplicationManager.getApplication().runWriteAction(() -> createDescription(roots.get(0)));

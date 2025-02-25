@@ -33,6 +33,22 @@ class K2MoveModelTest : KotlinLightCodeInsightFixtureTestCase() {
         assert(sourceElement is KtFile && sourceElement.name == "Foo.kt")
     }
 
+    fun `test declaration move from source directory to directory outside source root as files`() {
+        val fooFile = myFixture.addFileToProject("Foo.kt", """
+            package foo
+            class Foo
+            class Bar
+        """.trimIndent()) as KtFile
+        val nonSourceDir = runWriteAction { fooFile.containingDirectory?.parent }
+        val moveModel = K2MoveModel.create(arrayOf(fooFile.declarations.first()), targetContainer = nonSourceDir)!!
+        assertInstanceOf<K2MoveModel.Files>(moveModel)
+        assertTrue(moveModel.isValidRefactoring())
+        val moveDeclarationsModel = moveModel as K2MoveModel.Files
+        assertSize(1, moveDeclarationsModel.source.elements)
+        val sourceElement = moveDeclarationsModel.source.elements.firstOrNull()
+        assert(sourceElement is KtFile && sourceElement.name == "Foo.kt")
+    }
+
     fun `test file from source directory to file move`() {
         val fooFile = myFixture.addFileToProject("Foo.kt", """
             class Foo { }
@@ -361,15 +377,14 @@ class K2MoveModelTest : KotlinLightCodeInsightFixtureTestCase() {
         """.trimIndent())
         val nestedClass = myFixture.elementAtCaret as KtNamedDeclaration
         val moveModel = K2MoveModel.create(arrayOf(nestedClass), null)
-        assertInstanceOf<K2MoveModel.NestedDeclarations>(moveModel)
+        assertInstanceOf<K2MoveModel.Declarations>(moveModel)
         assertTrue(moveModel!!.isValidRefactoring())
-        val moveDeclarationsModel = moveModel as K2MoveModel.NestedDeclarations
+        val moveDeclarationsModel = moveModel as K2MoveModel.Declarations
         assertSize(1, moveDeclarationsModel.source.elements)
         val sourceElement = moveDeclarationsModel.source.elements.firstOrNull()
         assert(sourceElement is KtClass && sourceElement.name == "Bar")
         val targetElement = moveDeclarationsModel.target.pkgName
         assertEquals("foo", targetElement.asString())
-        assertEquals(false, moveDeclarationsModel.needsInstanceReference)
     }
 
     fun `test move nested inner class`() {
@@ -382,16 +397,14 @@ class K2MoveModelTest : KotlinLightCodeInsightFixtureTestCase() {
         """.trimIndent())
         val nestedClass = myFixture.elementAtCaret as KtNamedDeclaration
         val moveModel = K2MoveModel.create(arrayOf(nestedClass), null)
-        assertInstanceOf<K2MoveModel.NestedDeclarations>(moveModel)
+        assertInstanceOf<K2MoveModel.Declarations>(moveModel)
         assertTrue(moveModel!!.isValidRefactoring())
-        val moveDeclarationsModel = moveModel as K2MoveModel.NestedDeclarations
+        val moveDeclarationsModel = moveModel as K2MoveModel.Declarations
         assertSize(1, moveDeclarationsModel.source.elements)
         val sourceElement = moveDeclarationsModel.source.elements.firstOrNull()
         assert(sourceElement is KtClass && sourceElement.name == "Bar")
         val targetElement = moveDeclarationsModel.target.pkgName
         assertEquals("foo", targetElement.asString())
-        assertEquals("outerFoo", moveDeclarationsModel.outerClassInstanceParameterName)
-        assertEquals(true, moveDeclarationsModel.needsInstanceReference)
     }
 
     fun `test move instance method`() {
@@ -404,16 +417,14 @@ class K2MoveModelTest : KotlinLightCodeInsightFixtureTestCase() {
         """.trimIndent())
         val instanceMethod = myFixture.elementAtCaret as KtNamedDeclaration
         val moveModel = K2MoveModel.create(arrayOf(instanceMethod), null)
-        assertInstanceOf<K2MoveModel.NestedDeclarations>(moveModel)
+        assertInstanceOf<K2MoveModel.Declarations>(moveModel)
         assertTrue(moveModel!!.isValidRefactoring())
-        val moveDeclarationsModel = moveModel as K2MoveModel.NestedDeclarations
+        val moveDeclarationsModel = moveModel as K2MoveModel.Declarations
         assertSize(1, moveDeclarationsModel.source.elements)
         val sourceElement = moveDeclarationsModel.source.elements.firstOrNull()
         assert(sourceElement is KtFunction && sourceElement.name == "foo")
         val targetElement = moveDeclarationsModel.target.pkgName
         assertEquals("foo", targetElement.asString())
-        assertEquals("outerFoo", moveDeclarationsModel.outerClassInstanceParameterName)
-        assertEquals(true, moveDeclarationsModel.needsInstanceReference)
     }
 
     fun `test move multiple instance methods should fail`() {
@@ -443,15 +454,14 @@ class K2MoveModelTest : KotlinLightCodeInsightFixtureTestCase() {
         """.trimIndent())
         val instanceMethod = myFixture.elementAtCaret as KtNamedDeclaration
         val moveModel = K2MoveModel.create(arrayOf(instanceMethod), null)
-        assertInstanceOf<K2MoveModel.NestedDeclarations>(moveModel)
+        assertInstanceOf<K2MoveModel.Declarations>(moveModel)
         assertTrue(moveModel!!.isValidRefactoring())
-        val moveDeclarationsModel = moveModel as K2MoveModel.NestedDeclarations
+        val moveDeclarationsModel = moveModel as K2MoveModel.Declarations
         assertSize(1, moveDeclarationsModel.source.elements)
         val sourceElement = moveDeclarationsModel.source.elements.firstOrNull()
         assert(sourceElement is KtFunction && sourceElement.name == "foo")
         val targetElement = moveDeclarationsModel.target.pkgName
         assertEquals("foo", targetElement.asString())
-        assertEquals(false, moveDeclarationsModel.needsInstanceReference)
     }
 
     fun `test move companion object method`() {
@@ -466,15 +476,14 @@ class K2MoveModelTest : KotlinLightCodeInsightFixtureTestCase() {
         """.trimIndent())
         val instanceMethod = myFixture.elementAtCaret as KtNamedDeclaration
         val moveModel = K2MoveModel.create(arrayOf(instanceMethod), null)
-        assertInstanceOf<K2MoveModel.NestedDeclarations>(moveModel)
+        assertInstanceOf<K2MoveModel.Declarations>(moveModel)
         assertTrue(moveModel!!.isValidRefactoring())
-        val moveDeclarationsModel = moveModel as K2MoveModel.NestedDeclarations
+        val moveDeclarationsModel = moveModel as K2MoveModel.Declarations
         assertSize(1, moveDeclarationsModel.source.elements)
         val sourceElement = moveDeclarationsModel.source.elements.firstOrNull()
         assert(sourceElement is KtFunction && sourceElement.name == "foo")
         val targetElement = moveDeclarationsModel.target.pkgName
         assertEquals("foo", targetElement.asString())
-        assertEquals(false, moveDeclarationsModel.needsInstanceReference)
     }
 
     fun `test move member property`() {
@@ -487,15 +496,14 @@ class K2MoveModelTest : KotlinLightCodeInsightFixtureTestCase() {
         """.trimIndent())
         val instanceProperty = myFixture.elementAtCaret as KtNamedDeclaration
         val moveModel = K2MoveModel.create(arrayOf(instanceProperty), null)
-        assertInstanceOf<K2MoveModel.NestedDeclarations>(moveModel)
+        assertInstanceOf<K2MoveModel.Declarations>(moveModel)
         assertTrue(moveModel!!.isValidRefactoring())
-        val moveDeclarationsModel = moveModel as K2MoveModel.NestedDeclarations
+        val moveDeclarationsModel = moveModel as K2MoveModel.Declarations
         assertSize(1, moveDeclarationsModel.source.elements)
         val sourceElement = moveDeclarationsModel.source.elements.firstOrNull()
         assert(sourceElement is KtProperty && sourceElement.name == "foo")
         val targetElement = moveDeclarationsModel.target.pkgName
         assertEquals("foo", targetElement.asString())
-        assertEquals(false, moveDeclarationsModel.needsInstanceReference)
     }
 
     fun `test move multiple member properties should fal`() {

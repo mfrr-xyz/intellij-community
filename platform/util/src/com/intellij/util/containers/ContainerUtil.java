@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 @SuppressWarnings("UnstableApiUsage")
 public final class ContainerUtil {
   @ApiStatus.Internal
-  public static class Options {
+  public static final class Options {
     @ApiStatus.Internal
     public static boolean RETURN_REALLY_UNMODIFIABLE_COLLECTION_FROM_METHODS_MARKED_UNMODIFIABLE;
   }
@@ -645,8 +645,7 @@ public final class ContainerUtil {
   }
 
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull <K, V> Map<K,Couple<V>> diff(@NotNull Map<? extends K, ? extends V> map1, @NotNull Map<? extends K, ? extends V> map2) {
+  public static @Unmodifiable @NotNull <K, V> Map<K,Couple<V>> diff(@NotNull Map<? extends K, ? extends V> map1, @NotNull Map<? extends K, ? extends V> map2) {
     Set<K> keys = union(map1.keySet(), map2.keySet());
     FreezableHashMap<K, Couple<V>> result = new FreezableHashMap<>();
     for (K k : keys) {
@@ -661,7 +660,7 @@ public final class ContainerUtil {
 
   public enum MergeResult { COPIED_FROM_LIST1, MERGED_EQUAL_FROM_BOTH, COPIED_FROM_LIST2 }
   /**
-   * Process both sorted lists in order defined by {@code comparator}, call {@code processor} for each element in the merged list result.
+   * Process elements from the both sorted lists in order defined by {@code comparator} and call {@code processor} for each element in the merged list result.
    * When equal elements occurred, then if {@code mergeEqualItems} then output only the element from the {@code list1} and ignore the second,
    * else output them both in unspecified order.
    * {@code processor} is invoked for each output element, with the following arguments:
@@ -770,10 +769,9 @@ public final class ContainerUtil {
     }
   }
 
-  @Unmodifiable
   @CheckReturnValue
   @Contract(mutates = "param1")
-  public static @NotNull <K, V> Map<K, V> newMapFromKeys(@NotNull Iterator<? extends K> keys, @NotNull Convertor<? super K, ? extends V> valueConvertor) {
+  public static @Unmodifiable @NotNull <K, V> Map<K, V> newMapFromKeys(@NotNull Iterator<? extends K> keys, @NotNull Convertor<? super K, ? extends V> valueConvertor) {
     FreezableHashMap<K, V> map = new FreezableHashMap<>();
     while (keys.hasNext()) {
       K key = keys.next();
@@ -782,10 +780,9 @@ public final class ContainerUtil {
     return emptyOrFrozen(map);
   }
 
-  @Unmodifiable
   @CheckReturnValue
   @Contract(mutates = "param1")
-  public static @NotNull <K, V> Map<K, V> newMapFromValues(@NotNull Iterator<? extends V> values, @NotNull Convertor<? super V, ? extends K> keyConvertor) {
+  public static @Unmodifiable @NotNull <K, V> Map<K, V> newMapFromValues(@NotNull Iterator<? extends V> values, @NotNull Convertor<? super V, ? extends K> keyConvertor) {
     FreezableHashMap<K, V> map = new FreezableHashMap<>();
     fillMapWithValues(map, values, keyConvertor);
     return emptyOrFrozen(map);
@@ -802,9 +799,8 @@ public final class ContainerUtil {
   }
 
   @CheckReturnValue
-  @Unmodifiable
   @Contract(mutates = "param1")
-  public static @NotNull <K, V> Map<K, Set<V>> classify(@NotNull Iterator<? extends V> iterator, @NotNull Convertor<? super V, ? extends K> keyConvertor) {
+  public static @Unmodifiable @NotNull <K, V> Map<K, Set<V>> classify(@NotNull Iterator<? extends V> iterator, @NotNull Convertor<? super V, ? extends K> keyConvertor) {
     Map<K, Set<V>> hashMap = new LinkedHashMap<>();
     while (iterator.hasNext()) {
       V value = iterator.next();
@@ -817,7 +813,7 @@ public final class ContainerUtil {
   }
 
   @Contract(pure=true)
-  public static <T> T find(T @NotNull [] array, @NotNull Condition<? super T> condition) {
+  public static <T> @Nullable T find(T @NotNull [] array, @NotNull Condition<? super T> condition) {
     for (T element : array) {
       if (condition.value(element)) return element;
     }
@@ -1031,8 +1027,7 @@ public final class ContainerUtil {
    * @return read-only map consisting of the entries from the {@code map} for which {@code keyFilter.value} is true for its key
    */
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull <K, V> Map<K, V> filter(@NotNull Map<? extends K, ? extends V> map, @NotNull Condition<? super K> keyFilter) {
+  public static @Unmodifiable @NotNull <K, V> Map<K, V> filter(@NotNull Map<? extends K, ? extends V> map, @NotNull Condition<? super K> keyFilter) {
     FreezableHashMap<K, V> result = new FreezableHashMap<>();
     for (Map.Entry<? extends K, ? extends V> entry : map.entrySet()) {
       if (keyFilter.value(entry.getKey())) {
@@ -1142,22 +1137,6 @@ public final class ContainerUtil {
   public static void removeDuplicates(@NotNull Collection<?> collection) {
     Set<Object> collected = new HashSet<>();
     collection.removeIf(t -> !collected.add(t));
-  }
-
-  /**
-   * @deprecated use {@link Map#of}
-   */
-  @Contract(pure = true)
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval
-  @Unmodifiable
-  public static @NotNull Map<String, String> stringMap(String @NotNull ... keyValues) {
-    Map<String, String> result = new HashMap<>();
-    for (int i = 0; i < keyValues.length - 1; i+=2) {
-      result.put(keyValues[i], keyValues[i+1]);
-    }
-
-    return result;
   }
 
   @Contract(pure = true)
@@ -1368,7 +1347,7 @@ public final class ContainerUtil {
   }
 
   /**
-   * @return read-only list consisting of the elements from the {@code collection} of the specified {@code aClass}
+   * @return read-only list consisting of the elements from the result of {@code listGenerator} applied to each element of {@code array} concatenated
    */
   @Contract(pure = true)
   public static @Unmodifiable @NotNull <T, V> List<T> concat(V @NotNull [] array, @NotNull Function<? super V, ? extends Collection<? extends T>> listGenerator) {
@@ -1383,7 +1362,7 @@ public final class ContainerUtil {
    * @return read-only list consisting of all the elements from the collections stored in the list merged together
    */
   @Contract(pure = true)
-  public static @Unmodifiable @NotNull <T> List<T> concat(@NotNull Iterable<? extends Collection<? extends T>> list) {
+  public static @Unmodifiable @NotNull <T> List<T> concat(@NotNull @Unmodifiable Iterable<? extends Collection<? extends T>> list) {
     int totalSize = 0;
     for (Collection<? extends T> ts : list) {
       totalSize += ts.size();
@@ -1444,7 +1423,7 @@ public final class ContainerUtil {
   }
 
   /**
-   * @return read-only list consisting of {@code list1} and {@code list2} added together
+   * @return read-only list consisting of {@code list1} and {@code list2} added together.
    */
   @Contract(pure = true)
   public static @Unmodifiable @NotNull <T> List<T> concat(@NotNull List<? extends T> list1, @NotNull List<? extends T> list2) {
@@ -1472,6 +1451,22 @@ public final class ContainerUtil {
       @Override
       public int size() {
         return size;
+      }
+
+      /**
+       * Returns an iterator over the <em>actual elements</em> in this list based on the underlying lists.
+       *
+       * @implNote
+       * This implementation replaces the straightforward implementation based on index operations.
+       * Those fail badly, if the underlying lists change since creation of this concatenated list:
+       * either by an {@link IndexOutOfBoundsException} if any list shrinks unexpectedly,
+       * or by missing all elements added later on.
+       *
+       * @return Returns an iterator over the <em>actual elements</em> of both lists.
+       */
+      @Override
+      public @NotNull Iterator<T> iterator() {
+        return concat(list1, (Iterable<? extends T>)list2).iterator();
       }
     };
   }
@@ -1516,9 +1511,12 @@ public final class ContainerUtil {
     };
   }
 
+  /**
+   * return {@link Iterable} which iterates all arguments in sequence
+   */
   @SafeVarargs
   @Contract(pure = true)
-  public static @NotNull <T> Iterable<T> concat(@NotNull Iterable<? extends T> @NotNull ... iterables) {
+  public static @NotNull <T> Iterable<T> concat(@NotNull @Unmodifiable Iterable<? extends T> @NotNull ... iterables) {
     if (iterables.length == 0) return Collections.emptyList();
     if (iterables.length == 1) {
       //noinspection unchecked
@@ -1564,7 +1562,7 @@ public final class ContainerUtil {
    */
   @SafeVarargs
   @Contract(pure = true)
-  public static @Unmodifiable @NotNull <T> List<T> concat(@NotNull List<? extends T> @NotNull ... lists) {
+  public static @Unmodifiable @NotNull <T> List<T> concat(@NotNull @Unmodifiable List<? extends T> @NotNull ... lists) {
     if (lists.length == 1) {
       //noinspection unchecked
       return (List<T>)lists[0];

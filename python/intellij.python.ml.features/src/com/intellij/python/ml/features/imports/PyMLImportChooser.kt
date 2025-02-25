@@ -3,7 +3,6 @@ package com.intellij.python.ml.features.imports
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Computable
 import com.intellij.util.Consumer

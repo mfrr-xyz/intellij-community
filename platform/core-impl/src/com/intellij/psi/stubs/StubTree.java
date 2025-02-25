@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 /*
  * @author max
@@ -24,18 +24,16 @@ public class StubTree extends ObjectStubTree<StubElement<?>> {
   }
 
   @Override
-  @Unmodifiable
-  protected @NotNull List<StubElement<?>> enumerateStubs(@NotNull Stub root) {
-    return ((StubBase<?>)root).myStubList.finalizeLoadingStage().toPlainList();
+  protected @Unmodifiable @NotNull List<StubElement<?>> enumerateStubs(@NotNull Stub root) {
+    return ((StubBase<?>)root).getStubList().finalizeLoadingStage().toPlainList();
   }
 
   @Override
-  @Unmodifiable
-  final @NotNull List<StubElement<?>> getPlainListFromAllRoots() {
+  final @Unmodifiable @NotNull List<StubElement<?>> getPlainListFromAllRoots() {
     PsiFileStub<?>[] roots = ((PsiFileStubImpl<?>)getRoot()).getStubRoots();
     if (roots.length == 1) return super.getPlainListFromAllRoots();
 
-    return ContainerUtil.concat(roots, stub -> ((PsiFileStubImpl<?>)stub).myStubList.toPlainList());
+    return ContainerUtil.concat(roots, stub -> ((PsiFileStubImpl<?>)stub).getStubList().toPlainList());
   }
 
   @Override

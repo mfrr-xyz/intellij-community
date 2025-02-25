@@ -4,30 +4,37 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.UsefulTestCase
+import com.intellij.textmate.joni.JoniRegexFactory
 import com.intellij.tools.ide.metrics.benchmark.Benchmark
 import org.jetbrains.plugins.textmate.TestUtil
 import org.jetbrains.plugins.textmate.findScopeByFileName
+import org.jetbrains.plugins.textmate.language.TextMateConcurrentMapInterner
 import org.jetbrains.plugins.textmate.language.TextMateLanguageDescriptor
-import org.jetbrains.plugins.textmate.language.syntax.TextMateSyntaxTable
+import org.jetbrains.plugins.textmate.language.syntax.TextMateSyntaxTableBuilder
+import org.jetbrains.plugins.textmate.language.syntax.selector.TextMateSelectorCachingWeigher
+import org.jetbrains.plugins.textmate.language.syntax.selector.TextMateSelectorWeigherImpl
 import org.jetbrains.plugins.textmate.loadBundle
-import org.jetbrains.plugins.textmate.regex.joni.JoniRegexFactory
-import org.junit.Test
+import org.jetbrains.plugins.textmate.regex.CachingRegexFactory
+import org.jetbrains.plugins.textmate.regex.RememberingLastMatchRegexFactory
 import java.io.File
 import java.nio.charset.StandardCharsets
 
 class TextMateLexerPerformanceTest : UsefulTestCase() {
   fun testPerformance() {
-    val syntaxTable = TextMateSyntaxTable()
-    val matchers = syntaxTable.loadBundle(TestUtil.JAVA)
+    val builder = TextMateSyntaxTableBuilder(TextMateConcurrentMapInterner())
+    val matchers = builder.loadBundle(TestUtil.JAVA)
     val myFile = File(PlatformTestUtil.getCommunityPath() + "/platform/platform-impl/src/com/intellij/openapi/editor/impl/EditorImpl.java")
-    syntaxTable.compact()
+    val syntaxTable = builder.build()
 
     val scopeName = findScopeByFileName(matchers, myFile.name)
     val text = StringUtil.convertLineSeparators(FileUtil.loadFile(myFile, StandardCharsets.UTF_8))
 
     Benchmark.newBenchmark("bench") {
+      val regexFactory = CachingRegexFactory(RememberingLastMatchRegexFactory(JoniRegexFactory ()))
+      val weigher = TextMateSelectorCachingWeigher(TextMateSelectorWeigherImpl())
+      val syntaxMatcher = TextMateCachingSyntaxMatcher(TextMateSyntaxMatcherImpl(regexFactory, weigher))
       val lexer = TextMateHighlightingLexer(TextMateLanguageDescriptor(scopeName, syntaxTable.getSyntax(scopeName)),
-                                            JoniRegexFactory(),
+                                            syntaxMatcher,
                                             -1)
       lexer.start(text)
       while (lexer.tokenType != null) {

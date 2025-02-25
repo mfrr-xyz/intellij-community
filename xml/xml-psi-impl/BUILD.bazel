@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.xml.psi.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "psi-impl_resources",
@@ -8,23 +7,29 @@ jvm_resources(
   strip_prefix = "resources"
 )
 
+jvm_resources(
+  name = "psi-impl_resources_1",
+  files = glob(["resources-gen/**/*"]),
+  strip_prefix = "resources-gen"
+)
+
 jvm_library(
   name = "psi-impl",
   module_name = "intellij.xml.psi.impl",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
     "//xml/xml-frontback-impl:frontback-impl",
     "//xml/xml-psi-api:psi",
     "//platform/core-api:core",
     "//platform/core-impl",
     "//platform/analysis-impl",
+    "//xml/xml-parser:parser",
     "//platform/projectModel-impl",
     "//platform/indexing-impl",
     "@lib//:xerces",
     "//RegExpSupport:regexp",
+    "//platform/ide-core-impl",
     "//platform/lang-api:lang",
     "//platform/lang-impl",
     "@lib//:xml-resolver",
@@ -42,8 +47,10 @@ jvm_library(
   exports = [
     "//xml/xml-frontback-impl:frontback-impl",
     "//xml/xml-psi-api:psi",
-    "//RegExpSupport:regexp",
   ],
-  runtime_deps = [":psi-impl_resources"]
+  runtime_deps = [
+    ":psi-impl_resources",
+    ":psi-impl_resources_1",
+  ]
 )
 ### auto-generated section `build intellij.xml.psi.impl` end

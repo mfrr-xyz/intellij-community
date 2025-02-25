@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.debugger.test;
 
@@ -1734,6 +1734,11 @@ public abstract class IrKotlinEvaluateExpressionInMppTestGenerated extends Abstr
                 runTest("testData/evaluation/singleBreakpoint/capturedVariablesInSamLambda.kt");
             }
 
+            @TestMetadata("checkCastOtherClassloader.kt")
+            public void testCheckCastOtherClassloader() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/checkCastOtherClassloader.kt");
+            }
+
             @TestMetadata("classFromAnotherPackage.kt")
             public void testClassFromAnotherPackage() throws Exception {
                 runTest("testData/evaluation/singleBreakpoint/classFromAnotherPackage.kt");
@@ -1954,6 +1959,11 @@ public abstract class IrKotlinEvaluateExpressionInMppTestGenerated extends Abstr
                 runTest("testData/evaluation/singleBreakpoint/internalFunctionEvaluate.kt");
             }
 
+            @TestMetadata("internalMembersInInlinedLambda.kt")
+            public void testInternalMembersInInlinedLambda() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/internalMembersInInlinedLambda.kt");
+            }
+
             @TestMetadata("internalProperty.kt")
             public void testInternalProperty() throws Exception {
                 runTest("testData/evaluation/singleBreakpoint/internalProperty.kt");
@@ -1962,6 +1972,11 @@ public abstract class IrKotlinEvaluateExpressionInMppTestGenerated extends Abstr
             @TestMetadata("javaStaticMethods.kt")
             public void testJavaStaticMethods() throws Exception {
                 runTest("testData/evaluation/singleBreakpoint/javaStaticMethods.kt");
+            }
+
+            @TestMetadata("jvmNameConstEvaluation.kt")
+            public void testJvmNameConstEvaluation() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/jvmNameConstEvaluation.kt");
             }
 
             @TestMetadata("kClass.kt")
@@ -2137,6 +2152,11 @@ public abstract class IrKotlinEvaluateExpressionInMppTestGenerated extends Abstr
             @TestMetadata("parametersOfInlineFunSeveralOnLine.kt")
             public void testParametersOfInlineFunSeveralOnLine() throws Exception {
                 runTest("testData/evaluation/singleBreakpoint/parametersOfInlineFunSeveralOnLine.kt");
+            }
+
+            @TestMetadata("privateAssignmentOperators.kt")
+            public void testPrivateAssignmentOperators() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/privateAssignmentOperators.kt");
             }
 
             @TestMetadata("privateClass.kt")
@@ -2392,6 +2412,11 @@ public abstract class IrKotlinEvaluateExpressionInMppTestGenerated extends Abstr
             @TestMetadata("withSerializationPlugin.kt")
             public void testWithSerializationPlugin() throws Exception {
                 runTest("testData/evaluation/singleBreakpoint/withSerializationPlugin.kt");
+            }
+
+            @TestMetadata("withSerializationPlugin_ver_1.7.1.kt")
+            public void testWithSerializationPlugin_ver_1_7_1() throws Exception {
+                runTest("testData/evaluation/singleBreakpoint/withSerializationPlugin_ver_1.7.1.kt");
             }
 
             @TestMetadata(".kt.kt")
@@ -2749,6 +2774,11 @@ public abstract class IrKotlinEvaluateExpressionInMppTestGenerated extends Abstr
         @TestMetadata("functionBreakpointInCommonCode.kt")
         public void testFunctionBreakpointInCommonCode() throws Exception {
             runTest("testData/evaluation/multiplatform/functionBreakpointInCommonCode.kt");
+        }
+
+        @TestMetadata("inlineFromFileWithSerializableDeclaration.kt")
+        public void testInlineFromFileWithSerializableDeclaration() throws Exception {
+            runTest("testData/evaluation/multiplatform/inlineFromFileWithSerializableDeclaration.kt");
         }
 
         @TestMetadata("inlineFunWithDefaultArgument.kt")

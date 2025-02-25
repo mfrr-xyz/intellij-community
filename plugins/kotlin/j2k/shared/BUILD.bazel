@@ -1,11 +1,9 @@
 ### auto-generated section `build kotlin.j2k.shared` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   context_receivers = True,
   opt_in = [
     "org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
@@ -23,13 +21,12 @@ jvm_library(
   name = "kotlin-j2k-shared",
   module_name = "kotlin.j2k.shared",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_analysis-api",
-    "@lib//:kotlinc_kotlin-compiler-common",
+    "@lib//:kotlinc-analysis-api",
+    "@lib//:kotlinc-kotlin-compiler-common",
     "//java/java-impl:impl",
     "//java/java-indexing-api:indexing",
     "//java/java-psi-api:psi",
@@ -40,6 +37,7 @@ jvm_library(
     "//plugins/kotlin/base/indices:kotlin-base-indices",
     "//plugins/kotlin/base/plugin:kotlin-base-plugin",
     "//plugins/kotlin/base/project-structure:kotlin-base-project-structure",
+    "//platform/platform-impl:ide-impl",
     "//plugins/kotlin/base/psi:kotlin-base-psi",
     "//plugins/kotlin/base/util:kotlin-base-util",
     "//plugins/kotlin/frontend-independent:fir-frontend-independent",
@@ -47,6 +45,8 @@ jvm_library(
     "//platform/core-api:core",
     "//platform/util",
     "//plugins/kotlin/project-configuration",
+    "//plugins/kotlin/preferences",
+    "//plugins/kotlin/base/statistics:kotlin-base-statistics",
   ],
   runtime_deps = [":kotlin-j2k-shared_resources"]
 )

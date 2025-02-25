@@ -131,12 +131,12 @@ public final class QuickFixWrapper implements IntentionAction, PriorityAction, C
 
   @Override
   public @NotNull String getText() {
-    return getFamilyName();
+    return myFix.getName();
   }
 
   @Override
   public @NotNull String getFamilyName() {
-    return myFix.getName();
+    return myFix.getFamilyName();
   }
 
   @Override
@@ -237,8 +237,7 @@ public final class QuickFixWrapper implements IntentionAction, PriorityAction, C
   }
 
   @Override
-  @Unmodifiable
-  public @NotNull List<@NotNull RangeToHighlight> getRangesToHighlight(@NotNull Editor editor, @NotNull PsiFile file) {
+  public @Unmodifiable @NotNull List<@NotNull RangeToHighlight> getRangesToHighlight(@NotNull Editor editor, @NotNull PsiFile file) {
     return myFix.getRangesToHighlight(file.getProject(), myDescriptor);
   }
 

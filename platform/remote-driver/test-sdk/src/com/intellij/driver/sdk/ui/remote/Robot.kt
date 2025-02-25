@@ -45,4 +45,6 @@ interface Robot {
   fun pressAndReleaseKeys(vararg keyCodes: Int)
   fun waitForIdle()
   fun selectAndDrag(component: Component, to: Point, from: Point, delayMs: Int)
+
+  fun getColor(component: Component, point: Point?): ColorRef
 }

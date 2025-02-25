@@ -1,8 +1,7 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
-@file:Suppress("ReplaceGetOrSet", "ReplaceJavaStaticMethodWithKotlinAnalog")
-
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
+import com.intellij.platform.ijent.community.buildConstants.isIjentWslFsEnabledByDefaultForProduct
 import com.intellij.platform.util.putMoreLikelyPluginJarsFirst
 import com.intellij.util.lang.HashMapZipFile
 import io.opentelemetry.api.common.AttributeKey
@@ -11,6 +10,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import org.jetbrains.annotations.VisibleForTesting
 import org.jetbrains.intellij.build.impl.ModuleOutputPatcher
 import org.jetbrains.intellij.build.impl.PlatformJarNames
+import org.jetbrains.intellij.build.impl.PlatformJarNames.PLATFORM_CORE_NIO_FS
 import org.jetbrains.intellij.build.impl.PluginLayout
 import org.jetbrains.intellij.build.impl.projectStructureMapping.DistributionFileEntry
 import org.jetbrains.intellij.build.io.INDEX_FILENAME
@@ -49,7 +49,7 @@ private val sourceToNames: Map<String, MutableList<String>> by lazy {
 }
 
 suspend fun reorderJar(relativePath: String, file: Path) {
-  val orderedNames = sourceToNames.get(relativePath) ?: return
+  val orderedNames = sourceToNames[relativePath] ?: return
   spanBuilder("reorder jar")
     .setAttribute("relativePath", relativePath)
     .setAttribute("file", file.toString())
@@ -58,17 +58,22 @@ suspend fun reorderJar(relativePath: String, file: Path) {
     }
 }
 
-internal val excludedLibJars: Set<String> = java.util.Set.of(PlatformJarNames.TEST_FRAMEWORK_JAR)
+internal fun excludedLibJars(context: BuildContext): Set<String> =
+  setOf(PlatformJarNames.TEST_FRAMEWORK_JAR) +
+  if (isIjentWslFsEnabledByDefaultForProduct(context.productProperties.platformPrefix)) setOf(PLATFORM_CORE_NIO_FS) else emptySet()
 
-internal suspend fun generateClasspath(homeDir: Path, libDir: Path): List<String> {
+internal suspend fun generateClasspath(context: BuildContext): List<String> {
+  val homeDir = context.paths.distAllDir
+  val libDir = homeDir.resolve("lib")
   return spanBuilder("generate classpath")
     .setAttribute("dir", homeDir.toString())
     .use { span ->
+      val excluded = excludedLibJars(context)
       val existing = HashSet<Path>()
-      addJarsFromDir(dir = libDir) { paths ->
-        paths.filterTo(existing) { !excludedLibJars.contains(it.fileName.toString()) }
+      addJarsFromDir(libDir) { paths ->
+        paths.filterTo(existing) { !excluded.contains(it.fileName.toString()) }
       }
-      val files = computeAppClassPath(libDir = libDir, existing = existing, homeDir = homeDir)
+      val files = computeAppClassPath(libDir, existing, homeDir)
       val result = files.map { libDir.relativize(it).toString() }
       span.setAttribute(AttributeKey.stringArrayKey("result"), result)
       result
@@ -126,9 +131,9 @@ fun reorderJar(jarFile: Path, orderedNames: List<String>) {
     return
   }
 
-  sourceZipFile.use { sourceZip ->
-    val packageIndexBuilder = PackageIndexBuilder()
-    return transformZipUsingTempFile(jarFile, packageIndexBuilder.indexWriter) { zipCreator ->
+  val packageIndexBuilder = PackageIndexBuilder()
+  return transformZipUsingTempFile(jarFile, packageIndexBuilder.indexWriter) { zipCreator ->
+    sourceZipFile.use { sourceZip ->
       val entries = sourceZip.entries.filterTo(mutableListOf()) { !it.isDirectory && it.name != INDEX_FILENAME }
       // ignore the existing package index on reorder - a new one will be computed even if it is the same, do not optimize for simplicity
       entries.sortWith { o1, o2 ->
@@ -155,10 +160,7 @@ fun reorderJar(jarFile: Path, orderedNames: List<String>) {
 
       for (entry in entries) {
         packageIndexBuilder.addFile(entry.name)
-        zipCreator.uncompressedData(
-          nameString = entry.name,
-          data = entry.getByteBuffer(sourceZip, null),
-        )
+        zipCreator.uncompressedData(nameString = entry.name, data = entry.getByteBuffer(sourceZip, null))
       }
       packageIndexBuilder.writePackageIndex(zipCreator)
     }
@@ -179,8 +181,9 @@ internal fun writePluginClassPathHeader(out: DataOutputStream, isJarOnly: Boolea
   out.write(if (isJarOnly) 1 else 0)
 
   // main plugin
-  val mainDescriptor = moduleOutputPatcher.getPatchedContent(context.productProperties.applicationInfoModule)
-    .let { it.get("META-INF/plugin.xml") ?: it.get("META-INF/${context.productProperties.platformPrefix}Plugin.xml") }
+  val mainDescriptor = moduleOutputPatcher.getPatchedContent(context.productProperties.applicationInfoModule).let {
+    it["META-INF/plugin.xml"] ?: it["META-INF/${context.productProperties.platformPrefix}Plugin.xml"]
+  }
 
   val mainPluginDescriptorContent = requireNotNull(mainDescriptor) {
     "Cannot find core plugin descriptor (module=${context.productProperties.applicationInfoModule})"
@@ -271,7 +274,7 @@ internal fun generatePluginClassPathFromPrebuiltPluginFiles(pluginEntries: List<
       putMoreLikelyPluginJarsFirst(pluginDir.fileName.toString(), filesInLibUnderPluginDir = files)
     }
 
-    // move dir with plugin.xml to top (it may not exist if for some reason the main module dir still being packed into JAR)
+    // move a dir with "plugin.xml" to the top (it may not exist if for some reason the main module dir still being packed into JAR)
     writeEntry(out = out, files = files, pluginDir = pluginDir, pluginDescriptorContent = reorderPluginClassPath(files))
   }
 

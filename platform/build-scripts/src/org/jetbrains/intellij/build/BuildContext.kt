@@ -1,6 +1,7 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
+import com.intellij.platform.buildData.productInfo.ProductInfoLayoutItem
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.SpanBuilder
 import kotlinx.collections.immutable.PersistentMap
@@ -63,12 +64,9 @@ interface BuildContext : CompilationContext {
   val systemSelector: String
 
   /**
-   * Names of JARs inside `IDE_HOME/lib` directory which need to be added to the JVM boot classpath to start the IDE.
-   */
-  val xBootClassPathJarNames: List<String>
-
-  /**
    * Names of JARs inside `IDE_HOME/lib` directory which need to be added to the JVM classpath to start the IDE.
+   *
+   * **Note**: In terms of JVM, these JARs form a regular classpath (`-cp`), not a boot classpath (`-Xbootclasspath`).
    */
   var bootClassPathJarNames: List<String>
 
@@ -123,8 +121,6 @@ interface BuildContext : CompilationContext {
    */
   fun getDistFiles(os: OsFamily?, arch: JvmArchitecture?): Collection<DistFile>
 
-  suspend fun includeBreakGenLibraries(): Boolean
-
   fun patchInspectScript(path: Path)
 
   /**
@@ -136,6 +132,7 @@ interface BuildContext : CompilationContext {
     arch: JvmArchitecture,
     isScript: Boolean = false,
     isPortableDist: Boolean = false,
+    isQodana: Boolean = false,
   ): List<String>
 
   fun findApplicationInfoModule(): JpsModule
@@ -144,9 +141,11 @@ interface BuildContext : CompilationContext {
     proprietaryBuildTools.signTool.signFiles(files = files, context = this, options = options)
   }
 
-  suspend fun getJetBrainsClientModuleFilter(): JetBrainsClientModuleFilter
+  suspend fun getFrontendModuleFilter(): FrontendModuleFilter
+  
+  suspend fun getContentModuleFilter(): ContentModuleFilter
 
-  val isEmbeddedJetBrainsClientEnabled: Boolean
+  val isEmbeddedFrontendEnabled: Boolean
 
   fun shouldBuildDistributions(): Boolean
 
@@ -218,25 +217,12 @@ class BuiltinModulesFileData(
   @JvmField val fileExtensions: MutableList<String> = mutableListOf(),
 )
 
-@Serializable
-data class ProductInfoLayoutItem(
-  @JvmField val name: String,
-  @JvmField val kind: ProductInfoLayoutItemKind,
-  @JvmField val classPath: List<String> = emptyList(),
-)
-
-@Suppress("EnumEntryName")
-@Serializable
-enum class ProductInfoLayoutItemKind {
-  plugin, pluginAlias, productModuleV2, moduleV2
-}
-
 sealed interface DistFileContent {
   fun readAsStringForDebug(): String
 }
 
 data class LocalDistFileContent(@JvmField val file: Path, val isExecutable: Boolean = false) : DistFileContent {
-  override fun readAsStringForDebug() = Files.newInputStream(file).readNBytes(1024).decodeToString()
+  override fun readAsStringForDebug(): String = Files.newInputStream(file).readNBytes(1024).decodeToString()
 
   override fun toString(): String = "LocalDistFileContent(file=$file, isExecutable=$isExecutable)"
 }

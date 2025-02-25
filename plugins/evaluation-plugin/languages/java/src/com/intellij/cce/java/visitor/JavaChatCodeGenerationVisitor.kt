@@ -2,8 +2,8 @@
 package com.intellij.cce.java.visitor
 
 import com.intellij.cce.core.*
-import com.intellij.cce.evaluable.INTERNAL_RELEVANT_FILES_PROPERTY
 import com.intellij.cce.evaluable.INTERNAL_API_CALLS_PROPERTY
+import com.intellij.cce.evaluable.INTERNAL_RELEVANT_FILES_PROPERTY
 import com.intellij.cce.evaluable.METHOD_NAME_PROPERTY
 import com.intellij.cce.java.chat.extractCalledInternalApiMethods
 import com.intellij.cce.visitor.EvaluationVisitor
@@ -41,28 +41,28 @@ class JavaChatCodeGenerationVisitor : EvaluationVisitor, JavaRecursiveElementVis
         method.text,
         method.startOffset,
         SimpleTokenProperties.create(tokenType = TypeProperty.METHOD, SymbolLocation.PROJECT) {
-          put(INTERNAL_API_CALLS_PROPERTY, internalApiCalls.joinToString("\n"))
-          put(INTERNAL_RELEVANT_FILES_PROPERTY, internalRelevantFiles.joinToString("\n"))
+          put(INTERNAL_API_CALLS_PROPERTY, internalApiCalls.distinct().sorted().joinToString("\n"))
+          put(INTERNAL_RELEVANT_FILES_PROPERTY, internalRelevantFiles.distinct().joinToString("\n"))
           put(METHOD_NAME_PROPERTY, method.name)
         })
     )
   }
+}
 
-  private suspend fun extractInternalApiCallsAndRelevantFiles(method: PsiMethod): Pair<List<String>, List<String>> {
-    return smartReadActionBlocking(method.project) {
-      val methodNames = mutableListOf<String>()
-      val fileNames = mutableListOf<String>()
+internal suspend fun extractInternalApiCallsAndRelevantFiles(method: PsiMethod): Pair<List<String>, List<String>> {
+  return smartReadActionBlocking(method.project) {
+    val methodNames = mutableListOf<String>()
+    val fileNames = mutableListOf<String>()
 
-      for (calledMethod in extractCalledInternalApiMethods(method)) {
-        val projectPath = method.project.basePath ?: continue
-        val file = calledMethod.containingFile.virtualFile ?: continue
-        val methodName = QualifiedNameProviderUtil.getQualifiedName(calledMethod) ?: continue
+    for (calledMethod in extractCalledInternalApiMethods(method)) {
+      val projectPath = method.project.basePath ?: continue
+      val file = calledMethod.containingFile.virtualFile ?: continue
+      val methodName = QualifiedNameProviderUtil.getQualifiedName(calledMethod) ?: continue
 
-        methodNames.add(methodName)
-        fileNames.add(Path(file.path).relativeTo(Path(projectPath)).toString())
-      }
-
-      Pair(methodNames.distinct(), fileNames.distinct())
+      methodNames.add(methodName)
+      fileNames.add(Path(file.path).relativeTo(Path(projectPath)).toString())
     }
+
+    Pair(methodNames.distinct(), fileNames.distinct())
   }
 }

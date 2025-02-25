@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.impl.compiled;
 
 import com.intellij.openapi.diagnostic.Logger;
@@ -93,7 +93,7 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
     boolean isRecord = isSet(flags, Opcodes.ACC_RECORD);
     short stubFlags = PsiClassStubImpl.packFlags(
       isDeprecated, isInterface, isEnum, false, false, isAnnotationType, false, false, myAnonymousInner, myLocalClassInner, false,
-      isRecord, false);
+      isRecord, false, false/*asm doesn't know about value classes yet*/);
     myResult =
       new PsiClassStubImpl<>(JavaStubElementTypes.CLASS, myParent, fqn == null ? TypeInfo.SimpleTypeInfo.NULL : fqn, shortName, null,
                              stubFlags);
@@ -164,8 +164,7 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
     return result;
   }
 
-  @NotNull
-  private ClassInfo parseClassDescription(String superClass, String[] superInterfaces) {
+  private @NotNull ClassInfo parseClassDescription(String superClass, String[] superInterfaces) {
     ClassInfo result = new ClassInfo();
     result.typeParameters = TypeParametersDeclaration.EMPTY;
     if (superClass != null) {
@@ -512,8 +511,7 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
   private static class ClassInfo {
     private TypeParametersDeclaration typeParameters;
     private TypeInfo superType;
-    @Unmodifiable
-    private List<TypeInfo> interfaces;
+    private @Unmodifiable List<TypeInfo> interfaces;
   }
 
   private static class MethodInfo {

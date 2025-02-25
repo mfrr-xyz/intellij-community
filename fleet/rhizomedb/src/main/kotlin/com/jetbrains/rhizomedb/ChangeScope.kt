@@ -5,7 +5,6 @@ import com.jetbrains.rhizomedb.impl.entity
 import com.jetbrains.rhizomedb.impl.generateSeed
 import fleet.util.openmap.Key
 import fleet.util.openmap.MutableOpenMap
-import kotlin.reflect.KClass
 
 /**
  * Asserts that current thread-bound [DbContext] contains mutable db, constructs [ChangeScope] for it, and runs body with it
@@ -113,6 +112,9 @@ interface ChangeScope {
       }
     }
 
+  fun register(vararg entityTypes: EntityType<*>) {
+    entityTypes.forEach { register(it) }
+  }
 
   /**
    * Sets a value to the attribute of a given entity.
@@ -231,7 +233,7 @@ interface ChangeScope {
    * */
   fun <E : Entity> EntityType<E>.new(builder: EntityBuilder<E> = EntityBuilder {}): E = let { entityType ->
     require(entity(entityType.eid) != null) {
-      "Entity type '${entityType.entityTypeIdent}' is not registered. It should be registered automatically, report and use ChangeScope.register as mitigation"
+      "Entity type '${entityType.entityTypeIdent}' is not registered.\nDid you export package to rhizomedb?\nIt should be registered automatically, report and use ChangeScope.register as mitigation"
     }
     val eid = context.impl.createEntity(pipeline = context,
                                         entityTypeEid = entityType.eid,

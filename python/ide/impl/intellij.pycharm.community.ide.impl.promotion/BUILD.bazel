@@ -1,13 +1,17 @@
 ### auto-generated section `build intellij.pycharm.community.ide.impl.promotion` start
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
+
+jvm_resources(
+  name = "pycharm-community-ide-impl-promotion_resources",
+  files = glob(["resources/**/*"]),
+  strip_prefix = "resources"
+)
 
 jvm_library(
   name = "pycharm-community-ide-impl-promotion",
   module_name = "intellij.pycharm.community.ide.impl.promotion",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "//platform/projectModel-api:projectModel",
     "//platform/ide-core",
@@ -19,6 +23,7 @@ jvm_library(
     "//platform/statistics",
     "@lib//:http-client",
     "//platform/core-ui",
-  ]
+  ],
+  runtime_deps = [":pycharm-community-ide-impl-promotion_resources"]
 )
 ### auto-generated section `build intellij.pycharm.community.ide.impl.promotion` end

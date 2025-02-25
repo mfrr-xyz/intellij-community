@@ -10,6 +10,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.ExtensionDescriptor
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.extensions.impl.ExtensionPointImpl
+import com.intellij.openapi.util.BuildNumber
 import com.intellij.util.Java11Shim
 import com.intellij.util.PlatformUtils
 import org.jetbrains.annotations.ApiStatus
@@ -47,7 +48,7 @@ class IdeaPluginDescriptorImpl(
   @JvmField var isDependentOnCoreClassLoader: Boolean = true,
 ) : IdeaPluginDescriptor {
   private val id: PluginId = id ?: PluginId.getId(raw.id ?: raw.name ?: throw RuntimeException("Neither id nor name are specified"))
-  private val name = raw.name ?: id?.idString ?: raw.id
+  private val name: String = raw.name ?: id?.idString ?: raw.id!! // if it throws, it throws on `id` above
 
   @Suppress("EnumEntryName")
   enum class OS {
@@ -77,6 +78,11 @@ class IdeaPluginDescriptorImpl(
   @JvmField
   internal val url: String? = raw.url
 
+  /**
+   * aka `<depends>` elements from the plugin.xml
+   *
+   * Note that it's different from [dependencies]
+   */
   @JvmField
   val pluginDependencies: List<PluginDependency>
 
@@ -158,6 +164,11 @@ class IdeaPluginDescriptorImpl(
     raw.contentModules.takeIf { !it.isNullOrEmpty() }?.let { PluginContentDescriptor(it) }
     ?: PluginContentDescriptor.EMPTY
 
+  /**
+   * aka `<dependencies>` element from plugin.xml
+   *
+   * Note that it's different from [pluginDependencies]
+   */
   @JvmField
   val dependencies: ModuleDependenciesDescriptor = raw.dependencies
 
@@ -181,8 +192,8 @@ class IdeaPluginDescriptorImpl(
   @JvmField
   val packagePrefix: String? = raw.`package`
 
-  private val sinceBuild = raw.sinceBuild
-  private val untilBuild = raw.untilBuild
+  private val sinceBuild: String? = raw.sinceBuild
+  private val untilBuild: String? = UntilBuildDeprecation.nullizeIfTargets243OrLater( raw.untilBuild, raw.name ?: raw.id)
   private var isEnabled = true
 
   var isDeleted: Boolean = false
@@ -294,6 +305,11 @@ class IdeaPluginDescriptorImpl(
       // This alias is available in monolith and backend.
       // Modules, which depend on it, will not be loaded in split frontend.
       add(PluginId.getId("com.intellij.platform.experimental.backend"))
+    }
+    if (!AppMode.isRemoteDevHost() && !PlatformUtils.isJetBrainsClient()) {
+      // This alias is available in monolith only.
+      // Modules, which depend on it, will not be loaded in split mode.
+      add(PluginId.getId("com.intellij.platform.experimental.monolith"))
     }
   }
 
@@ -544,7 +560,7 @@ class IdeaPluginDescriptorImpl(
       }
     }
 
-    return name!!
+    return name
   }
 
   override fun getProductCode(): String? = productCode
@@ -655,9 +671,25 @@ private val extensionPointNameComparator = Comparator<String> { o1, o2 ->
 }
 
 private fun isCommunity(): Boolean {
-  val ideCode = ApplicationInfoImpl.getShadowInstanceImpl().build.productCode
-  return ideCode == "IC" || ideCode == "PC"
+  try {
+    val ideCode = ApplicationInfoImpl.getShadowInstanceImpl().build.productCode
+    return ideCode == "IC" || ideCode == "PC"
+  } catch (e: RuntimeException) {
+    // do not fail unit tests when there is no app >_<
+    val msg = e.message ?: throw e
+    if (msg.contains("Resource not found") && msg.contains("idea/ApplicationInfo.xml")) {
+      if (!unitTestIsCommunityDespammer) {
+        LOG.warn("failed to read application info, are we in unit tests?", e)
+        unitTestIsCommunityDespammer = true
+      }
+      return false
+    } else {
+      throw e
+    }
+  }
 }
+
+private var unitTestIsCommunityDespammer = false
 
 private data class PluginCardInfo(val title: String, val description: String)
 
@@ -667,3 +699,28 @@ private val CE_PLUGIN_CARDS = mapOf<String, PluginCardInfo>(
     "Provides an easy way to install AI assistant to your IDE"
   )
 )
+
+private object UntilBuildDeprecation {
+  private val forceHonorUntilBuild = System.getProperty("idea.plugins.honor.until.build.after.243", "false").toBoolean()
+
+  fun nullizeIfTargets243OrLater(untilBuild: String?, diagnosticId: String?): String? {
+    if (forceHonorUntilBuild || untilBuild == null) {
+      return untilBuild
+    }
+    try {
+      val untilBuildNumber = BuildNumber.fromStringOrNull(untilBuild)
+      if (untilBuildNumber != null && untilBuildNumber.baselineVersion >= 243) {
+        if (untilBuildNumber < PluginManagerCore.buildNumber) {
+          // log only if it would fail the compatibility check without the deprecation in place
+          LOG.info("Plugin ${diagnosticId ?: "<no name>"} has until-build set to $untilBuild. " +
+                   "Until-build _from plugin configuration file (plugin.xml)_ for plugins targeting 243+ is ignored. " +
+                   "Effective until-build value can be set via the Marketplace.")
+        }
+        return null
+      }
+    } catch (e: Throwable) {
+      LOG.warn("failed to parse until-build number", e)
+    }
+    return untilBuild
+  }
+}

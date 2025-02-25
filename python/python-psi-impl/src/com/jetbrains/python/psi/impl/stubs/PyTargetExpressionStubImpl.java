@@ -33,13 +33,13 @@ public class PyTargetExpressionStubImpl extends PyVersionSpecificStubBase<PyTarg
   private final String myName;
   private final InitializerType myInitializerType;
   private final QualifiedName myInitializer;
-  @Nullable private final PyLiteralKind myAssignedLiteralKind;
+  private final @Nullable PyLiteralKind myAssignedLiteralKind;
   private final boolean myQualified;
   private final String myTypeComment;
   private final String myAnnotation;
   private final boolean myHasAssignedValue;
   
-  @Nullable private final String myDocString;
+  private final @Nullable String myDocString;
   private final CustomTargetExpressionStub myCustomStub;
 
   public PyTargetExpressionStubImpl(String name,
@@ -113,27 +113,23 @@ public class PyTargetExpressionStubImpl extends PyVersionSpecificStubBase<PyTarg
     return myQualified;
   }
 
-  @Nullable
   @Override
-  public <T> T getCustomStub(Class<T> stubClass) {
+  public @Nullable <T> T getCustomStub(Class<T> stubClass) {
     return ObjectUtils.tryCast(myCustomStub, stubClass);
   }
 
-  @Nullable
   @Override
-  public String getDocString() {
+  public @Nullable String getDocString() {
     return myDocString;
   }
 
-  @Nullable
   @Override
-  public String getTypeComment() {
+  public @Nullable String getTypeComment() {
     return myTypeComment;
   }
 
-  @Nullable
   @Override
-  public String getAnnotation() {
+  public @Nullable String getAnnotation() {
     return myAnnotation;
   }
 
@@ -144,28 +140,17 @@ public class PyTargetExpressionStubImpl extends PyVersionSpecificStubBase<PyTarg
 
   @Override
   public String toString() {
-    String result = "PyTargetExpressionStub(name=" + myName +
-                    ", hasAssignedValue=" + myHasAssignedValue;
-    if (myCustomStub == null) {
-      if (myInitializer != null) {
-        result += ", initializer=" + myInitializer;
-      }
-      result += ", initializerType=" + myInitializerType +
-                ", qualified=" + myQualified;
-    }
-    else {
-      result += ", customStub=" + myCustomStub;
-    }
-    if (myTypeComment != null) {
-      result += ", typeComment='" + myTypeComment + '\'';
-    }
-    if (myAnnotation != null) {
-      result += ", annotation='" + myAnnotation + '\'';
-    }
-    if (myDocString != null) {
-      result += ", docString='" + StringUtil.escapeStringCharacters(myDocString) + '\'';
-    }
-    result += ")";
-    return result;
+    return "PyTargetExpressionStubImpl{" +
+           "myName='" + myName + '\'' +
+           ", myInitializerType=" + myInitializerType +
+           ", myInitializer=" + myInitializer +
+           ", myAssignedLiteralKind=" + myAssignedLiteralKind +
+           ", myQualified=" + myQualified +
+           ", myTypeComment='" + myTypeComment + '\'' +
+           ", myAnnotation='" + myAnnotation + '\'' +
+           ", myHasAssignedValue=" + myHasAssignedValue +
+           ", myDocString='" + (myDocString != null ? StringUtil.escapeStringCharacters(myDocString) : null) + '\'' +
+           ", myCustomStub=" + myCustomStub +
+           '}';
   }
 }

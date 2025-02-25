@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.command.impl;
 
 import com.intellij.openapi.application.AccessToken;
@@ -24,7 +24,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public class CoreCommandProcessor extends CommandProcessorEx {
-  private static class CommandDescriptor implements CommandToken {
+  @ApiStatus.Internal
+  public static final class CommandDescriptor implements CommandToken {
     public final @NotNull Runnable myCommand;
     public final Project myProject;
     public @NlsContexts.Command String myName;
@@ -276,7 +277,6 @@ public class CoreCommandProcessor extends CommandProcessorEx {
   }
 
   private void fireCommandFinished() {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
     CommandDescriptor currentCommand = myCurrentCommand;
     CommandEvent event = new CommandEvent(this, currentCommand.myCommand,
                                           currentCommand.myName,
@@ -299,7 +299,7 @@ public class CoreCommandProcessor extends CommandProcessorEx {
 
   @Override
   public void enterModal() {
-    ThreadingAssertions.assertWriteIntentReadAccess();
+    ThreadingAssertions.assertEventDispatchThread();
     CommandDescriptor currentCommand = myCurrentCommand;
     myInterruptedCommands.push(currentCommand);
     if (currentCommand != null) {
@@ -309,7 +309,7 @@ public class CoreCommandProcessor extends CommandProcessorEx {
 
   @Override
   public void leaveModal() {
-    ThreadingAssertions.assertWriteIntentReadAccess();
+    ThreadingAssertions.assertEventDispatchThread();
     CommandLog.LOG.assertTrue(myCurrentCommand == null, "Command must not run: " + myCurrentCommand);
 
     myCurrentCommand = myInterruptedCommands.pop();
@@ -461,7 +461,6 @@ public class CoreCommandProcessor extends CommandProcessorEx {
   }
 
   private void fireCommandStarted() {
-    ApplicationManager.getApplication().assertWriteIntentLockAcquired();
     CommandDescriptor currentCommand = myCurrentCommand;
     CommandEvent event = new CommandEvent(this,
                                           currentCommand.myCommand,

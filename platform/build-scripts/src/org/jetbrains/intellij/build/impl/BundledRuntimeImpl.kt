@@ -10,6 +10,7 @@ import org.jetbrains.intellij.build.*
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesDownloader
 import org.jetbrains.intellij.build.dependencies.BuildDependenciesExtractOptions
 import org.jetbrains.intellij.build.dependencies.DependenciesProperties
+import org.jetbrains.intellij.build.dependencies.LinuxLibcImpl
 import org.jetbrains.intellij.build.telemetry.TraceManager.spanBuilder
 import org.jetbrains.intellij.build.telemetry.use
 import java.nio.file.FileVisitResult
@@ -42,6 +43,7 @@ class BundledRuntimeImpl(
     get() {
       val bundledRuntimePrefix = options.bundledRuntimePrefix
       return when {
+        LinuxLibcImpl.isLinuxMusl -> "jbrsdk-"
         // required as a runtime for debugger tests
         System.getProperty("intellij.build.jbr.setupSdk", "false").toBoolean() -> "jbrsdk-"
         bundledRuntimePrefix != null -> bundledRuntimePrefix
@@ -76,7 +78,8 @@ class BundledRuntimeImpl(
   }
 
   override suspend fun extract(prefix: String, os: OsFamily, arch: JvmArchitecture): Path {
-    val targetDir = paths.communityHomeDir.resolve("build/download/${prefix}${build}-${os.jbrArchiveSuffix}-$arch")
+    val isMusl = os == OsFamily.LINUX && LinuxLibcImpl.isLinuxMusl
+    val targetDir = paths.communityHomeDir.resolve("build/download/${prefix}${build}-${os.jbrArchiveSuffix}-${if (isMusl) "musl-" else ""}$arch")
     val jbrDir = targetDir.resolve("jbr")
 
     val archive = findArchive(prefix, os, arch)
@@ -123,7 +126,8 @@ class BundledRuntimeImpl(
     val version = if (forceVersionWithUnderscores) split[0].replace(".", "_") else split[0]
     val buildNumber = "b${split[1]}"
     val archSuffix = getArchSuffix(arch)
-    return "${prefix}${version}-${os.jbrArchiveSuffix}-${archSuffix}-${runtimeBuildPrefix()}${buildNumber}.tar.gz"
+    val muslSuffix = if (LinuxLibcImpl.isLinuxMusl) "-musl" else ""
+    return "${prefix}${version}-${os.jbrArchiveSuffix}${muslSuffix}-${archSuffix}-${runtimeBuildPrefix()}${buildNumber}.tar.gz"
   }
 
   private fun runtimeBuildPrefix(): String {

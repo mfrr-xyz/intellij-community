@@ -38,6 +38,7 @@
     <orderEntry type="module" module-name="intellij.platform.editor.ex" />
     <orderEntry type="library" name="ASM" level="project" />
     <orderEntry type="library" name="kotlinc.kotlin-scripting-compiler-impl" level="project" />
+    <orderEntry type="module" module-name="intellij.platform.ide.observable" />
     <orderEntry type="library" name="kotlinc.kotlin-scripting-common" level="project" />
     <orderEntry type="library" name="kotlinc.kotlin-scripting-dependencies" level="project" />
     <orderEntry type="library" name="kotlinc.kotlin-scripting-jvm" level="project" />
@@ -52,9 +53,11 @@
     <orderEntry type="module" module-name="kotlin.base.facet" />
     <orderEntry type="module" module-name="kotlin.base.jps" />
     <orderEntry type="module" module-name="kotlin.base.compiler-configuration-ui" />
+    <orderEntry type="module" module-name="intellij.platform.usageView" />
     <orderEntry type="module" module-name="kotlin.base.platforms" />
     <orderEntry type="module" module-name="kotlin.base.project-structure" />
     <orderEntry type="module" module-name="kotlin.base.scripting" />
+    <orderEntry type="module" module-name="intellij.platform.util.progress" />
     <orderEntry type="module" module-name="kotlin.base.external-build-system" />
     <orderEntry type="module" module-name="kotlin.base.analysis" />
     <orderEntry type="module" module-name="kotlin.highlighting.shared" />

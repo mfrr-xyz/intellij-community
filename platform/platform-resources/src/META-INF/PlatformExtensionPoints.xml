@@ -188,7 +188,7 @@
 
     <extensionPoint name="toolWindowAllowlist" beanClass="com.intellij.openapi.wm.ToolWindowAllowlistEP" dynamic="true"/>
     <extensionPoint name="statistics.gotItTooltipAllowlist" beanClass="com.intellij.internal.statistic.collectors.fus.ui.GotItTooltipAllowlistEP" dynamic="true"/>
-
+    <extensionPoint name="dialogInvocationPlace" beanClass="com.intellij.internal.statistic.collectors.fus.ui.DialogInvocationPlaceEP" dynamic="true"/>
     <extensionPoint name="library.toolWindow" beanClass="com.intellij.openapi.wm.ext.LibraryDependentToolWindow" dynamic="true">
       <with attribute="librarySearchClass" implements="com.intellij.openapi.wm.ext.LibrarySearchHelper"/>
       <with attribute="factoryClass" implements="com.intellij.openapi.wm.ToolWindowFactory"/>
@@ -513,6 +513,10 @@
     <extensionPoint name="contentTabActionProvider" interface="com.intellij.openapi.wm.impl.content.tabActions.ContentTabActionProvider"
                     dynamic="true"/>
 
+    <extensionPoint name="toolWindowTabInEditorHelper" beanClass="com.intellij.util.KeyedLazyInstanceEP" dynamic="true">
+      <with attribute="implementationClass" implements="com.intellij.openapi.wm.impl.tabInEditor.ToolWindowTabInEditorHelper"/>
+    </extensionPoint>
+
     <extensionPoint name="inspectionPopupLevelChangePolicy" interface="com.intellij.openapi.editor.impl.InspectionPopupLevelChangePolicy" dynamic="true"/>
 
     <extensionPoint name="protocolHandler" interface="com.intellij.ide.ProtocolHandler" dynamic="true"/>
@@ -554,7 +558,6 @@
 
     <extensionPoint name="codeWithMe.authorizationProvider" interface="com.intellij.codeWithMe.CodeWithMeAuthorizationProvider" dynamic="true" />
     <extensionPoint name="codeWithMe.serverUrlProvider" interface="com.intellij.codeWithMe.CodeWithMeServerUrlProvider" dynamic="true" />
-    <extensionPoint name="emptyIntentionProvider" interface="com.intellij.codeInsight.daemon.impl.EmptyIntentionProvider" dynamic="true"/>
 
     <extensionPoint name="idePerformanceListener" interface="com.intellij.diagnostic.PerformanceListener" dynamic="true"/>
 
@@ -582,6 +585,10 @@
                     interface="com.intellij.ide.vcs.RecentProjectsBranchesProvider"
                     dynamic="true"/>
 
+    <extensionPoint name="recentProjectsProvider"
+                    interface="com.intellij.ide.RecentProjectProvider"
+                    dynamic="true"/>
+
     <extensionPoint name="applicationSettings"
                     beanClass="com.intellij.ide.settings.SettingsComponentDescriptor"
                     dynamic="true">
@@ -599,12 +606,34 @@
 
     <extensionPoint name="customTypeRpcSerializer" interface="com.intellij.ide.rpc.CustomTypeRpcSerializer" dynamic="true"/>
 
+    <extensionPoint name="frontendDocumentIdRegistry" interface="com.intellij.ide.rpc.FrontendDocumentIdRegistry"
+                    dynamic="true"/>
+
+    <extensionPoint name="frontendEditorBinder" interface="com.intellij.ide.rpc.FrontendEditorBinder"
+                    dynamic="true"/>
+
+    <extensionPoint name="backendDocumentBinder" interface="com.intellij.ide.rpc.BackendDocumentBinder"
+                    dynamic="true"/>
+
     <extensionPoint name="projectTaskManagerListener" interface="com.intellij.task.impl.ProjectTaskManagerListenerExtensionPoint" dynamic="true" />
 
     <extensionPoint name="logLevelConfigurationListener" interface="com.intellij.diagnostic.logs.LogLevelConfigurationManager$Listener" dynamic="true"/>
 
     <extensionPoint qualifiedName="com.intellij.ui.content.impl.toolWindowContentPostprocessor"
                     interface="com.intellij.ui.content.impl.ToolWindowContentPostProcessor"
+                    dynamic="true"/>
+
+    <extensionPoint qualifiedName="com.intellij.actionGroupCustomization" interface="com.intellij.ide.ui.customization.ActionGroupCustomizationExtension" dynamic="true"/>
+    <extensionPoint name="subprojectInfoProvider"
+                    interface="com.intellij.openapi.project.workspace.SubprojectInfoProvider"
+                    dynamic="true"/>
+
+    <extensionPoint name="commandLineEnvCustomizer"
+                    interface="com.intellij.execution.process.CommandLineEnvCustomizer"
+                    dynamic="true"/>
+
+    <extensionPoint name="documentEntityProvider"
+                    interface="com.intellij.openapi.editor.impl.ad.document.DocumentEntityProvider"
                     dynamic="true"/>
 
   </extensionPoints>

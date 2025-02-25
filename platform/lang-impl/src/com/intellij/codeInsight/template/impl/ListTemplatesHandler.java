@@ -163,8 +163,7 @@ public final class ListTemplatesHandler implements CodeInsightActionHandler {
   private static LiveTemplateLookupElement createTemplateElement(final TemplateImpl template) {
     return new LiveTemplateLookupElementImpl(template, false) {
       @Override
-      @Unmodifiable
-      public Set<String> getAllLookupStrings() {
+      public @Unmodifiable Set<String> getAllLookupStrings() {
         String description = template.getDescription();
         if (description == null) {
           return super.getAllLookupStrings();
@@ -179,7 +178,7 @@ public final class ListTemplatesHandler implements CodeInsightActionHandler {
     if (argument == null) {
       return key;
     }
-    if (key.length() > 0 && Character.isJavaIdentifierPart(key.charAt(key.length() - 1))) {
+    if (!key.isEmpty() && Character.isJavaIdentifierPart(key.charAt(key.length() - 1))) {
       return key + ' ' + argument;
     }
     return key + argument;

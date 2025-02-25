@@ -4,7 +4,7 @@ package com.intellij.ide.util.projectWizard
 import com.intellij.ide.highlighter.ModuleFileType
 import com.intellij.ide.wizard.AbstractNewProjectWizardStep
 import com.intellij.ide.wizard.NewProjectWizardBaseStep
-import com.intellij.openapi.module.Module
+import com.intellij.ide.wizard.setupProjectFromBuilder
 import com.intellij.openapi.module.WebModuleBuilder
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NotNullLazyValue
@@ -13,7 +13,6 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.Panel
 import java.nio.file.Path
-import java.util.function.Consumer
 import javax.swing.JLabel
 
 open class WebTemplateProjectWizardStep<T>(
@@ -47,22 +46,13 @@ open class WebTemplateProjectWizardStep<T>(
   }
 
   override fun setupProject(project: Project) {
-    webModuleBuilder().commitModule(project, null)
-  }
-
-  private fun webModuleBuilder(): WebModuleBuilder<T> {
     val moduleName = parent.name
     val projectPath = Path.of(parent.path, moduleName)
-
-    return WebModuleBuilder(template, peer).apply {
-      contentEntryPath = projectPath.toString()
-      moduleFilePath = projectPath.resolve(moduleName + ModuleFileType.DOT_DEFAULT_EXTENSION).toString()
-      name = moduleName
-    }
-  }
-
-  override fun createModuleConfigurator(): Consumer<Module>? {
-    return webModuleBuilder().createModuleConfigurator()
+    val builder = WebModuleBuilder(template, peer)
+    builder.contentEntryPath = projectPath.toString()
+    builder.moduleFilePath = projectPath.resolve(moduleName + ModuleFileType.DOT_DEFAULT_EXTENSION).toString()
+    builder.name = moduleName
+    setupProjectFromBuilder(project, builder)
   }
 
   init {

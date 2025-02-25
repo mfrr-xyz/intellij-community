@@ -22,17 +22,18 @@ internal class LocalShellIntegrationInjectorTest {
           put("MY_CUSTOM_ENV1", "MY_CUSTOM_ENV_VALUE1")
         })
         .build(),
-      true
+      true,
+      false
     )
 
     assertEquals(listOf("/bin/zsh"), actual.shellCommand)
     assertEquals(ShellIntegration(ShellType.ZSH, CommandBlockIntegration(false)), actual.shellIntegration)
-    assertEquals(PathUtil.getParentPath(findAbsolutePath("shell-integrations/zsh/.zshenv")), actual.envVariables[LocalShellIntegrationInjector.IJ_ZSH_DIR])
+    assertEquals(PathUtil.getParentPath(findAbsolutePath("shell-integrations/zsh/zsh-integration.zsh")), actual.envVariables[LocalShellIntegrationInjector.IJ_ZSH_DIR])
     assertEquals("1", actual.envVariables["PROCESS_LAUNCHED_BY_CW"])
     assertEquals("1", actual.envVariables["FIG_TERM"])
     assertEquals("1", actual.envVariables["PROCESS_LAUNCHED_BY_Q"])
     assertEquals("1", actual.envVariables["INTELLIJ_TERMINAL_COMMAND_BLOCKS"])
-    assertEquals(PathUtil.getParentPath(findAbsolutePath("shell-integrations/zsh/.zshenv")), actual.envVariables["ZDOTDIR"])
+    assertEquals(PathUtil.getParentPath(findAbsolutePath("shell-integrations/zsh/zdotdir/.zshenv")), actual.envVariables["ZDOTDIR"])
     assertEquals("MY_CUSTOM_ENV_VALUE1", actual.envVariables["MY_CUSTOM_ENV1"])
   }
 
@@ -45,7 +46,8 @@ internal class LocalShellIntegrationInjectorTest {
           put("MY_CUSTOM_ENV1", "MY_CUSTOM_ENV_VALUE1")
         })
         .build(),
-      true
+      true,
+      false
     )
 
     assertEquals(listOf("/bin/bash", "--rcfile", findAbsolutePath("shell-integrations/bash/bash-integration.bash")), actual.shellCommand)

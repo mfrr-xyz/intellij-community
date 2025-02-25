@@ -1281,7 +1281,7 @@
     {
       "name": "CsvSettings",
       "scope": "app",
-      "pluginId": "intellij.grid.core.impl",
+      "pluginId": "com.intellij",
       "classFqn": "com.intellij.database.settings.CsvSettings",
       "storage": "csvSettings.xml",
       "properties": [
@@ -1300,7 +1300,7 @@
     {
       "name": "DataGridAppearanceSettingsImpl",
       "scope": "app",
-      "pluginId": "intellij.grid.core.impl",
+      "pluginId": "com.intellij",
       "classFqn": "com.intellij.database.settings.DataGridAppearanceSettingsImpl",
       "storage": "dataViewsSettings.xml",
       "properties": [
@@ -2923,7 +2923,7 @@
     {
       "name": "ScriptedLoadersAssociations",
       "scope": "app",
-      "pluginId": "intellij.grid.impl",
+      "pluginId": "intellij.grid.plugin",
       "classFqn": "com.intellij.grid.scripting.impl.DataLoaderManager$Associations",
       "storage": "csvSettings.xml",
       "properties": [
@@ -5003,7 +5003,7 @@
     {
       "name": "Inline Third Parties",
       "scope": "app",
-      "pluginId": "com.intellij.ml.inline.completion",
+      "pluginId": "org.jetbrains.completion.full.line",
       "classFqn": "com.intellij.ml.inline.completion.impl.thirdparty.ThirdPartiesStateComponent",
       "storage": "ml.completion.xml",
       "properties": [
@@ -5018,7 +5018,7 @@
       "name": "AipLicense",
       "scope": "app",
       "pluginId": "com.intellij.ml.llm",
-      "classFqn": "com.intellij.ml.llm.aiaState.data.AipLicensePreferencesRepositoryImpl",
+      "classFqn": "com.intellij.ml.llm.activation.data.AipLicensePreferencesRepositoryImpl",
       "storage": "other.xml"
     },
     {

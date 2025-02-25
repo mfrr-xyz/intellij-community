@@ -1,10 +1,9 @@
 ### auto-generated section `build fleet.rpc` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   opt_in = [
     "kotlinx.coroutines.ExperimentalCoroutinesApi",
     "kotlin.ExperimentalStdlibApi",
@@ -16,12 +15,11 @@ jvm_library(
   module_name = "fleet.rpc",
   visibility = ["//visibility:public"],
   srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
   kotlinc_opts = ":custom",
-  plugins = ["@lib//:serialization_plugin"],
   deps = [
     "//fleet/reporting/api:fleet-reporting-api",
     "//fleet/preferences",
+    "//fleet/multiplatform.shims:multiplatform-shims",
     "@lib//:kotlin-reflect",
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-json",
@@ -29,10 +27,8 @@ jvm_library(
     "@lib//:jetbrains-annotations",
     "@lib//:kotlinx-coroutines-slf4j",
     "@lib//:kotlinx-coroutines-core",
-    "@lib//:rpc-compiler-plugin.provided",
+    "@lib//:kotlinx-datetime-jvm",
     "//fleet/util/core:fleet-util-core",
-    "@lib//:opentelemetry",
-    "@lib//:opentelemetry-semconv",
   ]
 )
 ### auto-generated section `build fleet.rpc` end

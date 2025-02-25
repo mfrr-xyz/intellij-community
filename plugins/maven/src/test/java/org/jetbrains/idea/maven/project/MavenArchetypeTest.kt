@@ -36,7 +36,7 @@ class MavenArchetypeTest : MavenMultiVersionImportingTestCase() {
   fun testInnerArchetypes() {
     assumeVersion("bundled")
 
-    val embedder = myManager!!.getEmbedder(MavenEmbeddersManager.FOR_FOLDERS_RESOLVE, dir.path)
+    val embedder = myManager!!.getEmbedder(MavenEmbeddersManager.FOR_FOLDERS_RESOLVE, dir.toString())
     val archetypes = embedder.getInnerArchetypes(Path.of("/non-existing-path"))
     TestCase.assertEquals(0, archetypes.size) // at least, there were no errors
   }
@@ -45,7 +45,7 @@ class MavenArchetypeTest : MavenMultiVersionImportingTestCase() {
   fun testRemoteArchetypes() {
     assumeVersion("bundled")
 
-    val embedder = myManager!!.getEmbedder(MavenEmbeddersManager.FOR_FOLDERS_RESOLVE, dir.path)
+    val embedder = myManager!!.getEmbedder(MavenEmbeddersManager.FOR_FOLDERS_RESOLVE, dir.toString())
     val archetypes = embedder.getRemoteArchetypes("https://cache-redirector.jetbrains.com/repo1.maven.org/maven2/")
     val filtered = archetypes
       .filter { archetype: MavenArchetype? ->
@@ -60,7 +60,7 @@ class MavenArchetypeTest : MavenMultiVersionImportingTestCase() {
   fun testResolveAndGetArchetypeDescriptor() {
     assumeVersion("bundled")
 
-    val embedder = myManager!!.getEmbedder(MavenEmbeddersManager.FOR_FOLDERS_RESOLVE, dir.path)
+    val embedder = myManager!!.getEmbedder(MavenEmbeddersManager.FOR_FOLDERS_RESOLVE, dir.toString())
     val descriptorMap = embedder.resolveAndGetArchetypeDescriptor(
       "org.apache.maven.archetypes",
       "maven-archetype-archetype",

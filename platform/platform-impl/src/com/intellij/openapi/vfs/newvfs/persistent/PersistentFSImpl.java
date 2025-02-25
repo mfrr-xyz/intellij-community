@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent;
 
 import com.intellij.concurrency.ConcurrentCollectionFactory;
@@ -158,7 +158,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   }
 
   @ApiStatus.Internal
-  synchronized public void connect() {
+  public synchronized void connect() {
     LOG.assertTrue(!myConnected.get());// vfsPeer could be !=null after disconnect
     myIdToDirCache.clear();
     myVfsData = new VfsData(app, this);
@@ -167,7 +167,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   }
 
   @ApiStatus.Internal
-  synchronized public void disconnect() {
+  public synchronized void disconnect() {
     if (myConnected.compareAndSet(true, false)) {
       for (PersistentFsConnectionListener listener : PersistentFsConnectionListener.EP_NAME.getExtensionList()) {
         listener.beforeConnectionClosed();
@@ -253,7 +253,15 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
   @Override
   public void dispose() {
-    disconnect();
+    try {
+      disconnect();
+    }
+    catch (ProcessCanceledException e) {
+      // Application may be closed before `LocalFileSystem` gets initialized()
+      //noinspection IncorrectCancellationExceptionHandling
+      LOG.warn("Detected cancellation during dispose of PersistentFS. Application was likely closed before VFS got completely initialized",
+               e);
+    }
   }
 
   @Override
@@ -312,8 +320,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
   @Override
   @ApiStatus.Internal
-  @Unmodifiable
-  public @NotNull List<? extends ChildInfo> listAll(@NotNull VirtualFile file) {
+  public @Unmodifiable @NotNull List<? extends ChildInfo> listAll(@NotNull VirtualFile file) {
     checkReadAccess();
 
     int id = fileId(file);
@@ -416,7 +423,6 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   public @NotNull AttributeOutputStream writeAttribute(@NotNull VirtualFile file,
                                                        @NotNull FileAttribute attribute) {
     //TODO RC: ThreadingAssertions.assertWriteAccess();
-
     return vfsPeer.writeAttribute(fileId(file), attribute);
   }
 
@@ -432,7 +438,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
   @Override
   public int storeUnlinkedContent(byte @NotNull [] bytes) throws ContentTooBigException {
-    //TODO RC: ThreadingAssertions.assertWriteAccess();
+    //TODO RC: ThreadingAssertions.assertWriteAccess() ?
     return vfsPeer.writeContentRecord(new ByteArraySequence(bytes));
   }
 
@@ -540,7 +546,6 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
   public void setWritable(@NotNull VirtualFile file,
                           boolean writableFlag) throws IOException {
     ThreadingAssertions.assertWriteAccess();
-
     getFileSystem(file).setWritable(file, writableFlag);
     boolean oldWritable = isWritable(file);
     if (oldWritable != writableFlag) {
@@ -667,6 +672,11 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
 
     //speculation failed: re-read, and update cache:
     NewVirtualFileSystem fileSystem = getFileSystem(file);
+    //1) do IO outside lock 2) some FileSystems (e.g. ArchiveFileSystem) .getLength() impl can call other VirtualFile.getLength(),
+    // which creates a possibility for deadlock, if lock segments happen to be the same. The downside is that we call
+    // getLength() even if the length is already set by racing thread -- but that should be a rare case, so ignore it
+    long actualLength = fileSystem.getLength(file);
+
     long[] lengthRef = new long[1];
     vfsPeer.updateRecordFields(fileId, record -> {
       int flags = record.getFlags();
@@ -677,7 +687,6 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
         return false;
       }
 
-      long actualLength = fileSystem.getLength(file);
       record.setLength(actualLength);
       record.removeFlags(Flags.MUST_RELOAD_LENGTH);
 
@@ -1802,8 +1811,7 @@ public final class PersistentFSImpl extends PersistentFS implements Disposable {
    * so we need to extract path from url (IDEA-341011)
    * Path should not end with '!' because then '!' won't be stripped and file won't be found (see {@link ArchiveFileSystem#findLocalByRootPath})
    */
-  @NotNull
-  private static String getRootPath(@NotNull String rootUrl, @NotNull String rootName) {
+  private static @NotNull String getRootPath(@NotNull String rootUrl, @NotNull String rootName) {
     NewVirtualFileSystem fs = detectFileSystem(rootUrl, rootName);
     if (fs instanceof ArchiveFileSystem) {
       String path = VirtualFileManager.extractPath(rootUrl);

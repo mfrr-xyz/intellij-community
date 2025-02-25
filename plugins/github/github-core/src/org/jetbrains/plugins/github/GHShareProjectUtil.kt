@@ -1,6 +1,8 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github
 
+import com.intellij.configurationStore.saveSettings
+import com.intellij.ide.IdeBundle
 import com.intellij.openapi.application.invokeAndWaitIfNeeded
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -9,6 +11,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.workspace.SubprojectInfoProvider
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.openapi.vcs.FilePath
@@ -17,6 +20,7 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsNotifier
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.containers.mapSmartSet
 import com.intellij.vcsUtil.VcsFileUtil
@@ -50,7 +54,15 @@ import java.io.IOException
 object GHShareProjectUtil {
   private val LOG = GithubUtil.LOG
 
-  // get gitRepository
+  @JvmStatic
+  fun shareProjectOnGithub(project: Project, file: VirtualFile?) {
+    val gitRepository = GithubGitHelper.findGitRepository(project, file)
+    val root = gitRepository?.root ?: project.baseDir
+    val projectName = file?.let { SubprojectInfoProvider.Companion.getSubprojectName(project, file) }?: project.name
+    shareProjectOnGithub(project, gitRepository, root, projectName)
+  }
+
+    // get gitRepository
   // check for existing git repo
   // check available repos and privateRepo access (net)
   // Show dialog (window)
@@ -59,11 +71,12 @@ object GHShareProjectUtil {
   // add GitHub as a remote host
   // make first commit
   // push everything (net)
-  @JvmStatic
-  fun shareProjectOnGithub(project: Project, file: VirtualFile?) {
+  fun shareProjectOnGithub(project: Project,
+                           gitRepository: GitRepository?,
+                           root: VirtualFile,
+                           projectName: @NlsSafe String) {
     FileDocumentManager.getInstance().saveAllDocuments()
 
-    val gitRepository = GithubGitHelper.findGitRepository(project, file)
     val possibleRemotes = gitRepository
       ?.let(project.service<GHHostedRepositoriesManager>()::findKnownRepositories)
       ?.map { it.remote.url }.orEmpty()
@@ -100,7 +113,7 @@ object GHShareProjectUtil {
               val user = requestExecutor.execute(progressManager.progressIndicator, GithubApiRequests.CurrentUser.get(account.server))
               val names = GithubApiPagesLoader
                 .loadAll(requestExecutor, progressManager.progressIndicator,
-                         GithubApiRequests.CurrentUser.Repos.pages(account.server, Type.OWNER))
+                         GithubApiRequests.CurrentUser.Repos.pages(account.server, type = Type.OWNER))
                 .mapSmartSet { it.name }
               user.canCreatePrivateRepo() to names
             }, GithubBundle.message("share.process.loading.account.info", account), true, project)
@@ -114,7 +127,8 @@ object GHShareProjectUtil {
 
     val shareDialog = GithubShareDialog(project,
                                         gitRepository?.remotes?.map { it.name }?.toSet() ?: emptySet(),
-                                        accountInformationLoader)
+                                        accountInformationLoader,
+                                        projectName)
     DialogManager.show(shareDialog)
     if (!shareDialog.isOK) {
       return
@@ -141,7 +155,6 @@ object GHShareProjectUtil {
           .execute(indicator, GithubApiRequests.CurrentUser.Repos.create(account.server, name, description, isPrivate)).htmlUrl
         LOG.info("Successfully created GitHub repository")
 
-        val root = gitRepository?.root ?: project.baseDir
         // creating empty git repo if git is not initialized
         LOG.info("Binding local project with GitHub")
         if (gitRepository == null) {
@@ -219,13 +232,22 @@ object GHShareProjectUtil {
           return true
         }
 
+        invokeAndWaitIfNeeded(indicator.modalityState) {
+          runWithModalProgressBlocking(project, IdeBundle.message("progress.saving.project", project.name)) {
+            saveSettings(project, forceSavingAllSettings = true)
+          }
+        }
+
         LOG.info("Trying to commit")
         try {
           LOG.info("Adding files for commit")
           indicator.text = GithubBundle.message("share.process.adding.files")
 
           // ask for files to add
-          val trackedFiles = ChangeListManager.getInstance(project).affectedFiles
+          val manager = GitUtil.getRepositoryManager(project)
+          val trackedFiles = ChangeListManager.getInstance(project).affectedFiles.filter {
+            it.isInLocalFileSystem && manager.getRepositoryForFileQuick(it) == repository
+          }.toMutableList()
           val untrackedFiles =
             filterOutIgnored(project, repository.untrackedFilesHolder.retrieveUntrackedFilePaths().mapNotNull(FilePath::getVirtualFile))
           trackedFiles.removeAll(untrackedFiles) // fix IDEA-119855

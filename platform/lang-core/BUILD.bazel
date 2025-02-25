@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.platform.lang.core` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "lang-core_resources",
@@ -12,9 +11,7 @@ jvm_library(
   name = "lang-core",
   module_name = "intellij.platform.lang.core",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/ide-core",
@@ -22,13 +19,14 @@ jvm_library(
     "//platform/platform-util-io:ide-util-io",
     "//platform/util/jdom",
     "//platform/util-class-loader:util-classLoader",
+    "//platform/util",
     "//platform/util/concurrency",
     "//platform/code-style-api:codeStyle",
     "//platform/util:util-ui",
     "//platform/util-ex",
     "//platform/core-ui",
     "//platform/projectModel-api:projectModel",
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/analysis-api:analysis",
     "//platform/usageView",
   ],

@@ -9,7 +9,6 @@ import com.intellij.collaboration.util.getOrNull
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.platform.util.coroutines.childScope
-import git4idea.remote.hosting.ui.ResolveConflictsLocallyViewModel
 import git4idea.repo.GitRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
@@ -28,7 +27,7 @@ interface GHPRStatusViewModel : CodeReviewStatusViewModel {
   val isRestricted: Flow<Boolean>
   val requiredApprovingReviewsCount: Flow<Int>
 
-  val resolveConflictsVm: ResolveConflictsLocallyViewModel<GHPRResolveConflictsLocallyError>
+  val resolveConflictsVm: GHPRResolveConflictsLocallyViewModel
 }
 
 private val LOG = logger<GHPRStatusViewModel>()
@@ -81,6 +80,6 @@ class GHPRStatusViewModelImpl(
     }
   }
 
-  override val resolveConflictsVm: ResolveConflictsLocallyViewModel<GHPRResolveConflictsLocallyError> =
-    GHPRResolveConflictsLocallyViewModelImpl(cs, project, server, gitRepository, detailsData)
+  override val resolveConflictsVm: GHPRResolveConflictsLocallyViewModel =
+    GHPRResolveConflictsLocallyViewModel(cs, project, server, gitRepository, detailsData)
 }

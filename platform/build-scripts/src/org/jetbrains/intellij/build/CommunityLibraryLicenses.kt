@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build
 
 import org.jetbrains.intellij.build.LibraryLicense.Companion.jetbrainsLibrary
@@ -176,8 +176,17 @@ object CommunityLibraryLicenses {
 
     LibraryLicense("Atlassian Commonmark", libraryName = "atlassian.commonmark", url = "https://github.com/commonmark/commonmark-java")
       .simplifiedBsd("https://github.com/commonmark/commonmark-java/blob/main/LICENSE.txt")
+      .additionalLibraryNames(
+        "commonmark.ext.autolink",
+        "commonmark.ext.gfm.tables",
+        "commonmark.ext.gfm.strikethrough",
+        "org.commonmark.commonmark"
+      )
       .copyrightText("Copyright (c) 2015, Atlassian Pty Ltd")
       .suppliedByOrganizations("Atlassian Pty Ltd"),
+
+    LibraryLicense("Autolink Java", libraryName = "org.nibor.autolink.autolink", url = "https://github.com/robinst/autolink-java")
+      .mit("https://github.com/robinst/autolink-java/blob/main/LICENSE"),
 
     LibraryLicense("Automaton", libraryName = "automaton", url = "https://www.brics.dk/automaton/")
       .simplifiedBsd("https://github.com/cs-au-dk/dk.brics.automaton/blob/master/COPYING")
@@ -240,9 +249,23 @@ object CommunityLibraryLicenses {
       .apache("https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:LICENSE.txt")
       .suppliedByOrganizations(Suppliers.GOOGLE),
 
+    LibraryLicense("Compose Multiplatform", libraryName = "compose-foundation-desktop", url = "https://github.com/JetBrains/compose-multiplatform")
+      .apache("https://github.com/JetBrains/compose-multiplatform/blob/master/LICENSE.txt")
+      .additionalLibraryNames(
+        "org.jetbrains.compose.components.components.resources.desktop",
+        "org.jetbrains.compose.components.components.resources"
+      )
+      .suppliedByOrganizations(Suppliers.JETBRAINS),
+
     LibraryLicense("Compose Multiplatform Compiler", libraryName = "jetbrains.compose.compiler.hosted", url = "https://github.com/JetBrains/compose-multiplatform")
       .apache("https://github.com/JetBrains/compose-multiplatform/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
+
+    LibraryLicense("Compose Multiplatform File Picker", libraryName = "com.darkrockstudios.mpfilepicker", url = "https://github.com/Wavesonics/compose-multiplatform-file-picker")
+      .mit("https://github.com/Wavesonics/compose-multiplatform-file-picker/blob/master/LICENSE")
+      .additionalLibraryNames(
+        "com.darkrockstudios.mpfilepicker.jvm"
+      ),
 
     // For ADB wireless QR Code generation
     LibraryLicense("Core barcode encoding/decoding library", url = "https://github.com/zxing/zxing/tree/master/core", libraryName = "zxing-core")
@@ -280,6 +303,9 @@ object CommunityLibraryLicenses {
     LibraryLicense("dbus-java", libraryName = "dbus-java", url = "https://github.com/hypfvieh/dbus-java")
       .lgpl2("https://github.com/hypfvieh/dbus-java/blob/dbus-java-3.0/LICENSE")
       .suppliedByPersons("David M. <hypfvieh@googlemail.com>"),
+
+    LibraryLicense("Detekt", libraryName = "io.gitlab.arturbosch.detekt.api", url = "https://github.com/detekt/detekt")
+      .apache("https://github.com/detekt/detekt/blob/master/LICENSE"),
 
     LibraryLicense("docutils", version = "0.12", attachedTo = "intellij.python", url = "https://docutils.sourceforge.io/")
       .public("https://sourceforge.net/p/docutils/code/HEAD/tree/trunk/docutils/COPYING.rst"),
@@ -594,26 +620,15 @@ object CommunityLibraryLicenses {
       .lgpl3("https://github.com/JetBrains/jediterm/blob/master/LICENSE-LGPLv3.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
 
-    LibraryLicense("jetbrains.kotlinx.metadata.jvm", libraryName = "jetbrains.kotlinx.metadata.jvm", url = "https://github.com/JetBrains/kotlin")
-      .apache("https://github.com/JetBrains/kotlin/blob/master/license/LICENSE.txt")
-      .suppliedByOrganizations(Suppliers.JETBRAINS),
-
     LibraryLicense("JetBrains Annotations", libraryName = "jetbrains-annotations", url = "https://github.com/JetBrains/java-annotations")
       .apache("https://github.com/JetBrains/java-annotations/blob/master/LICENSE.txt"),
 
     LibraryLicense("JetBrains Annotations for Java 5", libraryName = "jetbrains-annotations-java5", url = "https://github.com/JetBrains/java-annotations")
       .apache("https://github.com/JetBrains/java-annotations/blob/master/LICENSE.txt"),
 
-    LibraryLicense("JetBrains Jewel IDE LaF Bridge", url = "https://github.com/JetBrains/jewel", libraryName = "jewel-ide-laf-bridge")
-      .apache("https://github.com/JetBrains/jewel/blob/master/LICENSE")
-      .suppliedByOrganizations(Suppliers.JETBRAINS),
-
     LibraryLicense("JetBrains Jewel IDE LaF Bridge", url = "https://github.com/JetBrains/jewel", libraryName = "jetbrains.jewel.ide.laf.bridge.243")
       .apache("https://github.com/JetBrains/jewel/blob/master/LICENSE")
-      .suppliedByOrganizations(Suppliers.JETBRAINS),
-
-    LibraryLicense("JetBrains Jewel Markdown IDE LaF Bridge Styling", libraryName = "jetbrains-jewel-markdown-laf-bridge-styling", url = "https://github.com/JetBrains/jewel")
-      .apache("https://github.com/JetBrains/jewel/blob/master/LICENSE")
+      .additionalLibraryNames("jewel-ide-laf-bridge")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
 
     LibraryLicense("JetBrains Jewel Markdown IDE LaF Bridge Styling", url = "https://github.com/JetBrains/jewel", libraryName = "jewel-markdown-ide-laf-bridge-styling-242")
@@ -728,6 +743,10 @@ object CommunityLibraryLicenses {
     LibraryLicense(libraryName = "jzlib", url = "http://www.jcraft.com/jzlib/")
       .newBsd("https://github.com/ymnk/jzlib/raw/master/LICENSE.txt"),
 
+    LibraryLicense("kaml", libraryName = "kaml", url = "https://github.com/charleskorn/kaml")
+      .apache("https://github.com/charleskorn/kaml/blob/main/LICENSE")
+      .suppliedByPersons("Charles Korn"),
+
     LibraryLicense("Kconfig for the Zephyr Project", version = "1.2.0", attachedTo = "intellij.textmate", url = "https://github.com/trond-snekvik/vscode-kconfig")
       .mit("https://github.com/trond-snekvik/vscode-kconfig/blob/master/LICENSE"),
 
@@ -737,6 +756,10 @@ object CommunityLibraryLicenses {
 
     LibraryLicense("Kodein-DI", libraryName = "kodein-di-jvm", url = "https://github.com/kosi-libs/Kodein")
       .mit("https://github.com/kosi-libs/Kodein/blob/master/LICENSE.txt"),
+
+    LibraryLicense("kotlin-metadata", libraryName = "kotlin-metadata", url = "https://github.com/JetBrains/kotlin")
+      .apache("https://github.com/JetBrains/kotlin/blob/master/license/LICENSE.txt")
+      .suppliedByOrganizations(Suppliers.JETBRAINS),
 
     LibraryLicense("Kotlin Coroutines for Guava", libraryName = "kotlinx-coroutines-guava", url = "https://github.com/Kotlin/kotlinx.coroutines")
       .apache("https://github.com/Kotlin/kotlinx.coroutines/blob/master/LICENSE.txt")
@@ -755,6 +778,10 @@ object CommunityLibraryLicenses {
       .suppliedByOrganizations(Suppliers.JETBRAINS),
 
     LibraryLicense("Kotlin multiplatform / multi-format serialization", libraryName = "kotlinx-serialization-json", url = "https://github.com/Kotlin/kotlinx.serialization")
+      .apache("https://github.com/Kotlin/kotlinx.serialization/blob/master/LICENSE.txt")
+      .suppliedByOrganizations(Suppliers.JETBRAINS),
+
+    LibraryLicense("Kotlin multiplatform / multi-format serialization", libraryName = "kotlinx-serialization-json-io", url = "https://github.com/Kotlin/kotlinx.serialization")
       .apache("https://github.com/Kotlin/kotlinx.serialization/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
 
@@ -777,6 +804,9 @@ object CommunityLibraryLicenses {
     LibraryLicense("kotlinx-datetime-jvm", libraryName = "kotlinx-datetime-jvm", url = "https://github.com/Kotlin/kotlinx-datetime")
       .apache("https://github.com/Kotlin/kotlinx-datetime/blob/master/LICENSE.txt")
       .suppliedByOrganizations(Suppliers.JETBRAINS),
+
+    LibraryLicense("kotlinx-document-store-mvstore", libraryName = "kotlinx-document-store-mvstore", url = "https://github.com/lamba92/kotlin.document.store")
+      .apache("https://github.com/lamba92/kotlin.document.store/blob/master/LICENSE"),
 
     LibraryLicense("kotlinx.html", libraryName = "kotlinx-html-jvm", url = "https://github.com/Kotlin/kotlinx.html")
       .apache("https://github.com/Kotlin/kotlinx.html/blob/master/LICENSE")
@@ -860,6 +890,12 @@ object CommunityLibraryLicenses {
     LibraryLicense("Log4j", libraryName = "Log4J", url = "https://www.slf4j.org/legacy.html#log4j-over-slf4j")
       .apache("https://github.com/qos-ch/slf4j/blob/master/log4j-over-slf4j/LICENSE.txt")
       .suppliedByOrganizations("QOS.ch Sarl"),
+
+    LibraryLicense("LWJGL", libraryName="org.lwjgl.lwjgl", url = "https://github.com/LWJGL/lwjgl3")
+      .newBsd("https://github.com/LWJGL/lwjgl3/blob/master/LICENSE.md")
+      .additionalLibraryNames(
+        "org.lwjgl.lwjgl.tinyfd"
+      ),
 
     LibraryLicense("lz4-java", libraryName = "lz4-java", url = "https://github.com/lz4/lz4-java")
       .apache("https://github.com/lz4/lz4-java/blob/master/LICENSE.txt"),
@@ -999,7 +1035,7 @@ object CommunityLibraryLicenses {
       .apache("https://github.com/JetBrains/package-search-api-models/blob/master/LICENSE")
       .suppliedByOrganizations("JetBrains Team"),
 
-    LibraryLicense("pip", version = "20.3.4", attachedTo = "intellij.python", url = "https://pip.pypa.io/")
+    LibraryLicense("pip", version = "24.3.1", attachedTo = "intellij.python", url = "https://pip.pypa.io/")
       .mit("https://github.com/pypa/pip/blob/main/LICENSE.txt"),
 
     LibraryLicense("plexus-archiver", libraryName = "plexus-archiver", url = "https://github.com/codehaus-plexus/plexus-archiver")
@@ -1311,21 +1347,30 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("debugger-agent"),
     jetbrainsLibrary("debugger-memory-agent"),
     jetbrainsLibrary("download-pgp-verifier"),
+    jetbrainsLibrary("expects-compiler-plugin"),
     jetbrainsLibrary("file-prediction-model"),
     jetbrainsLibrary("find-action-model"),
     jetbrainsLibrary("find-action-model-experimental"),
     jetbrainsLibrary("find-all-model-experimental"),
     jetbrainsLibrary("find-classes-model"),
     jetbrainsLibrary("find-classes-model-experimental"),
+    jetbrainsLibrary("find-ec-model-experimental"),
     jetbrainsLibrary("find-file-model"),
     jetbrainsLibrary("find-file-model-experimental"),
     jetbrainsLibrary("git-learning-project"),
     jetbrainsLibrary("intellij.remoterobot.remote.fixtures"),
     jetbrainsLibrary("intellij.remoterobot.robot.server.core"),
     jetbrainsLibrary("jetbrains.intellij.deps.rwmutex.idea"),
+    jetbrainsLibrary("jetbrains.kotlin.compose.compiler.plugin"),
+    jetbrainsLibrary("jetbrains.llm.mlapi.catboost.shadow.need.slf4j"),
+    jetbrainsLibrary("jetbrains.llm.mlapi.ml.api"),
+    jetbrainsLibrary("jetbrains.llm.mlapi.ml.tools"),
+    jetbrainsLibrary("jetbrains.llm.mlapi.ml.tools.suspendable"),
+    jetbrainsLibrary("jetbrains.ml.models.jetenry.inline.prompt.detection.model"),
     jetbrainsLibrary("jetbrains.ml.models.python.imports.ranking.model"),
-    jetbrainsLibrary("jetbrains.mlapi.ml.building.blocks"),
-    jetbrainsLibrary("jetbrains.mlapi.ml.feature.api"),
+    jetbrainsLibrary("jetbrains.mlapi.ml.api"),
+    jetbrainsLibrary("jetbrains.mlapi.ml.tools"),
+    jetbrainsLibrary("jetbrains.mlapi.ml.tools.suspendable"),
     jetbrainsLibrary("jshell-frontend"),
     jetbrainsLibrary("jvm-native-trusted-roots"),
     jetbrainsLibrary("kotlin-gradle-plugin-idea"),
@@ -1355,6 +1400,8 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("kotlinc.kotlin-compiler-tests"),
     jetbrainsLibrary("kotlinc.kotlin-dist"),
     jetbrainsLibrary("kotlinc.kotlin-gradle-statistics"),
+    // TODO: KTIJ-32993
+    jetbrainsLibrary("kotlinc.kotlin-ide-dist"),
     jetbrainsLibrary("kotlinc.kotlin-jps-common"),
     jetbrainsLibrary("kotlinc.kotlin-jps-plugin-classpath"),
     jetbrainsLibrary("kotlinc.kotlin-objcexport-header-generator"),
@@ -1374,6 +1421,9 @@ object CommunityLibraryLicenses {
     jetbrainsLibrary("kotlinx-collections-immutable"),
     jetbrainsLibrary("kotlinx-coroutines-debug"),
     jetbrainsLibrary("ml-completion-prev-exprs-models"),
+    jetbrainsLibrary("noria-compiler-plugin"),
+    jetbrainsLibrary("rhizomedb-compiler-plugin"),
+    jetbrainsLibrary("rpc-compiler-plugin"),
     jetbrainsLibrary("tcServiceMessages"),
     jetbrainsLibrary("terminal-completion-db-with-extensions"),
     jetbrainsLibrary("terminal-completion-spec"),

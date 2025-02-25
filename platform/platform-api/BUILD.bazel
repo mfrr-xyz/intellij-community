@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.platform.ide` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_javac_options")
 
 kt_javac_options(
@@ -23,18 +22,19 @@ jvm_library(
   name = "ide",
   module_name = "intellij.platform.ide",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   javac_opts = ":custom-javac-options",
-  kotlinc_opts = "@rules_jvm//:k17",
   deps = [
     "//platform/util",
     "//platform/extensions",
     "//platform/core-api:core",
     "//platform/forms_rt:java-guiForms-rt",
     "//platform/icons",
+    "//platform/observable:ide-observable",
     "//platform/projectModel-api:projectModel",
     "//platform/analysis-api:analysis",
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
+    "//platform/util/progress",
     "@lib//:jna",
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinx-coroutines-core",
@@ -61,8 +61,7 @@ jvm_library(
     "//platform/core-api:core",
     "//platform/forms_rt:java-guiForms-rt",
     "//platform/projectModel-api:projectModel",
-    "//platform/analysis-api:analysis",
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/credential-store:credentialStore",
     "//platform/remote-core",
     "//platform/ide-core",

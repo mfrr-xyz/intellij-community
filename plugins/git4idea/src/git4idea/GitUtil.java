@@ -1,10 +1,11 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea;
 
 import com.intellij.dvcs.DvcsUtil;
 import com.intellij.dvcs.repo.RepoStateException;
 import com.intellij.dvcs.repo.Repository;
 import com.intellij.dvcs.repo.VcsRepositoryManager;
+import com.intellij.ide.SaveAndSyncHandler;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
@@ -484,7 +485,7 @@ public final class GitUtil {
       sb.append(lineIsAStart ? line.substring(2) : line).append('\n');
       firstStep = false;
     }
-    if (sb.length() > 0) {
+    if (!sb.isEmpty()) {
       final StringScanner innerScanner = new StringScanner(sb.toString());
       sb.setLength(0);
       consumer.consume(GitChangeUtils.parseChangeList(project, root, innerScanner, skipDiffsForMerge, h, false, false));
@@ -590,8 +591,7 @@ public final class GitUtil {
     }
   }
 
-  @Unmodifiable
-  public static @NotNull Collection<VirtualFile> getRootsFromRepositories(@NotNull @Unmodifiable Collection<? extends GitRepository> repositories) {
+  public static @Unmodifiable @NotNull Collection<VirtualFile> getRootsFromRepositories(@NotNull @Unmodifiable Collection<? extends GitRepository> repositories) {
     return ContainerUtil.map(repositories, Repository::getRoot);
   }
 
@@ -961,6 +961,10 @@ public final class GitUtil {
     }
     else {
       RefreshVFsSynchronously.updateChanges(changes);
+
+      // the file opened in the editor may accidentally capture an intermediate state for back-and-forth changes during rebase
+      // these may not be refreshed if 'before rebase' and 'after rebase' states match for the file
+      SaveAndSyncHandler.getInstance().refreshOpenFiles();
     }
   }
 

@@ -1,11 +1,12 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.service.execution
 
 import com.intellij.execution.target.value.TargetValue
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.toCanonicalPath
-import com.intellij.openapi.util.io.toNioPathOrNull
+import com.intellij.platform.eel.provider.LocalEelDescriptor
+import com.intellij.platform.eel.provider.getEelDescriptor
 import org.gradle.util.GradleVersion
 import org.gradle.wrapper.PathAssembler
 import org.gradle.wrapper.WrapperConfiguration
@@ -51,12 +52,12 @@ internal open class LocalBuildLayoutParameters(
   private fun findGradleHome(): Path? {
     val gradleProjectSettings = getGradleProjectSettings() ?: return null
     return when (gradleProjectSettings.distributionType) {
-      null -> GradleInstallationManager.getInstance().getAutodetectedGradleHome(project)?.toPath()
-      DistributionType.LOCAL -> gradleProjectSettings.gradleHome?.toNioPathOrNull()
+      null -> GradleInstallationManager.getInstance().getAutodetectedGradleHome(project)
+      DistributionType.LOCAL -> gradleProjectSettings.gradleHome?.let { Path.of(it) }
       DistributionType.WRAPPED -> {
         val projectNioPath = projectPath?.toCanonicalPath()
         val localSettings = GradleLocalSettings.getInstance(project)
-        return localSettings.getGradleHome(projectNioPath)?.toNioPathOrNull()
+        return localSettings.getGradleHome(projectNioPath)?.let { Path.of(it) }
       }
       else -> tryToFindGradleInstallation(gradleProjectSettings)
     }
@@ -112,13 +113,14 @@ internal open class LocalBuildLayoutParameters(
 
   private fun findGradleUserHomeDir(project: Project): Path {
     if (projectPath == null) {
-      return gradleUserHomeDir(project)
+      val descriptor = if (project.isDefault) LocalEelDescriptor else project.getEelDescriptor()
+      return gradleUserHomeDir(descriptor)
     }
-    val maybeGradleUserHome = getGradleSettings().serviceDirectoryPath?.toNioPathOrNull()
+    val maybeGradleUserHome = getGradleSettings().serviceDirectoryPath?.let { Path.of(it) }
     if (maybeGradleUserHome != null) {
       return maybeGradleUserHome
     }
-    return gradleUserHomeDir(project)
+    return gradleUserHomeDir(projectPath.getEelDescriptor())
   }
 
   companion object {

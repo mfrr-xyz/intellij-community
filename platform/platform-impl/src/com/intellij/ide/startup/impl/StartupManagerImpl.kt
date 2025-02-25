@@ -1,8 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("OVERRIDE_DEPRECATION", "ReplacePutWithAssignment")
 
 package com.intellij.ide.startup.impl
 
+import com.intellij.concurrency.captureThreadContext
 import com.intellij.diagnostic.*
 import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.lightEdit.LightEdit
@@ -164,10 +165,7 @@ open class StartupManagerImpl(private val project: Project, private val coroutin
   }
 
   suspend fun runPostStartupActivities() {
-    // opened on startup
-    LoadingState.compareAndSetCurrentState(LoadingState.COMPONENTS_LOADED, LoadingState.PROJECT_OPENED)
-    // opened from the welcome screen
-    LoadingState.compareAndSetCurrentState(LoadingState.APP_STARTED, LoadingState.PROJECT_OPENED)
+    LoadingState.setCurrentStateIfAtLeast(LoadingState.COMPONENTS_LOADED, LoadingState.PROJECT_OPENED)
 
     coroutineContext.ensureActive()
 
@@ -218,9 +216,12 @@ open class StartupManagerImpl(private val project: Project, private val coroutin
           && pluginId.idString != "com.intellij.clion.plugin"
           && pluginId.idString != "com.jetbrains.codeWithMe"
           && pluginId.idString != "intellij.rider.plugins.cwm"
-          && pluginId.idString != "org.jetbrains.plugins.clion.radler") {
-        LOG.error("Only bundled plugin can define ${extensionPoint.name}: ${adapter.pluginDescriptor}")
-        continue
+          && pluginId.idString != "org.jetbrains.plugins.clion.radler"
+        ) {
+        if (!(pluginId.idString == "com.intellij.ml.llm" && adapter.assignableToClassName.endsWith("XNextRootPaneCustomizer"))) {
+          LOG.error("Only bundled plugin can define ${extensionPoint.name}: ${adapter.pluginDescriptor}")
+          continue
+        }
       }
 
       val activity = adapter.createInstance<InitProjectActivity>(project) ?: continue
@@ -384,7 +385,7 @@ open class StartupManagerImpl(private val project: Project, private val coroutin
     if (!freezePostStartupActivities) {
       synchronized(lock) {
         if (!freezePostStartupActivities) {
-          postStartupActivities.add(runnable)
+          postStartupActivities.add(captureThreadContext(runnable))
           return
         }
       }

@@ -11,11 +11,14 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope
 import org.jdom.Element
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.idea.maven.dom.MavenDomUtil.isAtLeastMaven4
 import org.jetbrains.idea.maven.dom.converters.MavenConsumerPomUtil.isAutomaticVersionFeatureEnabled
 import org.jetbrains.idea.maven.internal.ReadStatisticsCollector
 import org.jetbrains.idea.maven.model.*
+import org.jetbrains.idea.maven.model.MavenConstants.MODEL_VERSION_4_0_0
 import org.jetbrains.idea.maven.server.MavenEmbedderWrapper
-import org.jetbrains.idea.maven.server.MavenServerConnector
+import org.jetbrains.idea.maven.server.MavenRemoteObjectWrapper
+import org.jetbrains.idea.maven.server.RemotePathTransformerFactory
 import org.jetbrains.idea.maven.telemetry.tracer
 import org.jetbrains.idea.maven.utils.MavenJDOMUtil
 import org.jetbrains.idea.maven.utils.MavenJDOMUtil.findChildByPath
@@ -26,12 +29,11 @@ import org.jetbrains.idea.maven.utils.MavenJDOMUtil.hasChildByPath
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.idea.maven.utils.MavenProcessCanceledException
 import org.jetbrains.idea.maven.utils.MavenUtil
+import java.io.File
 import java.io.IOException
 import java.nio.file.Path
-import kotlin.Throws
 
 private const val UNKNOWN = MavenId.UNKNOWN_VALUE
-private const val MODEL_VERSION_4_0_0 = "4.0.0"
 
 class MavenProjectReader(private val myProject: Project) {
   private val myCache = MavenReadProjectCache()
@@ -109,9 +111,12 @@ class MavenProjectReader(private val myProject: Project) {
 
     addSettingsProfiles(file, generalSettings, modelWithInheritance, alwaysOnProfiles, problems)
 
-    val basedir = MavenUtil.getBaseDir(file)
-
-    val profileApplicationResult = MavenServerConnector.applyProfiles(myProject, modelWithInheritance, basedir, explicitProfiles, alwaysOnProfiles)
+    val baseDirString = MavenUtil.getBaseDir(file).toString()
+    val transformer = RemotePathTransformerFactory.createForProject(myProject)
+    val baseDir = File(transformer.toRemotePathOrSelf(baseDirString))
+    val manager = MavenProjectsManager.getInstance(myProject).embeddersManager
+    val embedder = manager.getEmbedder(MavenEmbeddersManager.FOR_MODEL_READ, baseDirString)
+    val profileApplicationResult = embedder.applyProfiles(modelWithInheritance, baseDir, explicitProfiles, HashSet(alwaysOnProfiles), MavenRemoteObjectWrapper.ourToken)
 
     val modelWithProfiles = profileApplicationResult.model
 
@@ -369,58 +374,41 @@ class MavenProjectReader(private val myProject: Project) {
     file: VirtualFile,
     isAutomaticVersionFeatureEnabled: Boolean,
   ): String {
-    val version = doCalculateParentVersion(xmlProject, problems, file, isAutomaticVersionFeatureEnabled)
-    if (version != null) return version
-    problems.add(MavenProjectProblem(file.path, MavenProjectBundle.message("consumer.pom.cannot.determine.parent.version"),
-                                     MavenProjectProblem.ProblemType.STRUCTURE,
-                                     true))
-    return UNKNOWN
+    if (xmlProject == null) return UNKNOWN
+    findChildValueByPath(xmlProject, "parent.version")?.let { parentVersion ->
+      return parentVersion
+    }
+    if (!isAutomaticVersionFeatureEnabled) return UNKNOWN
+
+    val parentTag = findChildByPath(xmlProject, "parent") ?: return UNKNOWN
+    if (!xmlProject.checkParentGroupAndArtefactIdsPresence(file)) return UNKNOWN
+
+    val relativePath = findChildValueByPath(parentTag, "relativePath", "../pom.xml")!!
+    return getVersionFromParentPomRecursively(file, relativePath, problems)
   }
 
-  private suspend fun doCalculateParentVersion(
-    xmlProject: Element?,
-    problems: MutableCollection<MavenProjectProblem>,
+  private suspend fun getVersionFromParentPomRecursively(
     file: VirtualFile,
-    isAutomaticVersionFeatureEnabled: Boolean,
-  ): String? {
-    val explicitVersion = findChildValueByPath(xmlProject, "parent.version")
-    if (explicitVersion != null || !isAutomaticVersionFeatureEnabled) {
-      return StringUtil.notNullize(explicitVersion, UNKNOWN)
-    }
-    if (null == xmlProject) return null
-
-    if (!xmlProject.requiredParentGroupAndArtifactPresent()) return null
-
-    val relativePath = findChildValueByPath(xmlProject, "parent.relativePath", "../pom.xml")!!
-    val parentFile = file.findParentPom(relativePath)
-    if (parentFile == null) {
-      return null
-    }
+    relativePath: String,
+    problems: MutableCollection<MavenProjectProblem>,
+  ): String {
+    val parentFile = file.findParentPom(relativePath) ?: return UNKNOWN
 
     val parentXmlProject = readXml(parentFile, problems, MavenProjectProblem.ProblemType.SYNTAX)
     val version = findChildValueByPath(parentXmlProject, "version")
     if (version != null) {
       return version
     }
-    return doCalculateParentVersion(parentXmlProject, problems, parentFile, isAutomaticVersionFeatureEnabled)
+    return calculateParentVersion(parentXmlProject, problems, parentFile, isAutomaticVersionFeatureEnabled = true)
   }
 
-  private fun Element.requiredParentGroupAndArtifactPresent(): Boolean {
+  private fun Element.checkParentGroupAndArtefactIdsPresence(file: VirtualFile): Boolean {
+    // for Maven 4, <groupId> and <artifactId> are optional if a parent POM is reachable by <relativePath>
+    if (isAtLeastMaven4(file, myProject)) return true
+    // for Maven 3, these tags are required always
     val parentGroupId = findChildValueByPath(this, "parent.groupId")
     val parentArtifactId = findChildValueByPath(this, "parent.artifactId")
-    if (parentGroupId != null && parentArtifactId != null) return true
-
-    val modelVersion = this.getModelVersion()
-
-    // model version 4.0.0, parent.groupId or parent.artifactId is not present
-    if (modelVersion == null || modelVersion == MODEL_VERSION_4_0_0) return false
-
-    // model version 4.1.0, parent tag is not present
-    val parent = findChildByPath(this, "parent")
-    if (null == parent) return false
-
-    // model version 4.1.0, parent tag is present
-    return true
+    return parentGroupId != null && parentArtifactId != null
   }
 
   private fun VirtualFile.findParentPom(relativePath: String): VirtualFile? {

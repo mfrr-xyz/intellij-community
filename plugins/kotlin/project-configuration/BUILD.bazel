@@ -1,6 +1,5 @@
 ### auto-generated section `build kotlin.project-configuration` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "project-configuration_resources",
@@ -12,19 +11,22 @@ jvm_library(
   name = "project-configuration",
   module_name = "kotlin.project-configuration",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_kotlin-compiler-fe10",
-    "@lib//:kotlinc_kotlin-jps-common",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-kotlin-compiler-fe10",
+    "@lib//:kotlinc-kotlin-jps-common",
     "@lib//:asm",
+    "//platform/platform-impl:ide-impl",
     "@lib//:guava",
+    "//platform/vcs-api:vcs",
+    "//platform/observable:ide-observable",
     "@lib//:gson",
+    "//platform/ide-core-impl",
     "//plugins/kotlin/base/frontend-agnostic:kotlin-base-frontend-agnostic",
     "//plugins/kotlin/base/util:kotlin-base-util",
+    "//platform/util/progress",
     "//plugins/kotlin/base/psi:kotlin-base-psi",
     "//plugins/kotlin/base/indices:kotlin-base-indices",
     "//plugins/kotlin/base/plugin:kotlin-base-plugin",
@@ -43,7 +45,6 @@ jvm_library(
     "//java/java-impl:impl",
     "//java/compiler/openapi:java-compiler",
     "//aether-dependency-resolver:java-aetherDependencyResolver",
-    "//plugins/gradle/java",
     "//platform/vcs-impl",
     "//platform/diff-impl",
     "//platform/core-api:core",

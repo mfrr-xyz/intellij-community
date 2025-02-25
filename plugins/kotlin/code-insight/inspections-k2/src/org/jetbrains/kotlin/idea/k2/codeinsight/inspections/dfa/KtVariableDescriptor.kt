@@ -6,6 +6,7 @@ import com.intellij.codeInspection.dataFlow.types.DfType
 import com.intellij.codeInspection.dataFlow.value.DfaValue
 import com.intellij.codeInspection.dataFlow.value.DfaValueFactory
 import com.intellij.codeInspection.dataFlow.value.DfaVariableValue
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiModifier
 import com.intellij.psi.util.CachedValuesManager
@@ -32,7 +33,13 @@ class KtVariableDescriptor(
     val pointer: KaSymbolPointer<KaVariableSymbol>,
     val type: DfType,
     val hash: Int,
-    private val inline: Boolean
+    private val inline: Boolean,
+
+    /**
+     * This anchor psi element helps to avoid expensive [KaSymbolPointer.pointsToTheSameSymbolAs]
+     * comparison until KT-74121 is fixed
+     */
+    private val sourceAnchorPsi: PsiElement?,
 ) : JvmVariableDescriptor(), KtBaseDescriptor {
     val stable: Boolean by lazy {
         when (val result = analyze(module) {
@@ -69,7 +76,12 @@ class KtVariableDescriptor(
 
     override fun getDfType(qualifier: DfaVariableValue?): DfType = type
 
-    override fun equals(other: Any?): Boolean = other is KtVariableDescriptor && other.pointer.pointsToTheSameSymbolAs(pointer)
+    override fun equals(other: Any?): Boolean = when {
+        other === this -> true
+        other !is KtVariableDescriptor -> false
+        sourceAnchorPsi != null || other.sourceAnchorPsi != null -> other.sourceAnchorPsi == sourceAnchorPsi
+        else -> other.hash == hash && other.pointer.pointsToTheSameSymbolAs(pointer)
+    }
 
     override fun hashCode(): Int = hash
 
@@ -105,8 +117,14 @@ class KtVariableDescriptor(
         context(KaSession)
         internal fun KaVariableSymbol.variableDescriptor(): KtVariableDescriptor {
             val type = this.returnType
-            return KtVariableDescriptor(useSiteModule, this.createPointer(), type.toDfType(), this.name.hashCode(),
-                                        ((type as? KaClassType)?.symbol as? KaNamedClassSymbol)?.isInline == true)
+            return KtVariableDescriptor(
+                module = useSiteModule,
+                pointer = this.createPointer(),
+                type = type.toDfType(),
+                hash = callableId?.hashCode() ?: name.hashCode(),
+                inline = ((type as? KaClassType)?.symbol as? KaNamedClassSymbol)?.isInline == true,
+                sourceAnchorPsi = if (origin == KaSymbolOrigin.SOURCE) psi else null,
+            )
         }
 
         private fun getVariablesChangedInNestedFunctions(parent: KtElement): Set<KtVariableDescriptor> =
@@ -228,7 +246,7 @@ class KtVariableDescriptor(
 class KtLambdaThisVariableDescriptor(val lambda: KtFunctionLiteral, val type: DfType) : JvmVariableDescriptor() {
     override fun getDfType(qualifier: DfaVariableValue?): DfType = type
     override fun isStable(): Boolean = true
-    override fun equals(other: Any?): Boolean = other is KtLambdaThisVariableDescriptor && other.lambda == lambda
+    override fun equals(other: Any?): Boolean = other === this || other is KtLambdaThisVariableDescriptor && other.lambda == lambda
     override fun hashCode(): Int = lambda.hashCode()
     override fun toString(): String = "this@${lambda.name}"
     override fun createValue(factory: DfaValueFactory, qualifier: DfaValue?): DfaValue {

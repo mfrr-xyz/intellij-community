@@ -3,14 +3,10 @@ package com.intellij.openapi.wm.impl.headertoolbar
 
 import com.intellij.accessibility.AccessibilityUtils
 import com.intellij.ide.ProjectWindowCustomizerService
-import com.intellij.ide.ui.LafManager
 import com.intellij.ide.ui.LafManagerListener
+import com.intellij.ide.ui.MainMenuDisplayMode
 import com.intellij.ide.ui.UISettings
-import com.intellij.ide.ui.UISettingsListener
-import com.intellij.ide.ui.customization.ActionUrl
-import com.intellij.ide.ui.customization.CustomActionsListener
-import com.intellij.ide.ui.customization.CustomActionsSchema
-import com.intellij.ide.ui.customization.CustomizationUtil
+import com.intellij.ide.ui.customization.*
 import com.intellij.ide.ui.laf.darcula.ui.MainToolbarComboBoxButtonUI
 import com.intellij.idea.AppMode
 import com.intellij.openapi.Disposable
@@ -30,16 +26,15 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.keymap.impl.ui.ActionsTreeUtil
 import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.project.ProjectNameListener
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.wm.impl.IdeBackgroundUtil
+import com.intellij.openapi.wm.impl.ToolbarComboButton
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomWindowHeaderUtil
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomWindowHeaderUtil.hideNativeLinuxTitle
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomWindowHeaderUtil.isMenuButtonInToolbar
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.ExpandableMenu
 import com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.HeaderToolbarButtonLook
-import com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.MainMenuButton
 import com.intellij.platform.diagnostic.telemetry.impl.span
 import com.intellij.ui.*
 import com.intellij.ui.components.panels.HorizontalLayout
@@ -50,11 +45,11 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JBUI.CurrentTheme.Toolbar.mainToolbarButtonInsets
 import com.intellij.util.ui.showingScope
 import com.jetbrains.WindowDecorations
+import fleet.multiplatform.shims.ConcurrentHashSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withContext
-import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Internal
 import java.awt.*
 import java.awt.event.MouseEvent
@@ -77,18 +72,27 @@ private sealed interface MainToolbarFlavor {
 
 private class MenuButtonInToolbarMainToolbarFlavor(coroutineScope: CoroutineScope,
                                                    private val headerContent: JComponent,
-                                                   frame: JFrame) : MainToolbarFlavor {
-  private val mainMenuButton = MainMenuButton(coroutineScope)
+                                                   frame: JFrame, toolbar: MainToolbar) : MainToolbarFlavor {
+
+
+  private val mainMenuWithButton = MainMenuWithButton(coroutineScope, frame)
+  private val mainMenuButton = mainMenuWithButton.mainMenuButton
 
   init {
     val expandableMenu = ExpandableMenu(headerContent = headerContent, coroutineScope = coroutineScope, frame)
     mainMenuButton.expandableMenu = expandableMenu
     mainMenuButton.rootPane = frame.rootPane
+    toolbar.addWidthCalculationListener(object : ToolbarWidthCalculationListener {
+      override fun onToolbarCompressed(event: ToolbarWidthCalculationEvent) {
+        mainMenuWithButton.recalculateWidth(toolbar)
+      }
+    })
   }
 
   override fun addWidget() {
-    addWidget(widget = mainMenuButton.button, parent = headerContent, position = HorizontalLayout.Group.LEFT)
+    addWidget(widget = mainMenuWithButton, parent = headerContent, position = HorizontalLayout.Group.LEFT)
   }
+
 }
 
 private data object DefaultMainToolbarFlavor : MainToolbarFlavor
@@ -104,12 +108,13 @@ class MainToolbar(
   private val isFullScreen: () -> Boolean,
 ) : JPanel(HorizontalLayout(layoutGap)) {
   private val flavor: MainToolbarFlavor
+  private val widthCalculationListeners = ConcurrentHashSet<ToolbarWidthCalculationListener>()
 
   init {
     this.background = background
     this.isOpaque = isOpaque
     flavor = if (isMenuButtonInToolbar(UISettings.shadowInstance)) {
-      MenuButtonInToolbarMainToolbarFlavor(headerContent = this, coroutineScope = coroutineScope, frame = frame)
+      MenuButtonInToolbarMainToolbarFlavor(headerContent = this, coroutineScope = coroutineScope, frame = frame, toolbar = this)
     }
     else {
       DefaultMainToolbarFlavor
@@ -122,15 +127,27 @@ class MainToolbar(
     }
     (layout as HorizontalLayout).apply {
       preferredSizeFunction = { component ->
-        if (component is ActionToolbar) {
-          val availableSize = Dimension(this@MainToolbar.width - 4 * JBUI.scale(layoutGap), this@MainToolbar.height)
-          CompressingLayoutStrategy.distributeSize(availableSize, components.filterIsInstance<ActionToolbar>()).getValue(component)
-        }
-        else {
-          component.preferredSize
+        when (component) {
+          is ActionToolbar -> {
+            notifyToolbarWidthCalculation(ToolbarWidthCalculationEvent(this@MainToolbar))
+            val availableSize = Dimension(this@MainToolbar.width - 4 * JBUI.scale(layoutGap), this@MainToolbar.height)
+            CompressingLayoutStrategy.distributeSize(availableSize, components.filterIsInstance<ActionToolbar>()).getValue(component)
+          }
+          else -> {
+            component.preferredSize
+          }
         }
       }
     }
+  }
+
+  fun calculatePreferredWidth(): Int {
+    return components.filterIsInstance<ActionToolbar>().sumOf { it.component.preferredSize.width} + 4 * JBUI.scale(layoutGap)
+  }
+
+  @Internal
+  fun addToolbarListeners(listener: ActionToolbarListener, disposable: Disposable) {
+    components.filterIsInstance<ActionToolbar>().forEach { it.addListener(listener, disposable) }
   }
 
   private fun updateToolbarActions() {
@@ -259,7 +276,7 @@ class MainToolbar(
   }
 
   private fun installClickListener(popupHandler: PopupHandler, customTitleBar: WindowDecorations.CustomTitleBar?) {
-    if (hideNativeLinuxTitle(UISettings.shadowInstance) && !UISettings.shadowInstance.separateMainMenu) {
+    if (hideNativeLinuxTitle(UISettings.shadowInstance) && UISettings.shadowInstance.mainMenuDisplayMode != MainMenuDisplayMode.SEPARATE_TOOLBAR) {
       WindowMoveListener(this).apply {
         setLeftMouseButtonOnly(true)
         installTo(this@MainToolbar)
@@ -290,10 +307,24 @@ class MainToolbar(
     addMouseMotionListener(listener)
   }
 
+  internal fun addWidthCalculationListener(listener: ToolbarWidthCalculationListener) {
+    widthCalculationListeners.add(listener)
+  }
+
+  internal fun removeWidthCalculationListener(listener: ToolbarWidthCalculationListener) {
+    widthCalculationListeners.remove(listener)
+  }
+
+  private fun notifyToolbarWidthCalculation(event: ToolbarWidthCalculationEvent) {
+    widthCalculationListeners.forEach { it.onToolbarCompressed(event) }
+  }
+
+
   override fun removeNotify() {
     super.removeNotify()
     if (ScreenUtil.isStandardAddRemoveNotify(this)) {
       coroutineScope.cancel()
+      widthCalculationListeners.clear()
     }
   }
 
@@ -301,7 +332,7 @@ class MainToolbar(
     if (accessibleContext == null) {
       accessibleContext = AccessibleMainToolbar()
     }
-    accessibleContext.accessibleName = if (ExperimentalUI.isNewUI() && UISettings.getInstance().separateMainMenu) {
+    accessibleContext.accessibleName = if (ExperimentalUI.isNewUI() && UISettings.getInstance().mainMenuDisplayMode == MainMenuDisplayMode.SEPARATE_TOOLBAR) {
       UIBundle.message("main.toolbar.accessible.group.name")
     }
     else {
@@ -343,7 +374,7 @@ private fun addWidget(widget: JComponent, parent: JComponent, position: Horizont
   }
 }
 
-@ApiStatus.Internal
+@Internal
 class MyActionToolbarImpl(group: ActionGroup, customizationGroup: ActionGroup?)
   : ActionToolbarImpl(ActionPlaces.MAIN_TOOLBAR, group, true, false, false) {
   private val iconUpdater = HeaderIconUpdater()
@@ -370,10 +401,6 @@ class MyActionToolbarImpl(group: ActionGroup, customizationGroup: ActionGroup?)
     }
   }
 
-  override fun updateActionsOnAdd() {
-    // do nothing - called explicitly
-  }
-
   fun updateActions() {
     updateActionsWithoutLoadingIcon(/* includeInvisible = */ false)
   }
@@ -395,6 +422,14 @@ class MyActionToolbarImpl(group: ActionGroup, customizationGroup: ActionGroup?)
       component.foreground = JBColor.namedColor("MainToolbar.foreground", component.foreground)
     }
     (component as? ActionButton)?.setMinimumButtonSize(ActionToolbar.experimentalToolbarMinimumButtonSize())
+    if (component is ToolbarComboButton) {
+      component.preferredHeightSupplier = { ActionToolbar.experimentalToolbarMinimumButtonSize().height }
+      val insets = mainToolbarButtonInsets().apply {
+        left = 0
+        right = 0
+      }
+      component.border = JBUI.Borders.empty(insets)
+    }
 
     if (action is ComboBoxAction) {
       findComboButton(component)?.apply {
@@ -432,8 +467,9 @@ class MyActionToolbarImpl(group: ActionGroup, customizationGroup: ActionGroup?)
   }
 
   override fun updateUI() {
+    @Suppress("UNNECESSARY_SAFE_CALL") // you know, the old "this thing is called from a superclass constructor" pitfall
+    iconUpdater?.clearCache()
     super.updateUI()
-
     updateFont()
   }
 
@@ -496,7 +532,7 @@ private fun getMainToolbarGroups(): Sequence<GroupInfo> {
 
 internal fun isDarkHeader(): Boolean = ColorUtil.isDark(JBColor.namedColor("MainToolbar.background"))
 
-fun adjustIconForHeader(icon: Icon): Icon = if (isDarkHeader()) IconLoader.getDarkIcon(icon = icon, dark = true) else icon
+private fun adjustIconForHeader(icon: Icon): Icon = IconLoader.getDarkIcon(icon = icon, dark = isDarkHeader())
 
 private class HeaderIconUpdater {
   val iconCache = WeakHashMap<Icon, WeakReference<Icon>>()
@@ -512,6 +548,11 @@ private class HeaderIconUpdater {
     iconCache[sourceIcon] = WeakReference(replaceIcon)
     alreadyUpdated.add(replaceIcon)
     return replaceIcon
+  }
+
+  fun clearCache() {
+    iconCache.clear()
+    alreadyUpdated.clear()
   }
 }
 
@@ -552,4 +593,8 @@ private fun schemaChanged() {
     TouchbarSupport.reloadAllActions()
   }
   CustomActionsListener.fireSchemaChanged()
+}
+
+internal class MainToolbarActionGroupCustomization : ActionGroupCustomizationExtension {
+  override fun getReadOnlyActionGroupIds(): Set<String> = setOf(MAIN_TOOLBAR_ID)
 }

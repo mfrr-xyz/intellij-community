@@ -1,10 +1,9 @@
 ### auto-generated section `build kotlin.refactorings.common` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   context_receivers = True,
   opt_in = [
     "org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
@@ -16,8 +15,7 @@ jvm_library(
   name = "kotlin-refactorings-common",
   module_name = "kotlin.refactorings.common",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "//plugins/kotlin/base/psi:kotlin-base-psi",
@@ -26,11 +24,14 @@ jvm_library(
     "//java/java-psi-api:psi",
     "//platform/core-api:core",
     "//platform/core-impl",
+    "//platform/ide-core-impl",
     "//platform/lang-impl",
     "//java/java-impl-refactorings:impl-refactorings",
-    "@lib//:kotlinc_analysis-api",
-    "@lib//:kotlinc_kotlin-compiler-common",
+    "@lib//:kotlinc-analysis-api",
+    "@lib//:kotlinc-kotlin-compiler-common",
     "//java/openapi:java",
+    "//platform/platform-impl:ide-impl",
+    "//platform/usageView",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
     "//platform/core-ui",
     "//plugins/kotlin/base/analysis:kotlin-base-analysis",

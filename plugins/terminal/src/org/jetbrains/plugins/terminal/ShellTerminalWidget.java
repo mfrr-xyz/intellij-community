@@ -1,4 +1,4 @@
-// Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.terminal;
 
 import com.intellij.openapi.Disposable;
@@ -36,8 +36,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static org.jetbrains.plugins.terminal.util.TerminalCoroutineKt.terminalProjectScope;
-
 public class ShellTerminalWidget extends JBTerminalWidget {
 
   private static final Logger LOG = Logger.getInstance(ShellTerminalWidget.class);
@@ -65,7 +63,7 @@ public class ShellTerminalWidget extends JBTerminalWidget {
     super(project, settingsProvider, parent);
     myShellCommandHandlerHelper = new TerminalShellCommandHandlerHelper(this);
 
-    ClassicTerminalVfsRefresher refresher = new ClassicTerminalVfsRefresher(this, terminalProjectScope(project));
+    ClassicTerminalVfsRefresher refresher = new ClassicTerminalVfsRefresher(this);
     getTerminalPanel().addPreKeyEventHandler(e -> {
       if (e.getID() != KeyEvent.KEY_PRESSED) return;
       handleAnyKeyPressed();
@@ -134,8 +132,7 @@ public class ShellTerminalWidget extends JBTerminalWidget {
     return myStartupOptions;
   }
 
-  @NotNull
-  public String getTypedShellCommand() {
+  public @NotNull String getTypedShellCommand() {
     return myPrompt.getTypedShellCommand();
   }
 

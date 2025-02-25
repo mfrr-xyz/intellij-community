@@ -8,9 +8,6 @@ import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.util.messages.Topic
 import kotlinx.coroutines.delay
 import org.jetbrains.annotations.ApiStatus
-import org.jetbrains.idea.maven.model.MavenExplicitProfiles
-import org.jetbrains.idea.maven.model.MavenModel
-import java.nio.file.Path
 import java.rmi.RemoteException
 
 interface MavenServerConnector : Disposable {
@@ -57,17 +54,6 @@ interface MavenServerConnector : Disposable {
   @Throws(RemoteException::class)
   fun createIndexer(): MavenServerIndexer
 
-  suspend fun interpolateAndAlignModel(model: MavenModel, basedir: Path, pomDir: Path): MavenModel
-
-  suspend fun assembleInheritance(model: MavenModel, parentModel: MavenModel): MavenModel
-
-  suspend fun applyProfiles(
-    model: MavenModel,
-    basedir: Path,
-    explicitProfiles: MavenExplicitProfiles,
-    alwaysOnProfiles: Collection<String>,
-  ): ProfileApplicationResult
-
   fun checkConnected(): Boolean
 
   enum class State {
@@ -82,33 +68,6 @@ interface MavenServerConnector : Disposable {
     @Topic.AppLevel
     val DOWNLOAD_LISTENER_TOPIC: Topic<MavenServerDownloadListener> =
       Topic(MavenServerDownloadListener::class.java.simpleName, MavenServerDownloadListener::class.java)
-
-    @JvmStatic
-    suspend fun interpolateAndAlignModel(project: Project, model: MavenModel, basedir: Path, pomDir: Path): MavenModel {
-      return retry { MavenServerManager.getInstance().getConnector(project, basedir.toAbsolutePath().toString()).interpolateAndAlignModel(model, basedir, pomDir) }
-    }
-
-    @JvmStatic
-    suspend fun assembleInheritance(project: Project, basedir: Path, model: MavenModel, parentModel: MavenModel): MavenModel {
-      return retry {
-        MavenServerManager.getInstance().getConnector(project, basedir.toAbsolutePath().toString())
-          .assembleInheritance(model, parentModel)
-      }
-    }
-
-    @JvmStatic
-    suspend fun applyProfiles(
-      project: Project,
-      model: MavenModel,
-      basedir: Path,
-      explicitProfiles: MavenExplicitProfiles,
-      alwaysOnProfiles: Collection<String>,
-    ): ProfileApplicationResult {
-      return retry {
-        MavenServerManager.getInstance().getConnector(project, basedir.toAbsolutePath().toString())
-          .applyProfiles(model, basedir, explicitProfiles, alwaysOnProfiles)
-      }
-    }
 
     private suspend fun <T> retry(action: suspend () -> T): T {
       for (i in 1..3) {

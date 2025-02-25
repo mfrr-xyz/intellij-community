@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.project.backend
 
 import com.intellij.openapi.diagnostic.logger
@@ -15,19 +15,19 @@ import fleet.kernel.transactor
 
 internal class BackendProjectEntitiesStorage : ProjectEntitiesStorage() {
   override suspend fun createEntityImpl(project: Project) {
-    // migrate to the implementation below when IJPL-172500 is investigated and a fix has been found
-    //val projectId = project.projectId()
-    //change {
-    //  shared {
-    //    ProjectEntity.new {
-    //      it[ProjectEntity.ProjectIdValue] = projectId
-    //    }
-    //  }
-    //}
-    //LOG.info("Project entity created for $projectId")
-
+    val projectId = project.projectId()
+    change {
+      shared {
+        ProjectEntity.upsert(ProjectEntity.ProjectIdValue, projectId) {
+          it[ProjectEntity.ProjectIdValue] = projectId
+        }
+      }
+    }
   }
 
+  // withKernel should be kept here, since Kernel is not properly propagated in tests
+  // and project entity may be removed from threads without attached Kernel
+  @Suppress("DEPRECATION")
   override suspend fun removeProjectEntity(project: Project): Unit = withKernel {
     change {
       shared {

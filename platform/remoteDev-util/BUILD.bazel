@@ -1,7 +1,5 @@
 ### auto-generated section `build intellij.remoteDev.util` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
-load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
   name = "remoteDev-util_resources",
@@ -13,10 +11,7 @@ jvm_library(
   name = "remoteDev-util",
   module_name = "intellij.remoteDev.util",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "modelGenerated/**/*.kt", "modelGenerated/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
-  plugins = ["@lib//:serialization_plugin"],
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "modelGenerated/**/*.kt", "modelGenerated/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:rd-core",
@@ -25,6 +20,7 @@ jvm_library(
     "//platform/platform-api:ide",
     "//platform/platform-util-io:ide-util-io",
     "//platform/util/concurrency",
+    "//platform/analysis-api:analysis",
     "@lib//:jna",
     "@lib//:download-pgp-verifier",
     "@lib//:bouncy-castle-pgp",
@@ -35,6 +31,7 @@ jvm_library(
     "//platform/rd-platform-community:rd-community",
     "//platform/statistics",
     "@lib//:gson",
+    "//platform/util/progress",
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-json",
     "//platform/core-ui",
@@ -50,6 +47,8 @@ jvm_library(
     "//platform/bootstrap",
     "//platform/platform-impl/ui:ide-ui",
     "//platform/lang-core",
+    "//platform/runtime/repository",
+    "//platform/core-impl",
     "//platform/runtime/product",
     "//platform/execution",
     "//platform/util/coroutines",
@@ -57,14 +56,11 @@ jvm_library(
   runtime_deps = [":remoteDev-util_resources"]
 )
 
-kt_jvm_test(
-  name = "remoteDev-util_test",
+jvm_library(
+  name = "remoteDev-util_test_lib",
   visibility = ["//visibility:public"],
-  srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["testSrc/**/*.kt", "testSrc/**/*.java"], allow_empty = True),
   associates = [":remoteDev-util"],
-  plugins = ["@lib//:serialization_plugin"],
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:rd-core",
@@ -73,20 +69,25 @@ kt_jvm_test(
     "//platform/platform-api:ide",
     "//platform/platform-util-io:ide-util-io",
     "//platform/util/concurrency",
+    "//platform/util/concurrency:concurrency_test_lib",
+    "//platform/analysis-api:analysis",
     "@lib//:jna",
     "@lib//:download-pgp-verifier",
     "@lib//:bouncy-castle-pgp",
     "//platform/platform-impl:ide-impl",
+    "//platform/platform-impl:ide-impl_test_lib",
     "@lib//:miglayout-swing",
     "@lib//:jackson",
     "@lib//:jackson-databind",
     "//platform/rd-platform-community:rd-community",
     "//platform/statistics",
+    "//platform/statistics:statistics_test_lib",
     "@lib//:gson",
     "@lib//:junit5",
+    "//platform/util/progress",
     "@lib//:junit5Params",
     "//platform/testFramework/junit5",
-    "//platform/testFramework/junit5:junit5_test",
+    "//platform/testFramework/junit5:junit5_test_lib",
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-json",
     "//platform/core-ui",
@@ -96,16 +97,24 @@ kt_jvm_test(
     "@lib//:opentelemetry",
     "@lib//:opentelemetry-semconv",
     "//platform/diagnostic/telemetry",
+    "//platform/diagnostic/telemetry:telemetry_test_lib",
     "//platform/diagnostic/telemetry.exporters:telemetry-exporters",
     "//platform/diagnostic/telemetry-impl",
     "//platform/diagnostic",
     "//platform/bootstrap",
     "//platform/platform-impl/ui:ide-ui",
     "//platform/lang-core",
+    "//platform/runtime/repository",
+    "//platform/core-impl",
     "//platform/runtime/product",
     "//platform/execution",
     "//platform/util/coroutines",
   ],
   runtime_deps = [":remoteDev-util_resources"]
+)
+
+jvm_test(
+  name = "remoteDev-util_test",
+  runtime_deps = [":remoteDev-util_test_lib"]
 )
 ### auto-generated section `build intellij.remoteDev.util` end

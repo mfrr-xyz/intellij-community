@@ -2,6 +2,7 @@
 package org.jetbrains.kotlin.idea.base.codeInsight
 
 import org.jetbrains.kotlin.config.LanguageFeature
+import org.jetbrains.kotlin.config.LanguageFeature.PropertyParamAnnotationDefaultTargetMode
 import org.jetbrains.kotlin.config.toKotlinVersion
 import org.jetbrains.kotlin.diagnostics.rendering.buildRuntimeFeatureToFlagMap
 import org.jetbrains.kotlin.idea.compiler.configuration.IdeKotlinVersion
@@ -12,6 +13,11 @@ object CliArgumentStringBuilder {
     private val dedicatedFeatureFlags: Map<LanguageFeature, String> by lazy {
         buildRuntimeFeatureToFlagMap(this::class.java.classLoader)
     }
+
+    private val featuresWithComplexArguments: Map<Pair<LanguageFeature, LanguageFeature.State>, String> = mapOf(
+        (PropertyParamAnnotationDefaultTargetMode to LanguageFeature.State.ENABLED) to "-Xannotation-default-target=param-property",
+        (PropertyParamAnnotationDefaultTargetMode to LanguageFeature.State.DISABLED) to "-Xannotation-default-target=first-only-warn",
+    )
 
     private val LanguageFeature.dedicatedFlagInfo: Pair<String, KotlinVersion?>?
         get()  {
@@ -39,11 +45,12 @@ object CliArgumentStringBuilder {
             val (xFlag, xFlagSinceVersion) = this
             if (kotlinVersion == null || xFlagSinceVersion == null || kotlinVersion.kotlinVersion >= xFlagSinceVersion) xFlag else null
         }
+        val specialCompilerArgument = featuresWithComplexArguments[this to state]
 
-        return if (shouldBeFeatureEnabled && dedicatedFlag != null) {
-            dedicatedFlag
-        } else {
-            "$LANGUAGE_FEATURE_FLAG_PREFIX${state.sign}$name"
+        return when {
+            shouldBeFeatureEnabled && dedicatedFlag != null -> dedicatedFlag
+            specialCompilerArgument != null -> specialCompilerArgument
+            else -> "$LANGUAGE_FEATURE_FLAG_PREFIX${state.sign}$name"
         }
     }
 
@@ -68,12 +75,14 @@ object CliArgumentStringBuilder {
             replace(existingFeatureMatchResult.value, featureArgumentString)
         } else {
             val splitText = if (postfix.isNotEmpty()) split(postfix) else listOf(this, "")
+            // Split by `)` or `))` or some other postfix to add a new value between the old value and such brackets.
             if (splitText.size != 2) {
                 "$prefix$quote$featureArgumentString$quote$postfix"
             } else {
                 val (mainPart, commentPart) = splitText
+                val newArgumentString = "$separator$quote$featureArgumentString$quote"
                 // In Groovy / Kotlin DSL, we can have comment after [...] or listOf(...)
-                mainPart + "$separator$quote$featureArgumentString$quote$postfix" + commentPart
+                mainPart + newArgumentString + postfix + commentPart
             }
         }
     }

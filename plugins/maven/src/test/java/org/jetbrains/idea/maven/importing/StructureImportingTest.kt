@@ -8,11 +8,10 @@ import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.workspace.jps.JpsProjectFileEntitySource.FileInDirectory
 import com.intellij.platform.workspace.jps.entities.ModuleId
 import com.intellij.testFramework.PsiTestUtil
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
-import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 
 class StructureImportingTest : MavenMultiVersionImportingTestCase() {
   @Test
@@ -92,8 +91,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
 
     createProjectSubDirs("m1/src/main/java",
                          "m2/src/main/java",
-                         "m3/src/main/jva",
-                         "m4/src/main/java")
+                         "m3/src/main/java")
 
     importProjectAsync()
     assertModules("project", "m1", "m2", "m3", "m4")
@@ -168,7 +166,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
     PsiTestUtil.addContentRoot(userModuleWithConflictingRoot, projectRoot)
     val anotherContentRoot = createProjectSubFile("m1/user-content")
     PsiTestUtil.addContentRoot(userModuleWithConflictingRoot, anotherContentRoot)
-    assertContentRoots(userModuleWithConflictingRoot.getName(), projectPath, anotherContentRoot.getPath())
+    assertContentRoots(userModuleWithConflictingRoot.getName(), projectPath.toString(), anotherContentRoot.getPath())
 
     createProjectPom("""
                        <groupId>test</groupId>
@@ -178,7 +176,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
 
     importProjectAsync()
     assertModules("project", userModuleWithConflictingRoot.getName())
-    assertContentRoots("project", projectPath)
+    assertContentRoots("project", projectPath.toString())
     assertContentRoots(userModuleWithConflictingRoot.getName(), anotherContentRoot.getPath())
   }
 
@@ -187,7 +185,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
     val userModuleWithConflictingRoot = createModule("userModuleWithConflictingRoot")
     PsiTestUtil.removeAllRoots(userModuleWithConflictingRoot, null)
     PsiTestUtil.addContentRoot(userModuleWithConflictingRoot, projectRoot)
-    assertContentRoots(userModuleWithConflictingRoot.getName(), projectPath)
+    assertContentRoots(userModuleWithConflictingRoot.getName(), projectPath.toString())
 
     val userModuleWithUniqueRoot = createModule("userModuleWithUniqueRoot")
     assertContentRoots(userModuleWithUniqueRoot.getName(), "$projectPath/userModuleWithUniqueRoot")
@@ -200,7 +198,7 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
 
     importProjectAsync()
     assertModules("project", userModuleWithUniqueRoot.getName())
-    assertContentRoots("project", projectPath)
+    assertContentRoots("project", projectPath.toString())
     assertContentRoots(userModuleWithUniqueRoot.getName(), "$projectPath/userModuleWithUniqueRoot")
   }
 
@@ -562,7 +560,6 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
 
   @Test
   fun testModuleWithPropertiesWithParentWithoutARelativePath() = runBlocking {
-    runWithoutStaticSync()
     createProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
@@ -641,10 +638,10 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
   @Test
   fun testParentInRemoteRepository() = runBlocking {
     val pathToJUnit = "asm/asm-parent/3.0"
-    val parentDir = File(repositoryPath, pathToJUnit)
+    val parentDir = repositoryPath.resolve(pathToJUnit)
 
     removeFromLocalRepository(pathToJUnit)
-    assertFalse(parentDir.exists())
+    assertFalse(Files.exists(parentDir))
 
     createProjectPom("""
                        <groupId>test</groupId>
@@ -660,10 +657,10 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
     importProjectAsync()
     assertModules("project")
 
-    assertTrue(parentDir.exists())
+    assertTrue(Files.exists(parentDir))
 
     assertEquals("asm-parent", projectsTree.rootProjects[0].parentId!!.artifactId)
-    assertTrue(File(parentDir, "asm-parent-3.0.pom").exists())
+    assertTrue(Files.exists(parentDir.resolve("asm-parent-3.0.pom")))
   }
 
   @Test
@@ -803,6 +800,69 @@ class StructureImportingTest : MavenMultiVersionImportingTestCase() {
     assertModules("project", mn("project", "m1"), mn("project", "m2"))
     assertModuleLibDeps(mn("project", "m1"))
     assertModuleLibDeps(mn("project", "m2"), "Maven: junit:junit:4.0")
+  }
+
+  @Test
+  fun testFileProfileActivationInParentPom2() = runBlocking {
+    assumeMaven4()
+    createProjectPom("""
+                       <groupId>test</groupId>
+                       <artifactId>project</artifactId>
+                       <version>1</version>
+                       <packaging>pom</packaging>
+                         <profiles>
+                           <profile>
+                             <id>xxx</id>
+                             <dependencies>
+                               <dependency>
+                                 <groupId>junit</groupId>
+                                 <artifactId>junit</artifactId>
+                                 <version>4.0</version>
+                               </dependency>
+                             </dependencies>
+                             <activation>
+                               <file>
+                                 <exists>src/io.properties</exists>
+                               </file>
+                             </activation>
+                           </profile>
+                         </profiles>
+                       <modules>
+                         <module>m1</module>
+                         <module>m2</module>
+                       </modules>
+                       """.trimIndent())
+
+    val m1 =createModulePom("m1", """
+      <groupId>test</groupId>
+      <artifactId>m1</artifactId>
+      <parent>
+        <groupId>test</groupId>
+        <artifactId>project</artifactId>
+        <version>1</version>
+      </parent>
+      """.trimIndent())
+
+    val m2 = createModulePom("m2", """
+      <groupId>test</groupId>
+      <artifactId>m2</artifactId>
+      <parent>
+        <groupId>test</groupId>
+        <artifactId>project</artifactId>
+        <version>1</version>
+      </parent>
+      """.trimIndent())
+    createProjectSubFile("m2/src/io.properties", "")
+
+    assertTrue("File src/io.properties not found", Files.exists(m2.toNioPath().parent.resolve("src/io.properties")))
+
+    importProjectAsync()
+
+    val m1Project = projectsManager.findProject(m1)!!
+    assertSameElements("m1 enabled profiles", m1Project.activatedProfilesIds.enabledProfiles, emptyList())
+
+    val m2Project = projectsManager.findProject(m2)!!
+    assertSameElements("m2 enabled profiles", m2Project.activatedProfilesIds.enabledProfiles, listOf("xxx"))
   }
 
   @Test

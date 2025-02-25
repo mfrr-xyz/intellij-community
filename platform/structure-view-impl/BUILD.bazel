@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.platform.structureView.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "structureView-impl_resources",
@@ -12,11 +11,9 @@ jvm_library(
   name = "structureView-impl",
   module_name = "intellij.platform.structureView.impl",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/util",
     "//platform/extensions",
     "//platform/core-api:core",
@@ -25,16 +22,16 @@ jvm_library(
     "//platform/projectModel-api:projectModel",
     "//platform/platform-api:ide",
     "//platform/core-impl",
+    "//platform/analysis-api:analysis",
     "//platform/util:util-ui",
     "@lib//:fastutil-min",
     "//platform/core-ui",
+    "//platform/statistics",
   ],
   exports = [
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/util",
     "//platform/extensions",
-    "//platform/core-api:core",
-    "//platform/projectModel-api:projectModel",
   ],
   runtime_deps = [":structureView-impl_resources"]
 )

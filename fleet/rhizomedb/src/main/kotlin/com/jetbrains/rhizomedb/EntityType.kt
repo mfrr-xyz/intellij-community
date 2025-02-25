@@ -2,9 +2,8 @@
 package com.jetbrains.rhizomedb
 
 import com.jetbrains.rhizomedb.impl.EidGen
-import com.jetbrains.rhizomedb.impl.EntityFactory
 import fleet.util.singleOrNullOrThrow
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet
+import fleet.fastutil.ints.IntOpenHashSet
 import kotlinx.serialization.builtins.serializer
 import kotlin.reflect.KClass
 

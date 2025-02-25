@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.platform.projectModel.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "projectModel-impl_resources",
@@ -12,14 +11,13 @@ jvm_library(
   name = "projectModel-impl",
   module_name = "intellij.platform.projectModel.impl",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
     "//platform/projectModel-api:projectModel",
     "//platform/core-impl",
     "//jps/model-api:model",
     "//jps/model-impl",
+    "//platform/util",
     "//jps/model-serialization",
     "@lib//:kotlin-stdlib",
     "@lib//:kotlinx-coroutines-core",
@@ -37,6 +35,7 @@ jvm_library(
     "@lib//:hash4j",
     "//platform/backend/workspace",
     "//platform/diagnostic",
+    "//platform/eel-provider",
   ],
   exports = [
     "//platform/projectModel-api:projectModel",

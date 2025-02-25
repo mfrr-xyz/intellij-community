@@ -1,15 +1,25 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.rt.debugger;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.WrongMethodTypeException;
+import java.lang.ref.SoftReference;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 @SuppressWarnings({"SSBasedInspection", "unused"})
 public final class MethodInvoker {
-  // TODO: may leak objects here
-  static ThreadLocal<Object> returnValue = new ThreadLocal<>();
+  private static final ThreadLocal<List<Object>> keptValues = new ThreadLocal<>();
+  // Do not create an anonymous class here to simplify helper class loading into the target process
+  //{
+  //  @Override
+  //  protected List<Object> initialValue() {
+  //    return new LinkedList<>(); // LinkedList for fast elements removal
+  //  }
+  //};
 
   public static Object invoke0(MethodHandles.Lookup lookup, Class<?> cls, Object obj, String nameAndDescriptor, ClassLoader loader)
     throws Throwable {
@@ -188,6 +198,10 @@ public final class MethodInvoker {
         method = lookup.findStatic(cls, name, mt);
       }
 
+      if (method == null) {
+        throw new NoSuchMethodException(nameAndDescriptor + " not found in " + cls);
+      }
+
       int parameterCount = mt.parameterCount();
       Class<?> lastParameterType = parameterCount > 0 ? mt.parameterType(parameterCount - 1) : null;
       boolean vararg = method.isVarargsCollector();
@@ -207,12 +221,45 @@ public final class MethodInvoker {
       }
 
       Object result = method.invokeWithArguments(args);
-      returnValue.set(result);
-      return result;
+      return keepReference(result, false);
     }
     catch (WrongMethodTypeException | ClassCastException e) {
       e.printStackTrace();
+      keepReference(e, true);
       throw e;
+    }
+    catch (Throwable e) {
+      keepReference(e, true);
+      throw e;
+    }
+  }
+
+  private static Object keepReference(Object ref, boolean soft) {
+    List<Object> objects = keptValues.get();
+    if (objects == null) {
+      objects = new LinkedList<>();
+      keptValues.set(objects);
+    }
+    removeStaleReferences(objects);
+    Object wrapper = soft ? new SoftReference<>(ref) : new Object[]{ref};
+    objects.add(wrapper);
+    return wrapper;
+  }
+
+  private static void removeStaleReferences(List<Object> objects) {
+    Iterator<Object> iterator = objects.iterator();
+    while (iterator.hasNext()) {
+      Object object = iterator.next();
+      if (object instanceof Object[]) {
+        if (((Object[])object)[0] == null) {
+          iterator.remove();
+        }
+      }
+      else if (object instanceof SoftReference) {
+        if (((SoftReference<?>)object).get() == null) {
+          iterator.remove();
+        }
+      }
     }
   }
 }

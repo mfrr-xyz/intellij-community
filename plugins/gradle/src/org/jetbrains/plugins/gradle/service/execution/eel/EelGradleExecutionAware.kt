@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.gradle.service.execution.eel
 
 import com.intellij.execution.wsl.WSLUtil
@@ -10,9 +10,8 @@ import com.intellij.openapi.externalSystem.service.execution.TargetEnvironmentCo
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.platform.eel.LocalEelApi
-import com.intellij.platform.eel.impl.utils.getEelApi
-import com.intellij.platform.eel.impl.utils.getEelApiBlocking
+import com.intellij.platform.eel.provider.LocalEelDescriptor
+import com.intellij.platform.eel.provider.getEelDescriptor
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.plugins.gradle.service.execution.BuildLayoutParameters
 import org.jetbrains.plugins.gradle.service.execution.GradleExecutionAware
@@ -34,7 +33,7 @@ class EelGradleExecutionAware : GradleExecutionAware {
   }
 
   override fun isRemoteRun(runConfiguration: ExternalSystemRunConfiguration, project: Project): Boolean {
-    return true
+    return project.getEelDescriptor() !is LocalEelDescriptor
   }
 
   override fun getEnvironmentConfigurationProvider(
@@ -44,7 +43,7 @@ class EelGradleExecutionAware : GradleExecutionAware {
   ): TargetEnvironmentConfigurationProvider? {
     return if (project.isEelSyncAvailable()) {
       runBlockingCancellable {
-        EelTargetEnvironmentConfigurationProvider(project.getEelApi())
+        EelTargetEnvironmentConfigurationProvider(project.getEelDescriptor().upgrade(), project)
       }
     }
     else {
@@ -58,7 +57,7 @@ class EelGradleExecutionAware : GradleExecutionAware {
   ): TargetEnvironmentConfigurationProvider? {
     return if (project.isEelSyncAvailable()) {
       runBlockingCancellable {
-        EelTargetEnvironmentConfigurationProvider(project.getEelApi())
+        EelTargetEnvironmentConfigurationProvider(project.getEelDescriptor().upgrade(), project)
       }
     }
     else {
@@ -83,6 +82,6 @@ class EelGradleExecutionAware : GradleExecutionAware {
            && projectFilePath != null
            && WSLUtil.isSystemCompatible()
            && WslPath.getDistributionByWindowsUncPath(projectFilePath!!) != null
-           && getEelApiBlocking() !is LocalEelApi
+           && getEelDescriptor() !is LocalEelDescriptor
   }
 }

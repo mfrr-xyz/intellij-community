@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.markdown.images` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "images_resources",
@@ -12,15 +11,17 @@ jvm_library(
   name = "images",
   module_name = "intellij.markdown.images",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/main/kotlin/**/*.kt", "src/main/kotlin/**/*.java"], allow_empty = True),
   deps = [
     "//plugins/markdown/core:markdown",
     "//xml/xml-psi-impl:psi-impl",
     "//platform/core-ui",
+    "//platform/platform-impl:ide-impl",
+    "//platform/lang-impl",
     "//images",
-    "//platform/monolith",
+    "//xml/xml-parser:parser",
+    "//platform/backend",
+    "@lib//:kotlin-stdlib",
   ],
   runtime_deps = [":images_resources"]
 )

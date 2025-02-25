@@ -1,14 +1,16 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.debugger.engine;
 
 import com.intellij.debugger.JavaDebuggerBundle;
 import com.intellij.debugger.actions.AsyncStacksToggleAction;
 import com.intellij.debugger.engine.evaluation.EvaluateException;
+import com.intellij.debugger.engine.events.DebuggerContextCommandImpl;
 import com.intellij.debugger.engine.events.SuspendContextCommandImpl;
 import com.intellij.debugger.feedback.UsageTracker;
+import com.intellij.debugger.impl.DebugUtilsKt;
+import com.intellij.debugger.impl.DebuggerContextImpl;
 import com.intellij.debugger.impl.DebuggerUtilsAsync;
 import com.intellij.debugger.impl.DebuggerUtilsEx;
-import com.intellij.debugger.impl.DebuggerUtilsImpl;
 import com.intellij.debugger.jdi.StackFrameProxyImpl;
 import com.intellij.debugger.jdi.ThreadGroupReferenceProxyImpl;
 import com.intellij.debugger.jdi.ThreadReferenceProxyImpl;
@@ -41,6 +43,7 @@ import javax.swing.*;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 public class JavaExecutionStack extends XExecutionStack {
@@ -146,13 +149,11 @@ public class JavaExecutionStack extends XExecutionStack {
     }
   }
 
-  @NotNull
-  public List<XStackFrame> createStackFrames(@NotNull StackFrameProxyImpl stackFrameProxy) {
+  public @NotNull List<XStackFrame> createStackFrames(@NotNull StackFrameProxyImpl stackFrameProxy) {
     return createFrames(new StackFrameDescriptorImpl(stackFrameProxy, myTracker));
   }
 
-  @NotNull
-  private CompletableFuture<List<XStackFrame>> createStackFramesAsync(@NotNull StackFrameProxyImpl stackFrameProxy) {
+  private @NotNull CompletableFuture<List<XStackFrame>> createStackFramesAsync(@NotNull StackFrameProxyImpl stackFrameProxy) {
     if (!Registry.is("debugger.async.frames")) {
       return CompletableFuture.completedFuture(createStackFrames(stackFrameProxy));
     }
@@ -161,8 +162,7 @@ public class JavaExecutionStack extends XExecutionStack {
       .thenApply(this::createFrames);
   }
 
-  @NotNull
-  private List<XStackFrame> createFrames(StackFrameDescriptorImpl descriptor) {
+  private @NotNull List<XStackFrame> createFrames(StackFrameDescriptorImpl descriptor) {
     XStackFrame topFrame = ContainerUtil.getFirstItem(myTopFrames);
     if (descriptor.getUiIndex() == 1 && topFrame instanceof JavaStackFrame) {
       Method method = descriptor.getMethod();
@@ -179,27 +179,23 @@ public class JavaExecutionStack extends XExecutionStack {
     return Collections.singletonList(new JavaStackFrame(descriptor, true));
   }
 
-  @Nullable
   @Override
-  public XStackFrame getTopFrame() {
-    assert myTopFramesReady : "Top frame must be already calculated here";
+  public @Nullable XStackFrame getTopFrame() {
     return ContainerUtil.getFirstItem(myTopFrames);
   }
 
   @Override
   public void computeStackFrames(final int firstFrameIndex, final XStackFrameContainer container) {
     if (container.isObsolete()) return;
-    SuspendContextImpl pausedContext = SuspendManagerUtil.getPausedSuspendingContext(myDebugProcess.getSuspendManager(), myThreadProxy);
-    SuspendContextImpl context = pausedContext != null ? pausedContext : myDebugProcess.getDebuggerContext().getSuspendContext();
-    if (context == null) return;
-    context.getManagerThread().schedule(new SuspendContextCommandImpl(context) {
+    DebuggerContextImpl debuggerContext = myDebugProcess.getDebuggerContext();
+    Objects.requireNonNull(debuggerContext.getManagerThread()).schedule(new DebuggerContextCommandImpl(debuggerContext, myThreadProxy) {
       @Override
-      public Priority getPriority() {
+      public @NotNull Priority getPriority() {
         return Priority.NORMAL;
       }
 
       @Override
-      public void contextAction(@NotNull SuspendContextImpl suspendContext) {
+      public void threadAction(@NotNull SuspendContextImpl suspendContext) {
         if (container.isObsolete()) return;
         int status = myThreadProxy.status();
         if (status == ThreadReference.THREAD_STATUS_ZOMBIE) {
@@ -362,10 +358,10 @@ public class JavaExecutionStack extends XExecutionStack {
             (XDebugSessionImpl)suspendContext.getDebugProcess().getXdebugProcess().getSession()) &&
               topFrame instanceof JavaStackFrame frame) {
             if (creationStack == null) {
-              creationStack = DebuggerUtilsImpl.computeSafeIfAny(CreationStackTraceProvider.EP,
+              creationStack = DebugUtilsKt.computeSafeIfAny(CreationStackTraceProvider.EP,
                                                                  p -> p.getCreationStackTrace(frame, suspendContext));
             }
-            relatedStack = DebuggerUtilsImpl.computeSafeIfAny(AsyncStackTraceProvider.EP,
+            relatedStack = DebugUtilsKt.computeSafeIfAny(AsyncStackTraceProvider.EP,
                                                               p -> p.getAsyncStackTrace(frame, suspendContext));
             if (relatedStack != null) {
               schedule(suspendContext, null, relatedStack, null, true);

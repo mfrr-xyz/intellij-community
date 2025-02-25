@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vcs.changes;
 
 import com.intellij.openapi.actionSystem.ActionGroup;
@@ -13,7 +13,7 @@ import javax.swing.*;
 
 import static com.intellij.diff.util.DiffUtil.recursiveRegisterShortcutSet;
 
-public class UnversionedViewDialog extends SpecificFilesViewDialog.SpecificFilePathsViewDialog {
+public final class UnversionedViewDialog extends SpecificFilesViewDialog.SpecificFilePathsViewDialog {
   private static final String TOOLBAR_GROUP = "Unversioned.Files.Dialog";
   private static final String POPUP_GROUP = "Unversioned.Files.Dialog.Popup";
 
@@ -28,18 +28,15 @@ public class UnversionedViewDialog extends SpecificFilesViewDialog.SpecificFileP
     myView.installPopupHandler(registerUnversionedPopupGroup(myView));
   }
 
-  @NotNull
-  public static ActionGroup getUnversionedToolbarGroup() {
+  public static @NotNull ActionGroup getUnversionedToolbarGroup() {
     return (ActionGroup)ActionManager.getInstance().getAction(TOOLBAR_GROUP);
   }
 
-  @NotNull
-  public static ActionGroup getUnversionedPopupGroup() {
+  public static @NotNull ActionGroup getUnversionedPopupGroup() {
     return (ActionGroup)ActionManager.getInstance().getAction(POPUP_GROUP);
   }
 
-  @NotNull
-  public static ActionGroup registerUnversionedPopupGroup(@NotNull JComponent component) {
+  public static @NotNull ActionGroup registerUnversionedPopupGroup(@NotNull JComponent component) {
     ActionGroup popupGroup = getUnversionedPopupGroup();
     recursiveRegisterShortcutSet(popupGroup, component, null);
     return popupGroup;

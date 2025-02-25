@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.refactoring.inline;
 
@@ -2310,6 +2310,21 @@ public abstract class KotlinFirInlineTestGenerated extends AbstractKotlinFirInli
                 runTest("../../idea/tests/testData/refactoring/inline/namedFunction/InStringTemplates.kt");
             }
 
+            @TestMetadata("inferredOutProjection.kt")
+            public void testInferredOutProjection() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/inline/namedFunction/inferredOutProjection.kt");
+            }
+
+            @TestMetadata("inferredProjection.kt")
+            public void testInferredProjection() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/inline/namedFunction/inferredProjection.kt");
+            }
+
+            @TestMetadata("inferredStarProjection.kt")
+            public void testInferredStarProjection() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/inline/namedFunction/inferredStarProjection.kt");
+            }
+
             @TestMetadata("InvokeFunction.kt")
             public void testInvokeFunction() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/inline/namedFunction/InvokeFunction.kt");
@@ -2498,6 +2513,11 @@ public abstract class KotlinFirInlineTestGenerated extends AbstractKotlinFirInli
             @TestMetadata("NullableUnitReturnType3.kt")
             public void testNullableUnitReturnType3() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/inline/namedFunction/NullableUnitReturnType3.kt");
+            }
+
+            @TestMetadata("objectFunction.kt")
+            public void testObjectFunction() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/inline/namedFunction/objectFunction.kt");
             }
 
             @TestMetadata("OuterClassReceiver.kt")

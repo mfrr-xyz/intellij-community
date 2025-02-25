@@ -1,9 +1,12 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.maven.testFramework
 
+import com.intellij.maven.testFramework.utils.MavenProjectJDKTestFixture
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.roots.ContentEntry
 import com.intellij.openapi.roots.ContentFolder
 import com.intellij.openapi.roots.ExcludeFolder
+import com.intellij.openapi.util.io.toCanonicalPath
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.pom.java.LanguageLevel
@@ -14,6 +17,7 @@ import com.intellij.util.ThrowableRunnable
 import com.intellij.util.text.VersionComparatorUtil
 import junit.framework.TestCase
 import org.jetbrains.idea.maven.server.MavenDistributionsCache
+import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JavaSourceRootProperties
 import org.jetbrains.jps.model.java.JavaSourceRootType
@@ -21,11 +25,39 @@ import org.jetbrains.jps.model.module.JpsModuleSourceRootType
 import org.junit.Assume
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import java.nio.file.Path
 import java.util.*
 import kotlin.math.min
 
+private const val MAVEN_4_VERSION = "4.0.0-rc-2"
+private val MAVEN_VERSIONS: Array<String> = arrayOf<String>(
+  "bundled",
+  "4"
+)
+
+/**
+ * This test case uses the NIO API for handling file operations.
+ *
+ * **Background**:
+ * The test framework is transitioning from the `IO` API to the`NIO` API
+ *
+ * **Implementation Notes**:
+ * - `<TestCase>` represents the updated implementation using the `NIO` API.
+ * - `<TestCaseLegacy>` represents the legacy implementation using the `IO` API.
+ * - For now, both implementations coexist to allow for a smooth transition and backward compatibility.
+ * - Eventually, `<TestCaseLegacy>` will be removed from the codebase.
+ *
+ * **Action Items**:
+ * - Prefer using `<TestCase>` for new test cases.
+ * - Update existing tests to use `<TestCase>` where possible.
+ *
+ * **Future Direction**:
+ * Once the transition is complete, all test cases relying on the `IO` API will be retired,
+ * and the codebase will exclusively use the `NIO` implementation.
+ */
 @RunWith(Parameterized::class)
 abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
+
   override fun runInDispatchThread(): Boolean {
     return false
   }
@@ -49,11 +81,6 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
   protected fun forMaven4(r: Runnable) {
     val version: String = getActualVersion(myMavenVersion!!)
     if (version.startsWith("4.")) r.run()
-  }
-
-  protected fun needFixForMaven4() {
-    val version: String = getActualVersion(myMavenVersion!!)
-    Assume.assumeTrue(version.startsWith("3."))
   }
 
   protected fun assumeMaven3() {
@@ -92,7 +119,9 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
       MavenDistributionsCache.resolveEmbeddedMavenHome()
       return
     }
-    myWrapperTestFixture = MavenWrapperTestFixture(project, myMavenVersion)
+    val actualMavenVersion = getActualVersion(myMavenVersion!!)
+    MavenLog.LOG.warn("Running test with Maven $actualMavenVersion")
+    myWrapperTestFixture = MavenWrapperTestFixture(project, actualMavenVersion)
     myWrapperTestFixture!!.setUp()
   }
 
@@ -205,7 +234,7 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
 
   protected fun assertRelativeContentRoots(moduleName: String, vararg expectedRelativeRoots: String?) {
     val expectedRoots = expectedRelativeRoots
-      .map{ root -> projectPath + (if ("" == root) "" else "/$root") }
+      .map { root -> projectPath.resolve(root).toCanonicalPath() }
       .toTypedArray<String>()
     assertContentRoots(moduleName, *expectedRoots)
   }
@@ -216,6 +245,10 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
       actual.add(e.getUrl())
     }
     assertUnorderedPathsAreEqual(actual, expectedRoots.map { VfsUtilCore.pathToUrl(it) })
+  }
+
+  protected fun assertContentRoots(moduleName: String, vararg expectedRoots: Path) {
+    assertContentRoots(moduleName, *expectedRoots.map { it.toString() }.toTypedArray())
   }
 
   protected fun assertGeneratedSources(moduleName: String, vararg expectedSources: String) {
@@ -294,7 +327,7 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
 
       if (folderUrl.startsWith(rootUrl)) {
         val length = rootUrl.length + 1
-        folderUrl = folderUrl.substring(min(length.toDouble(), folderUrl.length.toDouble()).toInt())
+        folderUrl = folderUrl.substring(min(length, folderUrl.length))
       }
 
       actual.add(folderUrl)
@@ -328,24 +361,40 @@ abstract class MavenMultiVersionImportingTestCase : MavenImportingTestCase() {
   }
 
   companion object {
-    val MAVEN_VERSIONS: Array<String> = arrayOf<String>("bundled", "4.0.0-rc-1")
-
     @Parameterized.Parameters(name = "with Maven-{0}")
     @JvmStatic
     fun getMavenVersions(): List<Array<String>> {
-        val mavenVersionsString = System.getProperty("maven.versions.to.run")
-        var mavenVersionsToRun: Array<String> = MAVEN_VERSIONS
-        if (mavenVersionsString != null && !mavenVersionsString.isEmpty()) {
-          mavenVersionsToRun = mavenVersionsString.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-        }
-        return mavenVersionsToRun.map { arrayOf<String>(it) }
+      val mavenVersionsString = System.getProperty("maven.versions.to.run")
+      var mavenVersionsToRun: Array<String> = MAVEN_VERSIONS
+      if (mavenVersionsString != null && !mavenVersionsString.isEmpty()) {
+        mavenVersionsToRun = mavenVersionsString.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
       }
+      return mavenVersionsToRun.map { arrayOf<String>(it) }
+    }
 
-    protected fun getActualVersion(version: String): String {
+    internal fun getActualVersion(version: String): String {
       if (version == "bundled") {
         return MavenDistributionsCache.resolveEmbeddedMavenHome().version!!
       }
+      if (version == "4") {
+        return MAVEN_4_VERSION
+      }
       return version
+    }
+  }
+
+  protected suspend fun withRealJDK(jdkName: String = "JDK_FOR_MAVEN_TESTS", block: suspend () -> Unit) {
+    val fixture = MavenProjectJDKTestFixture(project, jdkName)
+    try {
+      edtWriteAction {
+        fixture.setUp()
+      }
+      block()
+    }
+    finally {
+      edtWriteAction {
+        fixture.tearDown()
+      }
     }
   }
 }

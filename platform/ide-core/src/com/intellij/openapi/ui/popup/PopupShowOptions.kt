@@ -6,11 +6,45 @@ import org.jetbrains.annotations.ApiStatus
 import java.awt.Component
 import java.awt.Point
 
-fun PopupShowOptions(): PopupShowOptions = PopupShowOptionsBuilder()
-
+/**
+ * A set of options to determine where and how a popup should be shown.
+ *
+ * An instance is created using one of the static builders, currently only [aboveComponent].
+ * The created options may then be modified using interface methods.
+ */
 sealed interface PopupShowOptions {
+  /**
+   * The gap between the popup and the component.
+   *
+   * Currently only supported for [aboveComponent].
+   * The gap must be in unscaled pixels.
+   */
   fun withPopupComponentUnscaledGap(popupComponentGap: Int?): PopupShowOptions
+
+  /**
+   * The minimum popup height.
+   *
+   * Currently only supported for [aboveComponent].
+   * The popup itself must also support height changing (e.g., by showing a vertical scrollbar).
+   */
   fun withMinimumHeight(minimumHeight: Int?): PopupShowOptions
+
+  companion object {
+
+    /**
+     * Creates popup options to show the popup above a specific component.
+     */
+    @JvmStatic
+    fun aboveComponent(
+      component: Component,
+    ): PopupShowOptions {
+      return PopupShowOptionsBuilder()
+        .withComponentPoint(AnchoredPoint(AnchoredPoint.Anchor.TOP_LEFT, component))
+        .withRelativePosition(PopupRelativePosition.TOP)
+        .withDefaultPopupAnchor(AnchoredPoint.Anchor.BOTTOM_LEFT)
+        .withDefaultPopupComponentUnscaledGap(4)
+    }
+  }
 }
 
 @ApiStatus.Internal
@@ -18,6 +52,7 @@ class PopupShowOptionsBuilder : PopupShowOptions {
   private var owner: Component? = null
   private var screenPoint: Point? = null
   private var considerForcedXY: Boolean = false
+  private var ownerAnchor: AnchoredPoint.Anchor? = null
   private var popupAnchor: AnchoredPoint.Anchor? = null
   private var relativePosition: PopupRelativePosition? = null
   private var popupComponentUnscaledGap: Int? = null
@@ -28,6 +63,11 @@ class PopupShowOptionsBuilder : PopupShowOptions {
 
   fun withOwner(owner: Component): PopupShowOptionsBuilder = apply {
     this.owner = owner
+  }
+
+  fun withComponentPoint(componentPoint: AnchoredPoint): PopupShowOptionsBuilder = withOwner(componentPoint.component).apply {
+    this.screenPoint = componentPoint.screenPoint
+    this.ownerAnchor = componentPoint.anchor
   }
 
   fun withScreenXY(screenX: Int, screenY: Int): PopupShowOptionsBuilder = apply {
@@ -48,11 +88,11 @@ class PopupShowOptionsBuilder : PopupShowOptions {
     this.relativePosition = relativePosition
   }
 
-  override fun withMinimumHeight(minimumHeight: Int?): PopupShowOptions = apply {
+  override fun withMinimumHeight(minimumHeight: Int?): PopupShowOptionsBuilder = apply {
     this.minimumHeight = minimumHeight
   }
 
-  override fun withPopupComponentUnscaledGap(popupComponentGap: Int?): PopupShowOptions = apply {
+  override fun withPopupComponentUnscaledGap(popupComponentGap: Int?): PopupShowOptionsBuilder = apply {
     this.popupComponentUnscaledGap = popupComponentGap
   }
 
@@ -69,6 +109,7 @@ class PopupShowOptionsBuilder : PopupShowOptions {
       owner = owner,
       screenPoint = screenPoint,
       considerForcedXY = considerForcedXY,
+      ownerAnchor = ownerAnchor,
       popupAnchor = popupAnchor ?: AnchoredPoint.Anchor.TOP_LEFT,
       relativePosition = relativePosition,
       popupComponentUnscaledGap = popupComponentUnscaledGap ?: 0,
@@ -82,6 +123,7 @@ data class PopupShowOptionsImpl(
   val owner: Component,
   val screenPoint: Point?,
   val considerForcedXY: Boolean,
+  val ownerAnchor: AnchoredPoint.Anchor?,
   val popupAnchor: AnchoredPoint.Anchor,
   val relativePosition: PopupRelativePosition?,
   val popupComponentUnscaledGap: Int,

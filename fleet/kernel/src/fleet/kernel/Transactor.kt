@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package fleet.kernel
 
 import com.jetbrains.rhizomedb.*
@@ -6,12 +6,12 @@ import com.jetbrains.rhizomedb.impl.*
 import fleet.kernel.rebase.OfferContributorEntity
 import fleet.kernel.rebase.RemoteKernelConnectionEntity
 import fleet.kernel.rebase.WorkspaceClockEntity
-import fleet.preferences.isUsingMicroSpans
 import fleet.rpc.client.RpcClientDisconnectedException
 import fleet.tracing.*
 import fleet.tracing.runtime.Span
 import fleet.tracing.runtime.SpanInfo
 import fleet.tracing.runtime.currentSpan
+import fleet.tracing.span
 import fleet.util.*
 import fleet.util.async.catching
 import fleet.util.async.coroutineNameAppended
@@ -82,19 +82,41 @@ interface Transactor : CoroutineContext.Element {
   }
 }
 
+internal suspend fun waitForDbSourceToCatchUpWithTimestamp(timestamp: Long) {
+  val dbContext = DbContext.threadBound
+  if (dbContext.poison == null) {    
+    if (dbContext.impl.timestamp < timestamp) {
+      val dbAfterTimestamp = currentCoroutineContext().dbSource.flow.first { db ->
+        db.timestamp >= timestamp
+      }
+      yield()
+      if (DbContext.threadBound.poison == null) {
+        DbContext.threadBound.set(dbAfterTimestamp)
+      }
+    }
+  }
+}
+
 /**
  * "Synchronous" version of [Transactor.changeAsync] carried out in [saga]
  * resulting [Change.dbAfter] will be bound to [coroutineContext] after the function returns
  * @return the result of [f]
  * */
 suspend fun <T> change(f: ChangeScope.() -> T): T {
-  val context = currentCoroutineContext()
-  val kernel = context.transactor
-  val interceptor = context[ChangeInterceptor] ?: ChangeInterceptor.Identity
+  val currentCoroutineContext = currentCoroutineContext()
+  val kernel = currentCoroutineContext.transactor
+  val interceptor = currentCoroutineContext[ChangeInterceptor] ?: ChangeInterceptor.Identity
   var res: T? = null
-  interceptor.change({ res = f() }) { changeFn ->
+  var timestamp = -1L
+  interceptor.change(
+    {
+      res = f()
+      timestamp = currentTimestamp()
+    }
+  ) { changeFn ->
     kernel.changeSuspend(changeFn)
   }
+  waitForDbSourceToCatchUpWithTimestamp(timestamp + 1)
   return res as T
 }
 
@@ -190,10 +212,40 @@ interface KernelMetaKey<V : Any> : Key<V, Transactor>
 private const val ChangesBufferSize: Int = 1000
 private const val DispatchBufferSize: Int = 1000
 
-const val SharedPart: Part = 2 // replicated between all the clients and workspace using RemoteKernel interface
-const val FrontendPart: Part = 3 // frontend
-const val WorkspacePart: Part = 4 // workspace
-const val CommonPart: Part = 1 // shared between frontend and workspace kernel views when running in short-circuited mode
+/**
+ * Database's partition, which is replicated between all the clients and workspace using [fleet.kernel.rebase.RemoteKernel] interface.
+ *
+ * Entities created in a shared block are going to be in this partition:
+ * ```kotlin
+ * change {
+ *   shared {
+ *      // this one will be put in SharedPart
+ *      SomeEntity.new {
+ *         // ...
+ *      }
+ *   }
+ * }
+ * ```
+ */
+const val SharedPart: Part = 2
+
+/**
+ * Database's partition, which is used by frontend's entities. They are not replicated between workspace or other clients.
+ */
+const val FrontendPart: Part = 3
+
+/**
+ * Database's partition, which is used by workspace's entities. They are not replicated to the frontends.
+ */
+const val WorkspacePart: Part = 4
+
+/**
+ * Database's partition, which is replicated between a local frontend and workspace (called workspace kernel view).
+ * This partition is used in the local Fleet's mode where frontend and workspace live in the same process (called short-circuited mode).
+ *
+ * This partition is not replicated to other clients.
+ */
+const val CommonPart: Part = 1
 
 class DispatchChannelOverflowException : RuntimeException("dispatch channel is overflown")
 
@@ -351,8 +403,7 @@ suspend fun <T> withTransactor(
       override suspend fun changeSuspend(f: ChangeScope.() -> Unit): Change {
         val job = currentCoroutineContext().job
         job.ensureActive()
-        val span = if (isUsingMicroSpans) {
-          currentSpan.startChild(
+        val span = currentSpan.startChild(
             SpanInfo(
               name = "change",
               job = job,
@@ -360,10 +411,6 @@ suspend fun <T> withTransactor(
               startTimestampNano = null,
               cause = null,
               map = HashMap()))
-        }
-        else {
-          null
-        }
         /**
          * DO NOT WRAP THIS BLOCK IN A SCOPE!
          * see `change suspend is atomic case 2` in [fleet.test.frontend.kernel.TransactorTest]
@@ -375,7 +422,7 @@ suspend fun <T> withTransactor(
             backgroundDispatchChannel.send(ChangeTask(f = f,
                                                       rendezvous = rendezvous,
                                                       resultDeferred = deferred,
-                                                      causeSpan = span ?: currentSpan))
+                                                      causeSpan = span))
             /** we want to preserve structured concurrency which means current job should be completed only when [body] has finished
              * see `change suspend is atomic` in [fleet.test.frontend.kernel.TransactorTest]
              */
@@ -387,7 +434,7 @@ suspend fun <T> withTransactor(
           finally {
             rendezvous.completeExceptionally(CancellationException("Suspending change is cancelled"))
           }
-        }.also { span?.completeWithResult(it) }.getOrThrow()
+        }.also { span.completeWithResult(it) }.getOrThrow()
       }
 
       override val log = flow {
@@ -439,7 +486,7 @@ suspend fun <T> withTransactor(
             changeTask.rendezvous.await()
             measureTimedValue {
               val dbBefore = dbState.value
-              frequentSpan("change", {
+              span("change", {
                 set("ts", (dbBefore.timestamp + 1).toString())
                 cause = changeTask.causeSpan
               }) {
@@ -511,9 +558,12 @@ private data class DbTimestamp(override val eid: EID) : Entity {
   }
 }
 
+internal fun currentTimestamp(): Long = 
+  DbTimestamp.single()[DbTimestamp.Timestamp]
+
 val Q.timestamp: Long
   get() = asOf(this) {
-    DbTimestamp.single()[DbTimestamp.Timestamp]
+    currentTimestamp()
   }
 
 private fun checkDuration(

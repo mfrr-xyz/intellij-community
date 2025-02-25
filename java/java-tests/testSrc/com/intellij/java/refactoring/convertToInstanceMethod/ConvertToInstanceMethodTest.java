@@ -1,8 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.refactoring.convertToInstanceMethod;
 
 import com.intellij.JavaTestUtil;
 import com.intellij.java.refactoring.LightRefactoringTestCase;
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiModifier;
@@ -40,7 +41,8 @@ public class ConvertToInstanceMethodTest extends LightRefactoringTestCase {
       fail("Conflict was not detected");
     }
     catch (BaseRefactoringProcessor.ConflictsInTestsException e) {
-      assertEquals("Method <b><code>Test.foo(Bar)</code></b> is private and will not be accessible from instance initializer of class <b><code>Test</code></b>.", e.getMessage());
+      assertEquals("Method <b><code>foo(Bar)</code></b> is private and will not be accessible from instance initializer of class " +
+                   "<b><code>Test</code></b>.", e.getMessage());
     }
   }
 
@@ -96,6 +98,7 @@ public class ConvertToInstanceMethodTest extends LightRefactoringTestCase {
       list.setSelectedIndex(myTargetParameter);
       dialog.setVisibility(myVisibility == null ? VisibilityUtil.ESCALATE_VISIBILITY : myVisibility);
       dialog.performOKAction();
+      NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
     }
 
     private static String toString(ListModel<Object> model) {

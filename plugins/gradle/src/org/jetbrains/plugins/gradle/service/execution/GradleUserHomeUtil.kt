@@ -1,15 +1,14 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("GradleUserHomeUtil")
 
 package org.jetbrains.plugins.gradle.service.execution
 
 import com.intellij.openapi.externalSystem.util.environment.Environment
-import com.intellij.openapi.project.Project
+import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.util.io.toNioPathOrNull
-import com.intellij.platform.eel.LocalEelApi
-import com.intellij.platform.eel.impl.utils.getEelApi
-import com.intellij.platform.eel.toNioPath
-import kotlinx.coroutines.runBlocking
+import com.intellij.platform.eel.EelDescriptor
+import com.intellij.platform.eel.provider.LocalEelDescriptor
+import com.intellij.platform.eel.provider.asNioPath
 import org.gradle.internal.FileUtils
 import org.gradle.internal.SystemProperties
 import java.io.File
@@ -29,20 +28,20 @@ fun gradleUserHomeDir(): File {
   return FileUtils.canonicalize(File(gradleUserHome ?: DEFAULT_GRADLE_USER_HOME.absolutePath))
 }
 
-fun gradleUserHomeDir(project: Project): Path {
-  return runBlocking {
-    val eel = project.getEelApi()
-    if (eel is LocalEelApi) {
-      return@runBlocking gradleUserHomeDir().toPath()
-    }
+fun gradleUserHomeDir(descriptor: EelDescriptor): Path {
+  if (descriptor == LocalEelDescriptor) {
+    return gradleUserHomeDir().toPath()
+  }
+  return runBlockingMaybeCancellable {
+    val eel = descriptor.upgrade()
     val env = eel.exec.fetchLoginShellEnvVariables()
     val gradleUserHome = env[GRADLE_USER_HOME_PROPERTY_KEY] ?: env[GRADLE_USER_HOME_ENV_KEY]
     if (gradleUserHome != null) {
       val nioUserHome = gradleUserHome.toNioPathOrNull()
       if (nioUserHome != null) {
-        return@runBlocking nioUserHome
+        return@runBlockingMaybeCancellable nioUserHome
       }
     }
-    return@runBlocking eel.userInfo.home.toNioPath(eel).resolve(".gradle")
+    return@runBlockingMaybeCancellable eel.userInfo.home.asNioPath().resolve(".gradle")
   }
 }

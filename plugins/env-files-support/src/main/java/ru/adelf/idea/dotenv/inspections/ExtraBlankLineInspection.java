@@ -11,6 +11,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import ru.adelf.idea.dotenv.DotEnvBundle;
 import ru.adelf.idea.dotenv.DotEnvFactory;
 import ru.adelf.idea.dotenv.psi.DotEnvFile;
 
@@ -20,10 +21,9 @@ import java.util.regex.Pattern;
 public class ExtraBlankLineInspection extends LocalInspectionTool {
     // Change the display name within the plugin.xml
     // This needs to be here as otherwise the tests will throw errors.
-    @NotNull
     @Override
-    public String getDisplayName() {
-        return "Extra blank line";
+    public @NotNull String getDisplayName() {
+        return DotEnvBundle.message("inspection.name.extra.blank.line");
     }
 
     @Override
@@ -31,9 +31,8 @@ public class ExtraBlankLineInspection extends LocalInspectionTool {
         return true;
     }
 
-    @Nullable
     @Override
-    public ProblemDescriptor[] checkFile(@NotNull PsiFile file, @NotNull InspectionManager manager, boolean isOnTheFly) {
+    public ProblemDescriptor @Nullable [] checkFile(@NotNull PsiFile file, @NotNull InspectionManager manager, boolean isOnTheFly) {
         if (!(file instanceof DotEnvFile)) {
             return null;
         }
@@ -41,8 +40,7 @@ public class ExtraBlankLineInspection extends LocalInspectionTool {
         return analyzeFile(file, manager, isOnTheFly).getResultsArray();
     }
 
-    @NotNull
-    private ProblemsHolder analyzeFile(@NotNull PsiFile file, @NotNull InspectionManager manager, boolean isOnTheFly) {
+    private static @NotNull ProblemsHolder analyzeFile(@NotNull PsiFile file, @NotNull InspectionManager manager, boolean isOnTheFly) {
         ProblemsHolder problemsHolder = new ProblemsHolder(manager, file, isOnTheFly);
 
         PsiTreeUtil.findChildrenOfType(file, PsiWhiteSpaceImpl.class).forEach(whiteSpace -> {
@@ -55,7 +53,7 @@ public class ExtraBlankLineInspection extends LocalInspectionTool {
 
             if (count > 2) {
                 problemsHolder.registerProblem(whiteSpace,
-                    "Only one extra line allowed between properties",
+                                               DotEnvBundle.message("inspection.message.only.one.extra.line.allowed.between.properties"),
                     new RemoveExtraBlankLineQuickFix());
             }
         });
@@ -65,10 +63,9 @@ public class ExtraBlankLineInspection extends LocalInspectionTool {
 
     private static class RemoveExtraBlankLineQuickFix implements LocalQuickFix {
 
-        @NotNull
         @Override
-        public String getName() {
-            return "Remove extra blank line";
+        public @NotNull String getName() {
+            return DotEnvBundle.message("intention.name.remove.extra.blank.line");
         }
 
         @Override
@@ -85,8 +82,7 @@ public class ExtraBlankLineInspection extends LocalInspectionTool {
         }
 
         @Override
-        @NotNull
-        public String getFamilyName() {
+        public @NotNull String getFamilyName() {
             return getName();
         }
     }

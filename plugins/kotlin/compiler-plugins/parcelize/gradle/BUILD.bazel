@@ -1,6 +1,5 @@
 ### auto-generated section `build kotlin.compiler-plugins.parcelize.gradle` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "kotlin-compiler-plugins-parcelize-gradle_resources",
@@ -12,12 +11,11 @@ jvm_library(
   name = "kotlin-compiler-plugins-parcelize-gradle",
   module_name = "kotlin.compiler-plugins.parcelize.gradle",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "//plugins/kotlin/gradle/gradle-tooling/impl:kotlin-gradle-gradle-tooling-impl",
+    "//platform/util",
     "//plugins/kotlin/compiler-plugins/parcelize/common:kotlin-compiler-plugins-parcelize-common",
     "//platform/object-serializer:objectSerializer-annotations",
     "//plugins/gradle:gradle-common",

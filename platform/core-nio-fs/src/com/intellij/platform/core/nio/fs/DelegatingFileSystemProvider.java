@@ -127,9 +127,8 @@ public abstract class DelegatingFileSystemProvider<
     return wrapDelegateFileSystem(getDelegate(null, null).getFileSystem(uri));
   }
 
-  @NotNull
   @Override
-  public Path getPath(@NotNull URI uri) {
+  public @NotNull Path getPath(@NotNull URI uri) {
     return toDelegatePath(getDelegate(null, null).getPath(uri));
   }
 
@@ -173,14 +172,14 @@ public abstract class DelegatingFileSystemProvider<
 
   @Contract("null -> null; !null -> !null")
   private @Nullable DirectoryStream.Filter<? super Path> craftFilter(@Nullable DirectoryStream.Filter<? super Path> originalFilter) {
-    if (originalFilter instanceof BasicFileAttributesHolder2.FetchAttributesFilter) {
+    if (originalFilter == null) {
+      return null;
+    }
+    if (BasicFileAttributesHolder2.FetchAttributesFilter.isFetchAttributesFilter(originalFilter)) {
       return (BasicFileAttributesHolder2.FetchAttributesFilter)p -> originalFilter.accept(fromDelegatePath(p));
     }
-    else if (originalFilter != null) {
-      return p -> originalFilter.accept(fromDelegatePath(p));
-    }
     else {
-      return null;
+      return p -> originalFilter.accept(fromDelegatePath(p));
     }
   }
 

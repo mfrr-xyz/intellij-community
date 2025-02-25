@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.io
 
 import io.netty.buffer.ByteBuf
@@ -15,14 +15,14 @@ import java.util.zip.ZipEntry
 const val INDEX_FILENAME: String = "__index__"
 private val INDEX_FILENAME_BYTES = "__index__".toByteArray()
 
-internal class ZipArchiveOutputStream(
+class ZipArchiveOutputStream(
   private val channel: GatheringByteChannel,
   private val zipIndexWriter: ZipIndexWriter,
 ) : AutoCloseable {
   private var finished = false
 
   private var bufferReleased = false
-  private val buffer = ByteBufAllocator.DEFAULT.directBuffer(512 * 1024)
+  private val buffer = ByteBufAllocator.DEFAULT.directBuffer(128 * 1024)
 
   private var channelPosition = 0L
 
@@ -77,6 +77,42 @@ internal class ZipArchiveOutputStream(
     )
   }
 
+  fun writeDataRawEntryWithoutCrc(name: ByteArray, data: ByteArray) {
+    writeDataRawEntry(name = name, data = data, size = data.size, crc = 0)
+  }
+
+  // data contains only data - zip local file header will be generated
+  fun writeDataRawEntry(
+    name: ByteArray,
+    data: ByteArray,
+    size: Int,
+    crc: Long,
+  ) {
+    if (finished) {
+      throw IOException("Stream has already been finished")
+    }
+
+    buffer.clear()
+    writeZipLocalFileHeader(name = name, size = size, compressedSize = size, crc32 = crc, method = ZipEntry.STORED, buffer = buffer)
+
+    val localFileHeaderOffset = channelPosition
+    val dataOffset = localFileHeaderOffset + buffer.readableBytes()
+
+    // write to buffer, to avoid writing to disk in two calls
+    buffer.writeBytes(data)
+    writeBuffer(buffer)
+
+    zipIndexWriter.writeCentralFileHeader(
+      size = size,
+      compressedSize = size,
+      method = ZipEntry.STORED,
+      crc = crc,
+      name = name,
+      localFileHeaderOffset = localFileHeaderOffset,
+      dataOffset = dataOffset,
+    )
+  }
+
   // data contains only data - zip local file header will be generated
   fun writeDataRawEntry(
     data: ByteBuffer,
@@ -98,7 +134,7 @@ internal class ZipArchiveOutputStream(
     val localFileHeaderOffset = channelPosition
     val dataOffset = localFileHeaderOffset + buffer.readableBytes()
 
-    writeBuffer()
+    writeBuffer(buffer)
     writeBuffer(data)
 
     zipIndexWriter.writeCentralFileHeader(
@@ -167,17 +203,15 @@ internal class ZipArchiveOutputStream(
     val headerSize = 30 + name.size
     val dataOffset = channelPosition + headerSize
 
-    val method = ZipEntry.STORED
-
     buffer.clear()
-    writeZipLocalFileHeader(name = name, size = size, compressedSize = size, crc32 = 0, method = method, buffer = buffer)
+    writeZipLocalFileHeader(name = name, size = size, compressedSize = size, crc32 = 0, method = ZipEntry.STORED, buffer = buffer)
     assert(buffer.readableBytes() == headerSize)
     writeBuffer()
 
     zipIndexWriter.writeCentralFileHeader(
       size = size,
       compressedSize = size,
-      method = method,
+      method = ZipEntry.STORED,
       crc = 0,
       name = name,
       localFileHeaderOffset = localFileHeaderOffset,
@@ -346,12 +380,15 @@ internal class ZipArchiveOutputStream(
     return p
   }
 
-  internal fun transferFrom(fileChannel: FileChannel, size: Long) {
+  internal fun transferFrom(source: FileChannel, size: Long) {
     var position = 0L
+    val to = this.fileChannel!!
     while (position < size) {
-      position += fileChannel.transferTo(position, size - position, channel)
+      val n = to.transferFrom(source, channelPosition, size - position)
+      assert(n >= 0)
+      position += n
+      channelPosition += n
     }
-    channelPosition += size
   }
 
   private fun writeBuffer(buffer: ByteBuf = this.buffer): Int {

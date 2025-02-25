@@ -1,9 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.compiler.charts.ui
 
-import com.intellij.java.compiler.charts.CompilationChartsViewModel
-import com.intellij.java.compiler.charts.CompilationChartsViewModel.Modules.EventKey
-import com.intellij.java.compiler.charts.CompilationChartsViewModel.StatisticData
+import com.intellij.java.compiler.charts.events.StatisticChartEvent
+import com.intellij.java.compiler.charts.impl.CompilationChartsViewModel
+import com.intellij.java.compiler.charts.impl.ModuleKey
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.UIUtil.FontSize
 import java.awt.Color
@@ -12,17 +12,19 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionListener
 import java.awt.geom.Rectangle2D
+import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-fun charts(vm: CompilationChartsViewModel, zoom: Zoom, cleanCache: () -> Unit, init: Charts.() -> Unit): Charts {
-  return Charts(vm, zoom, cleanCache).apply(init)
+fun charts(zoom: Zoom, init: Charts.() -> Unit): Charts {
+  return Charts(zoom).apply(init)
 }
 
-class Charts(private val vm: CompilationChartsViewModel, private val zoom: Zoom, cleanCache: () -> Unit) {
+class Charts(private val zoom: Zoom) {
   private val model: DataModel = DataModel(this)
-  internal val progress: ChartProgress = ChartProgress(zoom, model.chart, cleanCache)
+  internal val progress: ChartProgress = ChartProgress(zoom, model.chart)
   internal lateinit var usage: ChartUsage
   internal lateinit var axis: ChartAxis
   internal var settings: ChartSettings = ChartSettings()
@@ -125,34 +127,39 @@ internal data class MaxSize(val width: Double, val height: Double) {
 
 class CompilationChartsModuleInfo(
   private val vm: CompilationChartsViewModel,
-  private val component: CompilationChartsDiagramsComponent,
+  component: CompilationChartsDiagramsComponent,
 ) : MouseAdapter() {
-  private val components = mutableSetOf<ModuleIndex>()
-  private var currentPopup = CompilationChartsPopup(vm.project, component)
+  private val components = ConcurrentHashMap<ModuleKey, ModuleIndex>()
+  private val hint = CompilationChartsHint(vm.project(), component, vm.disposable())
 
   override fun mouseClicked(e: MouseEvent) {
-    component.setFocus()
-    val index = search(e.point) ?: return
-    currentPopup.open(index, e.locationOnScreen)
+    val name = search(e.point)?.key?.name ?: return
+    vm.dependenciesFor(name)
   }
 
   override fun mouseMoved(e: MouseEvent) {
-    if (!currentPopup.contains(e)) {
-      currentPopup.close()
+    val module = search(e.point)
+    if (hint.isInside(e.point)) return
+
+    if (module == null) {
+      hint.close()
+    }
+    else if (module != hint.module()) {
+      hint.open(module, e, 750)
     }
   }
 
-  fun clear() = components.clear()
+  fun clear(): Unit = components.clear()
 
-  fun module(rect: Rectangle2D, key: EventKey, info: Map<String, String>) {
-    components.add(ModuleIndex(rect, key, info))
+  fun module(rect: Rectangle2D, key: ModuleKey, info: Map<String, String>) {
+    components.put(key, ModuleIndex(rect, key, info))
   }
 
-  private fun search(point: Point): ModuleIndex? = components.firstOrNull { it.contains(point) }
+  private fun search(point: Point): ModuleIndex? = components.values.firstOrNull { it.contains(point) }
 }
 
 class CompilationChartsUsageInfo(val component: CompilationChartsDiagramsComponent, val charts: Charts, val zoom: Zoom) : MouseMotionListener {
-  var statistic: StatisticData? = null
+  var statistic: StatisticChartEvent? = null
   override fun mouseDragged(e: MouseEvent) {
   }
 
@@ -179,13 +186,13 @@ class CompilationChartsUsageInfo(val component: CompilationChartsDiagramsCompone
     }
   }
 
-  private fun search(point: Point): StatisticData? {
-    if (charts.usage.model.isEmpty()) return null
-    var statistic = charts.usage.model.first()
-    var currentDistance = abs(zoom.toPixels(statistic.time - charts.settings.duration.from) - point.x)
+  private fun search(point: Point): StatisticChartEvent? {
+    if (charts.usage.state.model.isEmpty()) return null
+    var statistic = charts.usage.state.model.first()
+    var currentDistance = abs(zoom.toPixels(statistic.nanoTime() - charts.settings.duration.from) - point.x)
     var lastDistance = currentDistance
-    charts.usage.model.forEach { stat ->
-      val x = zoom.toPixels(stat.time - charts.settings.duration.from)
+    charts.usage.state.model.forEach { stat ->
+      val x = zoom.toPixels(stat.nanoTime() - charts.settings.duration.from)
       if (abs(point.x - x) < currentDistance) {
         statistic = stat
         lastDistance = currentDistance
@@ -202,17 +209,33 @@ class CompilationChartsUsageInfo(val component: CompilationChartsDiagramsCompone
 data class ModuleIndex(
   val x0: Double, val x1: Double,
   val y0: Double, val y1: Double,
-  val key: EventKey,
+  val key: ModuleKey,
   val info: Map<String, String>,
 ) {
-  constructor(rect: Rectangle2D, key: EventKey, info: Map<String, String>) : this(
+  constructor(rect: Rectangle2D, key: ModuleKey, info: Map<String, String>) : this(
     rect.x, rect.x + rect.width,
     rect.y, rect.y + rect.height,
     key, info
   )
 
-  fun contains(point: Point): Boolean = x0 <= point.x &&
-                                        x1 >= point.x &&
-                                        y0 <= point.y &&
-                                        y1 >= point.y
+  fun contains(point: Point, border: Int = 0): Boolean =
+    x0 - border <= point.x &&
+    x1 + border >= point.x &&
+    y0 - border <= point.y &&
+    y1 + border >= point.y
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
+
+    other as ModuleIndex
+
+    if (x0 != other.x0) return false
+    if (y0 != other.y0) return false
+    if (key != other.key) return false
+
+    return true
+  }
+
+  override fun hashCode(): Int = Objects.hash(x0, y0, key)
 }

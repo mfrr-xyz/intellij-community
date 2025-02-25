@@ -88,8 +88,7 @@ internal class NestedLambdaShadowedImplicitParameterInspection :
      * — some other outer lambda also has an implicit `it` that has usages
      * — owner of the referenced `it` parameter is not a scope function call (`also`, `let`, `takeIf`, `takeUnless`) on an outer `it`
      */
-    context(KaSession)
-    override fun prepareContext(element: KtNameReferenceExpression): Context? {
+    override fun KaSession.prepareContext(element: KtNameReferenceExpression): Context? {
         val enclosingLambdaImplicitItSymbol = element.getImplicitLambdaParameterSymbol()
         if (enclosingLambdaImplicitItSymbol == null) return null
         val ownerLambda = getOwnerLambdaExpression(enclosingLambdaImplicitItSymbol) ?: return null
@@ -99,12 +98,8 @@ internal class NestedLambdaShadowedImplicitParameterInspection :
             it is KtLambdaExpression && it.valueParameters.isEmpty()
         } as? KtLambdaExpression ?: return null
 
-        val anotherItReferenceOutside = outermostLambdaWithoutParams.findDescendantOfType<KtNameReferenceExpression> fd@{ refExpression ->
-            if (refExpression.getReferencedNameAsName() != StandardNames.IMPLICIT_LAMBDA_PARAMETER_NAME) return@fd false
-            if (PsiTreeUtil.isAncestor(ownerLambda, refExpression, false)) return@fd false
-            val otherItSymbol = refExpression.getImplicitLambdaParameterSymbol() ?: return@fd false
-            if (otherItSymbol == enclosingLambdaImplicitItSymbol) return@fd false
-            return@fd PsiTreeUtil.isAncestor(getOwnerLambdaExpression(otherItSymbol), ownerLambda, false)
+        val anotherItReferenceOutside = outermostLambdaWithoutParams.findDescendantOfType<KtNameReferenceExpression> { refExpression ->
+            isShadowedImplicitItOfAnotherLambda(refExpression, ownerLambda, enclosingLambdaImplicitItSymbol)
         }
 
         return anotherItReferenceOutside?.getImplicitLambdaParameterSymbol()?.let(::getOwnerLambdaExpression)?.let { outerLambda ->
@@ -117,6 +112,21 @@ internal class NestedLambdaShadowedImplicitParameterInspection :
         val qualifiedExpression = getStrictParentOfType<KtQualifiedExpression>() ?: return false
         if (qualifiedExpression.receiverExpression.text != StandardNames.IMPLICIT_LAMBDA_PARAMETER_NAME.identifier) return false
         return qualifiedExpression.callExpression?.isCalling(scopeFunctionsList.asSequence()) == true
+    }
+
+    context(KaSession)
+    private fun isShadowedImplicitItOfAnotherLambda(
+        refExpression: KtNameReferenceExpression,
+        primaryLambda: KtLambdaExpression,
+        primaryLambdaItSymbol: KaValueParameterSymbol,
+    ): Boolean {
+        if (refExpression.getReferencedNameAsName() != StandardNames.IMPLICIT_LAMBDA_PARAMETER_NAME) return false
+        // Not interested in `it` refs inside the primary lambda
+        if (PsiTreeUtil.isAncestor(primaryLambda, refExpression, false)) return false
+        val otherItSymbol = refExpression.getImplicitLambdaParameterSymbol() ?: return false
+        if (otherItSymbol == primaryLambdaItSymbol) return false
+        // If an outer `it`'s owner lambda is not an ancestor of the primary lambda, then this `it` is not shadowed
+        return PsiTreeUtil.isAncestor(getOwnerLambdaExpression(otherItSymbol), primaryLambda, false)
     }
 
     private fun getOwnerLambdaExpression(itParameterSymbol: KaValueParameterSymbol): KtLambdaExpression? {

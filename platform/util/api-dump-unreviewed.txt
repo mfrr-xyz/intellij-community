@@ -95,6 +95,7 @@ a:com.intellij.execution.process.BaseProcessHandler
 - pf:myProcess:java.lang.Process
 - pf:myWaitFor:com.intellij.execution.process.ProcessWaitFor
 - <init>(java.lang.Process,java.lang.String,java.nio.charset.Charset):V
+- p:createWaitFor():com.intellij.execution.process.ProcessWaitFor
 - p:destroyProcessImpl():V
 - detachIsDefault():Z
 - p:detachProcessImpl():V
@@ -105,6 +106,16 @@ a:com.intellij.execution.process.BaseProcessHandler
 - f:getProcess():java.lang.Process
 - getProcessInput():java.io.OutputStream
 - p:onOSProcessTerminated(I):V
+c:com.intellij.execution.process.CompositeProcessHandler
+- com.intellij.execution.process.ProcessHandler
+- <init>(java.util.List):V
+- p:destroyProcessImpl():V
+- detachIsDefault():Z
+- p:detachProcessImpl():V
+- f:getHandlers():java.util.List
+- getProcessInput():java.io.OutputStream
+- startNotify():V
+- p:startNotifyHandler(com.intellij.execution.process.ProcessHandler):V
 c:com.intellij.execution.process.NopProcessHandler
 - com.intellij.execution.process.ProcessHandler
 - <init>():V
@@ -398,6 +409,7 @@ a:com.intellij.openapi.diagnostic.Logger
 - setLevel(com.intellij.openapi.diagnostic.LogLevel):V
 - setLevel(org.apache.log4j.Level):V
 - s:setUnitTestMode():V
+- s:shouldRethrow(java.lang.Throwable):Z
 - trace(java.lang.String):V
 - trace(java.lang.Throwable):V
 - warn(java.lang.String):V
@@ -907,7 +919,6 @@ a:com.intellij.openapi.util.RecursionGuard
 - a:computePreventingRecursion(java.lang.Object,Z,com.intellij.openapi.util.ThrowableComputable):java.lang.Object
 - a:currentStack():java.util.List
 - doPreventingRecursion(java.lang.Object,Z,com.intellij.openapi.util.Computable):java.lang.Object
-- markStack():com.intellij.openapi.util.RecursionGuard$StackStamp
 - a:prohibitResultCaching(java.lang.Object):V
 com.intellij.openapi.util.RecursionGuard$StackStamp
 - a:mayCacheNow():Z
@@ -938,10 +949,6 @@ a:com.intellij.openapi.util.SimpleFieldCache
 f:com.intellij.openapi.util.StackOverflowPreventedException
 - java.lang.RuntimeException
 - <init>(java.lang.String):V
-f:com.intellij.openapi.util.StaticGetter
-- com.intellij.openapi.util.Getter
-- <init>(java.lang.Object):V
-- get():java.lang.Object
 f:com.intellij.openapi.util.SystemInfo
 - sf:JAVA_RUNTIME_VERSION:java.lang.String
 - sf:JAVA_VENDOR:java.lang.String
@@ -1564,6 +1571,7 @@ c:com.intellij.openapi.util.text.HtmlChunk$Element
 - addRaw(java.lang.String):com.intellij.openapi.util.text.HtmlChunk$Element
 - addText(java.lang.String):com.intellij.openapi.util.text.HtmlChunk$Element
 - appendTo(java.lang.StringBuilder):V
+- applyStyles(java.util.Map):com.intellij.openapi.util.text.HtmlChunk
 - attr(java.lang.String):com.intellij.openapi.util.text.HtmlChunk$Element
 - attr(java.lang.String,I):com.intellij.openapi.util.text.HtmlChunk$Element
 - attr(java.lang.String,java.lang.String):com.intellij.openapi.util.text.HtmlChunk$Element
@@ -1674,7 +1682,6 @@ Fc:com.intellij.openapi.util.text.StringUtil
 - s:firstLast(java.lang.String,I):java.lang.String
 - s:fixVariableNameDerivedFromPropertyName(java.lang.String):java.lang.String
 - s:formatDuration(J):java.lang.String
-- s:formatDuration(J,java.lang.String):java.lang.String
 - s:formatDuration(java.time.Duration):java.lang.String
 - s:formatFileSize(J):java.lang.String
 - s:formatFileSize(J,java.lang.String):java.lang.String
@@ -1735,6 +1742,7 @@ Fc:com.intellij.openapi.util.text.StringUtil
 - s:isJavaIdentifierStart(C):Z
 - s:isLatinAlphanumeric(java.lang.CharSequence):Z
 - s:isLineBreak(C):Z
+- s:isLowerCase(java.lang.CharSequence):Z
 - s:isNotEmpty(java.lang.String):Z
 - s:isNotNegativeNumber(java.lang.CharSequence):Z
 - s:isNumeric(java.lang.CharSequence):Z
@@ -2118,6 +2126,7 @@ f:com.intellij.util.ConcurrencyUtil
 - s:awaitQuiescence(java.util.concurrent.ThreadPoolExecutor,J,java.util.concurrent.TimeUnit):V
 - s:cacheOrGet(java.util.concurrent.ConcurrentMap,java.lang.Object,java.lang.Object):java.lang.Object
 - s:cacheOrGet(java.util.concurrent.atomic.AtomicReference,java.lang.Object):java.lang.Object
+- s:computeIfAbsent(com.intellij.openapi.util.UserDataHolder,com.intellij.openapi.util.Key,java.util.function.Supplier):java.lang.Object
 - s:getAll(J,java.util.concurrent.TimeUnit,java.util.Collection):V
 - s:getAll(java.util.Collection):V
 - s:invokeAll(java.util.Collection,java.util.concurrent.ExecutorService):java.util.List
@@ -2147,6 +2156,7 @@ com.intellij.util.Consumer
 f:com.intellij.util.CoroutineScopeKt
 - sf:asDisposable(kotlinx.coroutines.CoroutineScope):com.intellij.openapi.Disposable
 - sf:attachAsChildTo(com.intellij.openapi.Disposable,kotlinx.coroutines.CoroutineScope):V
+- sf:disposeOnCompletion(com.intellij.openapi.Disposable,kotlinx.coroutines.CoroutineScope):V
 f:com.intellij.util.DefaultBundleService
 - <init>():V
 - compute(java.util.function.Supplier):java.lang.Object
@@ -2836,8 +2846,10 @@ com.intellij.util.containers.ConcurrentIntObjectMap
 - com.intellij.util.containers.IntObjectMap
 - a:cacheOrGet(I,java.lang.Object):java.lang.Object
 - a:elements():java.util.Enumeration
+- a:getOrDefault(I,java.lang.Object):java.lang.Object
 - a:putIfAbsent(I,java.lang.Object):java.lang.Object
 - a:remove(I,java.lang.Object):Z
+- a:replace(I,java.lang.Object):java.lang.Object
 - a:replace(I,java.lang.Object,java.lang.Object):Z
 - a:size():I
 com.intellij.util.containers.ConcurrentList
@@ -2851,7 +2863,9 @@ com.intellij.util.containers.ConcurrentLongObjectMap
 - a:containsValue(java.lang.Object):Z
 - a:elements():java.util.Iterator
 - a:entries():java.lang.Iterable
+- a:entrySet():java.util.Set
 - a:get(J):java.lang.Object
+- a:getOrDefault(J,java.lang.Object):java.lang.Object
 - a:isEmpty():Z
 - a:keys():J[]
 - a:put(J,java.lang.Object):java.lang.Object
@@ -3096,7 +3110,6 @@ f:com.intellij.util.containers.ContainerUtil
 - s:sorted(java.util.Collection,java.util.Comparator):java.util.List
 - s:splitListToChunks(java.util.List,I):java.util.stream.Stream
 - s:startsWith(java.util.List,java.util.List):Z
-- s:stringMap(java.lang.String[]):java.util.Map
 - s:subArrayAsList(java.lang.Object[],I,I):java.util.List
 - s:subList(java.util.List,I):java.util.List
 - s:subtract(java.util.Collection,java.util.Collection):java.util.Collection
@@ -4229,9 +4242,10 @@ com.intellij.util.indexing.InvertedIndex
 - a:clear():V
 - a:dispose():V
 - a:flush():V
-- a:getData(java.lang.Object):com.intellij.util.indexing.ValueContainer
+- getData(java.lang.Object):com.intellij.util.indexing.ValueContainer
 - a:mapInputAndPrepareUpdate(I,java.lang.Object):com.intellij.util.indexing.StorageUpdate
 - a:prepareUpdate(I,com.intellij.util.indexing.impl.InputData):com.intellij.util.indexing.StorageUpdate
+- a:withData(java.lang.Object,com.intellij.util.indexing.impl.ValueContainerProcessor):Z
 f:com.intellij.util.indexing.InvertedIndexUtil
 - <init>():V
 - s:collectInputIdsContainingAllKeys(com.intellij.util.indexing.InvertedIndex,java.util.Collection,com.intellij.openapi.util.Condition,java.util.function.IntPredicate):it.unimi.dsi.fastutil.ints.IntSet
@@ -4247,6 +4261,7 @@ com.intellij.util.indexing.StorageUpdate
 - a:update():Z
 a:com.intellij.util.indexing.ValueContainer
 - <init>():V
+- s:emptyContainer():com.intellij.util.indexing.ValueContainer
 - f:forEach(com.intellij.util.indexing.ValueContainer$ContainerAction):Z
 - a:getValueIterator():com.intellij.util.indexing.ValueContainer$ValueIterator
 - f:process(com.intellij.util.indexing.ValueContainer$ThrowableContainerProcessor):Z
@@ -4290,9 +4305,10 @@ com.intellij.util.indexing.impl.IndexStorage
 - a:close():V
 - a:flush():V
 - a:isDirty():Z
-- a:read(java.lang.Object):com.intellij.util.indexing.ValueContainer
+- read(java.lang.Object):com.intellij.util.indexing.ValueContainer
+- a:read(java.lang.Object,com.intellij.util.indexing.impl.ValueContainerProcessor):Z
 - a:removeAllValues(java.lang.Object,I):V
-- updateValue(java.lang.Object,I,java.lang.Object):V
+- a:updateValue(java.lang.Object,I,java.lang.Object):V
 f:com.intellij.util.indexing.impl.IndexStorageUtil
 - <init>():V
 - s:adaptKeyDescriptorToStrategy(com.intellij.util.io.KeyDescriptor):com.intellij.util.containers.HashingStrategy
@@ -4305,6 +4321,8 @@ f:com.intellij.util.indexing.impl.InputIndexDataExternalizer
 - <init>(com.intellij.util.io.KeyDescriptor,com.intellij.util.indexing.IndexId):V
 - read(java.io.DataInput):java.util.Collection
 - save(java.io.DataOutput,java.util.Collection):V
+com.intellij.util.indexing.impl.ValueContainerProcessor
+- a:process(com.intellij.util.indexing.ValueContainer):Z
 com.intellij.util.indexing.impl.ValueSerializationProblemReporter
 - a:reportProblem(java.lang.Exception):V
 com.intellij.util.indexing.impl.forward.ForwardIndex

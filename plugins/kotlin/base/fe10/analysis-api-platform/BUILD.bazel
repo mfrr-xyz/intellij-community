@@ -1,11 +1,9 @@
 ### auto-generated section `build kotlin.base.fe10.analysis-api-platform` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   opt_in = [
     "org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
     "org.jetbrains.kotlin.analysis.api.KaExperimentalApi",
@@ -24,14 +22,13 @@ jvm_library(
   name = "kotlin-base-fe10-analysis-api-platform",
   module_name = "kotlin.base.fe10.analysis-api-platform",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_analysis-api",
-    "@lib//:kotlinc_analysis-api-platform-interface",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-analysis-api",
+    "@lib//:kotlinc-analysis-api-platform-interface",
     "//plugins/kotlin/base/project-structure:kotlin-base-project-structure",
     "//plugins/kotlin/base/analysis:kotlin-base-analysis",
     "//platform/core-impl",

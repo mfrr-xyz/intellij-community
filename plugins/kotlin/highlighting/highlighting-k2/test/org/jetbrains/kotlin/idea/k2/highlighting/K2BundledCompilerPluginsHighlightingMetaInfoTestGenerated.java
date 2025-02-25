@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.highlighting;
 
@@ -48,6 +48,11 @@ public class K2BundledCompilerPluginsHighlightingMetaInfoTestGenerated extends A
     @TestMetadata("compose.kt")
     public void testCompose() throws Exception {
         runTest("../../idea/tests/testData/highlighterMetaInfoWithBundledCompilerPlugins/compose.kt");
+    }
+
+    @TestMetadata("composeAgainstOldBinaries.kt")
+    public void testComposeAgainstOldBinaries() throws Exception {
+        runTest("../../idea/tests/testData/highlighterMetaInfoWithBundledCompilerPlugins/composeAgainstOldBinaries.kt");
     }
 
     @TestMetadata("lombok.kt")

@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.psi;
 
 import com.intellij.lang.FileASTNode;
@@ -563,7 +563,7 @@ public class JavaStubBuilderTest extends LightIdeaTestCase {
            """
              PsiJavaFileStub []
                IMPORT_LIST:PsiImportListStub
-               MODULE:PsiJavaModuleStub:M.N
+               MODULE:PsiJavaModuleStub[name=M.N, resolution=0]
                  MODIFIER_LIST:PsiModifierListStub[mask=8192]
                    ANNOTATION:PsiAnnotationStub[@Deprecated]
                      ANNOTATION_PARAMETER_LIST:PsiAnnotationParameterListStubImpl
@@ -751,6 +751,26 @@ public class JavaStubBuilderTest extends LightIdeaTestCase {
                      RECORD_HEADER:PsiRecordHeaderStub
                      EXTENDS_LIST:PsiRefListStub[EXTENDS_LIST:]
                      IMPLEMENTS_LIST:PsiRefListStub[IMPLEMENTS_LIST:]
+             """);
+  }
+
+  public void testInvalidGenericEmptyBody() {
+    doTest("""
+             import java.util.*;
+             import java.util.function.*;
+             
+             private static class A implements BiConsumer<List<A>, List<A>n>> {}
+             """,
+           """
+             PsiJavaFileStub []
+               IMPORT_LIST:PsiImportListStub
+                 IMPORT_STATEMENT:PsiImportStatementStub[java.util.*]
+                 IMPORT_STATEMENT:PsiImportStatementStub[java.util.function.*]
+               CLASS:PsiClassStub[name=A fqn=A]
+                 MODIFIER_LIST:PsiModifierListStub[mask=10]
+                 TYPE_PARAMETER_LIST:PsiTypeParameterListStub
+                 EXTENDS_LIST:PsiRefListStub[EXTENDS_LIST:]
+                 IMPLEMENTS_LIST:PsiRefListStub[IMPLEMENTS_LIST:]
              """);
   }
 

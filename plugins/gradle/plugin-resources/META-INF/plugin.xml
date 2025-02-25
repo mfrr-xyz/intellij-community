@@ -72,12 +72,19 @@
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleDaemonStartupIssueChecker"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleBuildCancelledIssueChecker"/>
     <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleOutOfMemoryIssueChecker"/>
+    <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleToolchainDownloadedMismatchCriteriaIssueChecker"/>
+    <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleUndefinedDaemonJvmCriteriaIssueChecker"/>
+    <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleInvalidDaemonJvmCriteriaIssueChecker"/>
+    <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleToolchainDownloadingErrorIssueChecker"/>
+    <issueChecker implementation="org.jetbrains.plugins.gradle.issue.GradleToolchainInstalledNotFoundMatchingCriteriaIssueChecker"/>
     <executionHelperExtension implementation="org.jetbrains.plugins.gradle.service.execution.GradleTaskExecutionMeasuringExtension"/>
     <executionHelperExtension
       implementation="org.jetbrains.plugins.gradle.service.execution.telemetry.GradleTelemetryAgentProvidingExecutionHelperExtension"/>
 
     <autoReloadSettingsCollector
       implementation="org.jetbrains.plugins.gradle.service.project.GradleAutoImportAware$GradlePropertiesCollector"/>
+    <autoReloadSettingsCollector
+      implementation="org.jetbrains.plugins.gradle.service.project.GradleAutoImportAware$GradleDaemonJvmPropertiesCollector"/>
     <autoReloadSettingsCollector
       implementation="org.jetbrains.plugins.gradle.service.project.GradleAutoImportAware$VersionCatalogCollector"/>
     <autoReloadSettingsCollector
@@ -110,7 +117,7 @@
 
     <executionTargetLanguageRuntimeType implementation="org.jetbrains.plugins.gradle.execution.target.GradleRuntimeType" />
 
-    <externalSystemWorkspaceContributor implementation="org.jetbrains.plugins.gradle.service.project.GradleWorkspaceContributor"/>
+    <externalSystemCoordinateContributor implementation="org.jetbrains.plugins.gradle.service.project.GradleCoordinateContributor"/>
     <externalSystemConfigurationHandler implementation="org.jetbrains.plugins.gradle.service.project.GradleTaskTriggersImporter"/>
     <externalSystemConfigurationHandler implementation="org.jetbrains.plugins.gradle.service.project.ActionDelegateConfigImporter"/>
     <externalSystemConfigurationHandler implementation="org.jetbrains.plugins.gradle.service.project.IDEAProjectFilesPostProcessor"/>
@@ -196,6 +203,8 @@
 
     <registryKey key="gradle.daemon.jvm.criteria" defaultValue="true"
                  description="Enable the Gradle Daemon JVM criteria allowing to detect provisioning required toolchain for the build"/>
+    <registryKey key="gradle.daemon.jvm.criteria.new.project" defaultValue="false"
+                 description="Enable to allow new projects to be created with the Gradle Daemon JVM criteria"/>
     <registryKey key="gradle.phased.sync.enabled" defaultValue="true"
                  description="Enable the phased Gradle sync execution"/>
     <registryKey defaultValue="https://download.jetbrains.com/resources/intellij/plugins/gradle/v1/compatibility.json"
@@ -233,6 +242,7 @@
 
     <!--advanced settings-->
     <advancedSetting id="gradle.download.sources" default="false" bundle="messages.GradleBundle" groupKey="advanced.settings.gradle"/>
+    <advancedSetting id="gradle.download.sources.automatically" default="true" bundle="messages.GradleBundle" groupKey="advanced.settings.gradle"/>
     <experimentalFeature id="gradle.parallel.model.fetch" percentOfUsers="0">
       <description>
         Enable Building of models in parallel during Gradle project sync.
@@ -253,7 +263,7 @@
     </group>
 
     <action id="Gradle.ExecuteTask" class="org.jetbrains.plugins.gradle.action.GradleExecuteTaskAction"
-            icon="AllIcons.Actions.Run_anything">
+            icon="AllIcons.Actions.RunAnything">
     </action>
     <action id="Gradle.ToggleOfflineAction" class="org.jetbrains.plugins.gradle.action.ToggleOfflineAction"
             icon="AllIcons.Actions.OfflineMode"/>

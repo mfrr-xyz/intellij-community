@@ -42,8 +42,7 @@ import static git4idea.commands.GitLocalChangesWouldBeOverwrittenDetector.Operat
 public class GitResetOperation {
 
   private final @NotNull Project myProject;
-  @Unmodifiable
-  private final @NotNull Map<GitRepository, @NotNull String> myCommits;
+  private final @Unmodifiable @NotNull Map<GitRepository, @NotNull String> myCommits;
   private final @NotNull GitResetMode myMode;
   private final @NotNull ProgressIndicator myIndicator;
   private final @NotNull Git myGit;
@@ -96,7 +95,7 @@ public class GitResetOperation {
         results.put(repository, result);
 
         updateAndRefreshChangedVfs(repository, startHash);
-        VcsDirtyScopeManager.getInstance(myProject).dirDirtyRecursively(root);
+        VcsDirtyScopeManager.getInstance(myProject).rootDirty(root);
         repository.getUntrackedFilesHolder().invalidate(); // 'git reset --mixed' may make a file untracked without changing anything else
       }
     }

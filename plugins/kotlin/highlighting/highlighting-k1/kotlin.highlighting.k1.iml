@@ -4,7 +4,7 @@
     <facet type="kotlin-language" name="Kotlin">
       <configuration version="5" platform="JVM 17" allPlatforms="JVM [17]" useProjectSettings="false">
         <compilerSettings>
-          <option name="additionalArguments" value=" -opt-in=org.jetbrains.kotlin.idea.base.util.K1ModeProjectStructureApi -opt-in=org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction" />
+          <option name="additionalArguments" value="-Xjvm-default=all -opt-in=org.jetbrains.kotlin.idea.base.util.K1ModeProjectStructureApi -opt-in=org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction" />
         </compilerSettings>
         <compilerArguments>
           <stringArguments>
@@ -33,7 +33,7 @@
     <orderEntry type="module" module-name="kotlin.base.plugin" />
     <orderEntry type="module" module-name="kotlin.base.project-structure" />
     <orderEntry type="module" module-name="kotlin.base.scripting" />
-    <orderEntry type="module" module-name="intellij.platform.editor" />
+    <orderEntry type="module" module-name="intellij.platform.editor.ui" />
     <orderEntry type="module" module-name="intellij.platform.ide" />
     <orderEntry type="module" module-name="intellij.platform.diff.impl" />
     <orderEntry type="module" module-name="intellij.java.analysis.impl" />
@@ -46,6 +46,7 @@
     <orderEntry type="library" name="Guava" level="project" />
     <orderEntry type="module" module-name="kotlin.base.compiler-configuration" />
     <orderEntry type="module" module-name="kotlin.base.facet" />
+    <orderEntry type="module" module-name="intellij.platform.ide.impl" />
     <orderEntry type="module" module-name="kotlin.base.fe10.analysis" />
     <orderEntry type="module" module-name="intellij.java.psi" />
     <orderEntry type="module" module-name="kotlin.base.code-insight" />

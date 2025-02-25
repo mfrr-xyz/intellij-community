@@ -10,7 +10,6 @@ import com.intellij.platform.ijent.IjentUnavailableException
 import com.intellij.platform.ijent.coroutineNameAppended
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.util.containers.ContainerUtil
-import com.intellij.util.io.awaitExit
 import com.intellij.util.io.blockingDispatcher
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
@@ -217,7 +216,7 @@ private fun logIjentStderr(ijentLabel: String, line: String) {
   val (rawRemoteDateTime, level, message) =
     ijentLogMessageRegex.matchEntire(line)?.destructured
     ?: run {
-      LOG.debug { "$ijentLabel log: $line" }
+      LOG.info("$ijentLabel log: $line")
       return
     }
 

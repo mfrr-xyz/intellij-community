@@ -1,9 +1,9 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.builders.java;
 
 import com.intellij.openapi.util.Pair;
 import com.intellij.util.SmartList;
-import kotlinx.metadata.*;
+import kotlin.metadata.*;
 import org.jetbrains.jps.builders.java.dependencyView.Callbacks;
 import org.jetbrains.jps.dependency.*;
 import org.jetbrains.jps.dependency.java.*;
@@ -34,7 +34,7 @@ final class BackendCallbackToGraphDeltaAdapter implements Callbacks.Backend {
   @Override
   public void associate(String classFileName, Collection<String> sources, ClassReader cr, boolean isGenerated) {
     if (reportMissingOutput && !classFileName.startsWith("$") && !new File(classFileName).exists()) {
-      throw new IllegalArgumentException("Class file '" + classFileName + "' was registered but it does not exist");
+      throw new RuntimeException("Class file '" + classFileName + "' was registered but it does not exist");
     }
     JvmClassNodeBuilder builder = JvmClassNodeBuilder.create(classFileName, cr, isGenerated);
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.util
 
 import com.intellij.execution.CommandLineUtil
@@ -16,6 +16,7 @@ import com.intellij.openapi.util.io.PathExecLazyValue
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.platform.eel.EelExecApi
 import com.intellij.platform.eel.getOrThrow
+import com.intellij.platform.eel.provider.asEelPath
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.io.IdeUtilIoBundle
 import com.intellij.util.io.SuperUserStatus
@@ -25,8 +26,6 @@ import java.io.*
 import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.Throws
-import kotlin.io.path.pathString
 
 object ExecUtil {
   private val hasGnomeTerminal = PathExecLazyValue.create("gnome-terminal")
@@ -50,8 +49,9 @@ object ExecUtil {
     get() = "/usr/bin/open"
 
   @JvmStatic
+  @Suppress("unused")
   val windowsShellName: String
-    @Deprecated("Inline this property")
+    @Deprecated("Inline this property", level = DeprecationLevel.ERROR)
     get() = CommandLineUtil.getWinShellName()
 
   @ApiStatus.Internal
@@ -157,34 +157,15 @@ object ExecUtil {
       return commandLine
     }
 
-    val command = mutableListOf(commandLine.exePath)
-    command += commandLine.parametersList.list
-
     val sudoCommandLine = SudoCommandProvider.getInstance().sudoCommand(commandLine, prompt)
                           ?: throw UnsupportedOperationException("Cannot `sudo` on this system - no suitable utils found")
 
-    val parentEnvType = if (SystemInfoRt.isWindows) GeneralCommandLine.ParentEnvironmentType.NONE else commandLine.parentEnvironmentType
     return sudoCommandLine
       .withWorkingDirectory(commandLine.workingDirectory)
       .withEnvironment(commandLine.environment)
-      .withParentEnvironmentType(parentEnvType)
+      .withParentEnvironmentType(commandLine.parentEnvironmentType)
       .withRedirectErrorStream(commandLine.isRedirectErrorStream)
   }
-
-  @ApiStatus.Internal
-  fun envCommand(commandLine: GeneralCommandLine): List<String> =
-    when (val args = envCommandArgs(commandLine)) {
-      emptyList<String>() -> emptyList()
-      else -> listOf("env") + args
-    }
-
-  internal fun envCommandArgs(commandLine: GeneralCommandLine): List<String> =
-    // sudo doesn't pass parent process environment for security reasons,
-    // for the same reasons we pass only explicitly configured env variables
-    when (val env = commandLine.environment) {
-      emptyMap<String, String>() -> emptyList()
-      else -> env.map { entry -> "${entry.key}=${entry.value}" }
-    }
 
   @ApiStatus.Internal
   @JvmStatic
@@ -192,15 +173,15 @@ object ExecUtil {
   fun sudoAndGetOutput(commandLine: GeneralCommandLine, prompt: @Nls String): ProcessOutput =
     execAndGetOutput(sudoCommand(commandLine, prompt))
 
-  internal fun escapeAppleScriptArgument(arg: String): @NlsSafe String = "quoted form of \"${arg.replace("\"", "\\\"").replace("\\", "\\\\")}\""
+  internal fun escapeAppleScriptArgument(arg: String): @NlsSafe String =
+    if (arg == "&&") "\"$arg\"" // support multiple commands separated with &&
+    else "quoted form of \"${arg.replace("\"", "\\\"").replace("\\", "\\\\")}\""
 
   @ApiStatus.Internal
   @Deprecated(
     "It is an oversimplified quoting. Prefer CommandLineUtil.posixQuote instead.",
-    ReplaceWith(
-      "CommandLineUtil.posixQuote(arg)",
-      "com.intellij.execution.CommandLineUtil.posixQuote",
-    )
+    ReplaceWith("CommandLineUtil.posixQuote(arg)", "com.intellij.execution.CommandLineUtil.posixQuote"),
+    level = DeprecationLevel.ERROR
   )
   @JvmStatic
   fun escapeUnixShellArgument(arg: String): String = "'${arg.replace("'", "'\"'\"'")}'"
@@ -249,10 +230,9 @@ object ExecUtil {
   }
 
   /**
-   * Wraps the commandline process with the OS specific utility
-   * to mark the process to run with low priority.
+   * Wraps the commandline process with the OS-specific utility to mark the process to run with low priority.
    *
-   * NOTE. Windows implementation does not return the original process exit code!
+   * NOTE: Windows implementation does not return the original process exit code!
    */
   @ApiStatus.Internal
   @JvmStatic
@@ -283,20 +263,20 @@ object ExecUtil {
     }
   }
 
-  @JvmStatic
   @ApiStatus.Internal
+  @JvmStatic
   fun EelExecApi.startProcessBlockingUsingEel(builder: ProcessBuilder, pty: LocalPtyOptions?): Process {
     val args = builder.command()
-    val exe = args.first()
+    val exe = args.first().let { exe -> runCatching { Path.of(exe).asEelPath().toString() }.getOrNull() ?: exe }
     val rest = args.subList(1, args.size)
     val env = builder.environment()
-    val workingDir = builder.directory()?.toPath()?.pathString
+    val workingDir = builder.directory()?.toPath()?.asEelPath()
 
     val options = EelExecApi.ExecuteProcessOptions.Builder(exe)
       .args(rest)
       .workingDirectory(workingDir)
       .env(env)
-      .pty(pty?.run { EelExecApi.Pty(initialColumns, initialRows, !consoleMode) })
+      .ptyOrStdErrSettings(pty?.run { EelExecApi.Pty(initialColumns, initialRows, !consoleMode) })
 
     return runBlockingMaybeCancellable {
       execute(options.build()).getOrThrow().convertToJavaProcess()

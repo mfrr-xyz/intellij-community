@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.ui
 
+import com.intellij.diagnostic.LoadingState
 import com.intellij.idea.AppMode
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.BaseState
@@ -20,6 +21,9 @@ interface UISettingsStateDefaultsProvider {
   companion object {
     @JvmStatic
     fun getInstance(): UISettingsStateDefaultsProvider = ApplicationManager.getApplication().service<UISettingsStateDefaultsProvider>()
+
+    @JvmStatic
+    fun getInstanceOrNull(): UISettingsStateDefaultsProvider? = if (LoadingState.CONFIGURATION_STORE_INITIALIZED.isOccurred) getInstance() else null
   }
 
   val searchEverywherePreviewDefault: Boolean
@@ -191,8 +195,11 @@ class UISettingsState : BaseState() {
   var maxLookupListHeight: Int by property(11)
   @get:OptionTag("DND_WITH_PRESSED_ALT_ONLY")
   var dndWithPressedAltOnly: Boolean by property(false)
+  @Deprecated(message = "", replaceWith = ReplaceWith("UISettingsState.getMainMenuDisplayMode"))
   @get:OptionTag("SEPARATE_MAIN_MENU")
   var separateMainMenu: Boolean by property(false)
+  @get:OptionTag("SHOW_MAIN_MENU_MODE")
+  var mainMenuDisplayMode: String? by string(MainMenuDisplayMode.UNDER_HAMBURGER_BUTTON.name)
   @get:OptionTag("DEFAULT_AUTOSCROLL_TO_SOURCE")
   var defaultAutoScrollToSource: Boolean by property(false)
   @get:Transient
@@ -247,7 +254,8 @@ class UISettingsState : BaseState() {
   var showBreakpointsOverLineNumbers: Boolean by property(true)
 
   @get:OptionTag("SHOW_PREVIEW_IN_SEARCH_EVERYWHERE")
-  var showPreviewInSearchEverywhere: Boolean by property(UISettingsStateDefaultsProvider.getInstance().searchEverywherePreviewDefault)
+  var showPreviewInSearchEverywhere: Boolean by property(UISettingsStateDefaultsProvider.getInstanceOrNull()?.searchEverywherePreviewDefault
+                                                         ?: false)
 
   @Suppress("FunctionName")
   fun _incrementModificationCount(): Unit = incrementModificationCount()

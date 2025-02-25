@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui;
 
 import com.intellij.application.Topics;
@@ -19,6 +19,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.ex.AnActionListener;
 import com.intellij.openapi.application.ApplicationActivationListener;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.impl.InternalUICustomization;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.ui.GraphicsConfig;
 import com.intellij.openapi.ui.impl.ShadowBorderPainter;
@@ -44,6 +45,7 @@ import com.intellij.util.ui.*;
 import com.intellij.util.ui.accessibility.AccessibleContextUtil;
 import com.intellij.util.ui.accessibility.ScreenReader;
 import org.intellij.lang.annotations.JdkConstants;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -1209,9 +1211,9 @@ public final class BalloonImpl implements Balloon, IdeTooltip.Ui, ScreenAreaCons
     return myDefaultPrefSize;
   }
 
-  private abstract static class AbstractPosition {
+  @ApiStatus.Internal
+  public abstract static class AbstractPosition {
     abstract EmptyBorder createBorder(final BalloonImpl balloon);
-
 
     abstract void setRecToRelativePosition(Rectangle rec, Point targetPoint);
 
@@ -1431,11 +1433,10 @@ public final class BalloonImpl implements Balloon, IdeTooltip.Ui, ScreenAreaCons
                                        balloon.getArc(), balloon.getArc());
   }
 
-  public static final AbstractPosition BELOW = new Below();
-  public static final AbstractPosition ABOVE = new Above();
-  public static final AbstractPosition AT_RIGHT = new AtRight();
-  public static final AbstractPosition AT_LEFT = new AtLeft();
-
+  static final AbstractPosition BELOW = new Below();
+  static final AbstractPosition ABOVE = new Above();
+  static final AbstractPosition AT_RIGHT = new AtRight();
+  static final AbstractPosition AT_LEFT = new AtLeft();
 
   private static final class Below extends AbstractPosition {
     @Override
@@ -1987,6 +1988,13 @@ public final class BalloonImpl implements Balloon, IdeTooltip.Ui, ScreenAreaCons
         paintShadow(g);
         myBalloon.myPosition.paintComponent(myBalloon, shapeBounds, (Graphics2D)g, pointTarget);
       }
+    }
+    @Override
+    protected Graphics getComponentGraphics(Graphics graphics) {
+      Graphics componentGraphics = super.getComponentGraphics(graphics);
+      InternalUICustomization service = InternalUICustomization.getInstance();
+      if(service == null) return componentGraphics;
+      return service.transformGraphics(this, componentGraphics);
     }
 
     private void paintShadow(Graphics graphics) {

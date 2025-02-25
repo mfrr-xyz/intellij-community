@@ -22,6 +22,7 @@ import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.VcsSynchronousProgressWrapper;
 import com.intellij.vcs.AnnotationProviderEx;
+import com.intellij.vcs.commit.CommitMode;
 import com.intellij.vcs.log.VcsUserRegistry;
 import git4idea.annotate.GitAdvancedSettingsListener;
 import git4idea.annotate.GitAnnotationProvider;
@@ -32,11 +33,12 @@ import git4idea.changes.GitOutgoingChangesProvider;
 import git4idea.checkin.GitCheckinEnvironment;
 import git4idea.checkin.GitCommitAndPushExecutor;
 import git4idea.checkout.GitCheckoutProvider;
+import git4idea.commit.GitCommitModeProvider;
+import git4idea.commit.GitStagingAreaCommitMode;
 import git4idea.config.*;
 import git4idea.diff.GitDiffProvider;
 import git4idea.history.GitHistoryProvider;
 import git4idea.i18n.GitBundle;
-import git4idea.index.GitStageManagerKt;
 import git4idea.merge.GitMergeProvider;
 import git4idea.repo.GitRepository;
 import git4idea.repo.GitRepositoryManager;
@@ -165,7 +167,7 @@ public final class GitVcs extends AbstractVcs {
 
   @Override
   public @Nullable VcsRevisionNumber parseRevisionNumber(@Nullable String revision, @Nullable FilePath path) throws VcsException {
-    if (revision == null || revision.length() == 0) return null;
+    if (revision == null || revision.isEmpty()) return null;
     if (revision.length() > 40) {    // date & revision-id encoded string
       String dateString = revision.substring(0, revision.indexOf("["));
       String rev = revision.substring(revision.indexOf("[") + 1, 40);
@@ -237,7 +239,7 @@ public final class GitVcs extends AbstractVcs {
    * @param action an action
    */
   public void showErrors(@NotNull List<? extends VcsException> list, @NotNull @Nls String action) {
-    if (list.size() > 0) {
+    if (!list.isEmpty()) {
       @Nls StringBuilder buffer = new StringBuilder();
       buffer.append("\n");
       buffer.append(GitBundle.message("error.list.title", action));
@@ -353,9 +355,17 @@ public final class GitVcs extends AbstractVcs {
   }
 
   @Override
-  public boolean isWithCustomLocalChanges() {
-    return GitVcsApplicationSettings.getInstance().isStagingAreaEnabled() &&
-           GitStageManagerKt.canEnableStagingArea();
+  public @Nullable CommitMode getForcedCommitMode() {
+    if (GitVcsApplicationSettings.getInstance().isStagingAreaEnabled()) {
+      return GitStagingAreaCommitMode.INSTANCE;
+    }
+    CommitMode commitModeFromExtension = GitCommitModeProvider.EP_NAME.computeSafeIfAny(GitCommitModeProvider::getCommitMode);
+    if (commitModeFromExtension != null) {
+      return commitModeFromExtension;
+    }
+    else {
+      return null;
+    }
   }
 
   @Override

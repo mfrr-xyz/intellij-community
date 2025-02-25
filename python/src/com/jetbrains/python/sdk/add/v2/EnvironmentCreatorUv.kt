@@ -5,23 +5,26 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.observable.properties.ObservableMutableProperty
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
+import com.intellij.util.text.nullize
 import com.jetbrains.python.sdk.ModuleOrProject
 import com.jetbrains.python.sdk.uv.impl.setUvExecutable
 import com.jetbrains.python.sdk.uv.setupUvSdkUnderProgress
 import com.jetbrains.python.statistics.InterpreterType
 import java.nio.file.Path
 
-class EnvironmentCreatorUv(model: PythonMutableTargetAddInterpreterModel, private val moduleOrProject: ModuleOrProject?) : CustomNewEnvironmentCreator("uv", model) {
+internal class EnvironmentCreatorUv(model: PythonMutableTargetAddInterpreterModel) : CustomNewEnvironmentCreator("uv", model) {
   override val interpreterType: InterpreterType = InterpreterType.UV
   override val executable: ObservableMutableProperty<String> = model.state.uvExecutable
+  override val installationVersion: String? = null
 
   override fun onShown() {
     // FIXME: validate base interpreters against pyprojecttoml version. See poetry
     basePythonComboBox.setItems(model.baseInterpreters)
   }
 
-  override fun savePathToExecutableToProperties() {
-    setUvExecutable(Path.of(executable.get()))
+  override fun savePathToExecutableToProperties(path: Path?) {
+    val savingPath = path ?: executable.get().nullize()?.let { Path.of(it) } ?: return
+    setUvExecutable(savingPath)
   }
 
   override suspend fun setupEnvSdk(project: Project?, module: Module?, baseSdks: List<Sdk>, projectPath: String, homePath: String?, installPackages: Boolean): Result<Sdk> {
@@ -31,7 +34,7 @@ class EnvironmentCreatorUv(model: PythonMutableTargetAddInterpreterModel, privat
     }
 
     val python = homePath?.let { Path.of(it) }
-    return setupUvSdkUnderProgress(module, Path.of(projectPath), baseSdks, python)
+    return setupUvSdkUnderProgress(ModuleOrProject.ModuleAndProject(module), baseSdks, python)
   }
 
   override suspend fun detectExecutable() {

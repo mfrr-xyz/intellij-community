@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.api;
 
 import com.intellij.collaboration.api.ServerPath;
@@ -24,20 +24,17 @@ import java.util.regex.Pattern;
 @Tag("server")
 public final class GithubServerPath implements ServerPath {
   public static final String DEFAULT_HOST = "github.com";
+  public static final String DATA_RESIDENCY_HOST = "ghe.com";
   public static final GithubServerPath DEFAULT_SERVER = new GithubServerPath(DEFAULT_HOST);
   private static final String API_PREFIX = "api.";
   private static final String API_SUFFIX = "/api";
   private static final String ENTERPRISE_API_V3_SUFFIX = "/v3";
   private static final String GRAPHQL_SUFFIX = "/graphql";
 
-  @Attribute("useHttp")
-  @Nullable private final Boolean myUseHttp;
-  @Attribute("host")
-  @NotNull private final String myHost;
-  @Attribute("port")
-  @Nullable private final Integer myPort;
-  @Attribute("suffix")
-  @Nullable private final String mySuffix;
+  @Attribute("useHttp") private final @Nullable Boolean myUseHttp;
+  @Attribute("host") private final @NotNull @NonNls String myHost;
+  @Attribute("port") private final @Nullable Integer myPort;
+  @Attribute("suffix") private final @Nullable String mySuffix;
 
   public GithubServerPath() {
     this(null, "", null, null);
@@ -57,32 +54,27 @@ public final class GithubServerPath implements ServerPath {
     mySuffix = suffix;
   }
 
-  @NotNull
-  public String getSchema() {
+  public @NotNull String getSchema() {
     return (myUseHttp == null || !myUseHttp) ? "https" : "http";
   }
 
-  @NotNull
-  public String getHost() {
+  public @NotNull String getHost() {
     return myHost;
   }
 
-  @Nullable
-  public Integer getPort() {
+  public @Nullable Integer getPort() {
     return myPort;
   }
 
-  @Nullable
-  public String getSuffix() {
+  public @Nullable String getSuffix() {
     return mySuffix;
   }
 
   // 1 - schema, 2 - host, 4 - port, 5 - path
-  private final static Pattern URL_REGEX = Pattern.compile("^(https?://)?([^/?:]+)(:(\\d+))?((/[^/?#]+)*)?/?",
+  private static final Pattern URL_REGEX = Pattern.compile("^(https?://)?([^/?:]+)(:(\\d+))?((/[^/?#]+)*)?/?",
                                                            Pattern.CASE_INSENSITIVE);
 
-  @NotNull
-  public static GithubServerPath from(@NotNull String uri) throws GithubParseException {
+  public static @NotNull GithubServerPath from(@NotNull String uri) throws GithubParseException {
     Matcher matcher = URL_REGEX.matcher(uri);
 
     if (!matcher.matches()) throw new GithubParseException("Not a valid URL");
@@ -110,22 +102,19 @@ public final class GithubServerPath implements ServerPath {
     return new GithubServerPath(httpSchema, host, port, path);
   }
 
-  @NotNull
-  public String toUrl() {
+  public @NotNull String toUrl() {
     return toUrl(true);
   }
 
-  @NotNull
-  public String toUrl(boolean showSchema) {
+  public @NotNull String toUrl(boolean showSchema) {
     StringBuilder builder = new StringBuilder();
     if (showSchema) builder.append(getSchemaUrlPart());
     builder.append(myHost).append(getPortUrlPart()).append(StringUtil.notNullize(mySuffix));
     return builder.toString();
   }
 
-  @NotNull
-  public String getApiHost() {
-    if (isGithubDotCom()) {
+  public @NotNull String getApiHost() {
+    if (isGithubDotCom() || isGheDataResidency()) {
       return API_PREFIX + myHost;
     }
     else {
@@ -133,10 +122,10 @@ public final class GithubServerPath implements ServerPath {
     }
   }
 
-  @NotNull
-  public String toApiUrl() {
+  // see: https://docs.github.com/en/enterprise-cloud@latest/admin/data-residency/about-github-enterprise-cloud-with-data-residency#api-access
+  public @NotNull String toApiUrl() {
     StringBuilder builder = new StringBuilder(getSchemaUrlPart());
-    if (isGithubDotCom()) {
+    if (isGithubDotCom() || isGheDataResidency()) {
       builder.append(API_PREFIX).append(myHost).append(getPortUrlPart()).append(StringUtil.notNullize(mySuffix));
     }
     else {
@@ -146,10 +135,10 @@ public final class GithubServerPath implements ServerPath {
     return builder.toString();
   }
 
-  @NotNull
-  public String toGraphQLUrl() {
+  // see: https://docs.github.com/en/enterprise-cloud@latest/admin/data-residency/about-github-enterprise-cloud-with-data-residency#api-access
+  public @NotNull String toGraphQLUrl() {
     StringBuilder builder = new StringBuilder(getSchemaUrlPart());
-    if (isGithubDotCom()) {
+    if (isGithubDotCom() || isGheDataResidency()) {
       builder.append(API_PREFIX).append(myHost).append(getPortUrlPart()).append(StringUtil.notNullize(mySuffix)).append(GRAPHQL_SUFFIX);
     }
     else {
@@ -174,19 +163,22 @@ public final class GithubServerPath implements ServerPath {
     return myHost.equalsIgnoreCase(DEFAULT_HOST);
   }
 
+  // see: https://docs.github.com/en/enterprise-cloud@latest/admin/data-residency/about-github-enterprise-cloud-with-data-residency
+  public boolean isGheDataResidency() {
+    return myHost.toLowerCase().endsWith(DATA_RESIDENCY_HOST);
+  }
+
   @Override
   public @NlsSafe @NotNull String toString() {
     String schema = myUseHttp != null ? getSchemaUrlPart() : "";
     return schema + myHost + getPortUrlPart() + StringUtil.notNullize(mySuffix);
   }
 
-  @NotNull
-  private String getPortUrlPart() {
+  private @NotNull String getPortUrlPart() {
     return myPort != null ? (":" + myPort.toString()) : "";
   }
 
-  @NotNull
-  private String getSchemaUrlPart() {
+  private @NotNull String getSchemaUrlPart() {
     return getSchema() + URLUtil.SCHEME_SEPARATOR;
   }
 

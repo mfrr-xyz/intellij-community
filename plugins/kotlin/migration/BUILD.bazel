@@ -1,6 +1,5 @@
 ### auto-generated section `build kotlin.migration` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "migration_resources",
@@ -12,12 +11,10 @@ jvm_library(
   name = "migration",
   module_name = "kotlin.migration",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
+    "@lib//:kotlinc-kotlin-compiler-common",
     "//plugins/kotlin/base/frontend-agnostic:kotlin-base-frontend-agnostic",
     "//plugins/kotlin/base/util:kotlin-base-util",
     "//plugins/kotlin/base/plugin:kotlin-base-plugin",
@@ -30,7 +27,7 @@ jvm_library(
     "//platform/ide-core",
     "//platform/ide-core-impl",
     "//platform/lang-impl",
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/core-ui",
     "//platform/external-system-api:externalSystem",
     "//platform/external-system-impl:externalSystem-impl",

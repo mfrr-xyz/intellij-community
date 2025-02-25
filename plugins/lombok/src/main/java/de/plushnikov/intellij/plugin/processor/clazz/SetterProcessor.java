@@ -104,8 +104,7 @@ public final class SetterProcessor extends AbstractClassProcessor {
     return result;
   }
 
-  @NotNull
-  private Collection<PsiField> filterSetterFields(@NotNull PsiClass psiClass) {
+  private @NotNull Collection<PsiField> filterSetterFields(@NotNull PsiClass psiClass) {
     final Collection<PsiMethod> classMethods = filterToleratedElements(PsiClassUtil.collectClassMethodsIntern(psiClass));
 
     final SetterFieldProcessor fieldProcessor = getSetterFieldProcessor();
@@ -131,8 +130,11 @@ public final class SetterProcessor extends AbstractClassProcessor {
       createSetter &= PsiAnnotationSearchUtil.isNotAnnotatedWith(psiField, fieldProcessor.getSupportedAnnotationClasses());
       //Skip fields that start with $
       createSetter &= !psiField.getName().startsWith(LombokUtils.LOMBOK_INTERN_FIELD_MARKER);
+
+      final AccessorsInfo accessorsInfo = AccessorsInfo.buildFor(psiField);
+      createSetter &= accessorsInfo.acceptsFieldName(psiField.getName());
       //Skip fields if a method with same name already exists
-      final Collection<String> methodNames = fieldProcessor.getAllSetterNames(psiField, PsiTypes.booleanType().equals(psiField.getType()));
+      final Collection<String> methodNames = LombokUtils.toAllSetterNames(accessorsInfo, psiField.getName(), PsiTypes.booleanType().equals(psiField.getType()));
       for (String methodName : methodNames) {
         createSetter &= !PsiMethodUtil.hasSimilarMethod(classMethods, methodName, 1);
       }

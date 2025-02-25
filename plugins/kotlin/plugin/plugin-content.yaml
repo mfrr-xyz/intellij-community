@@ -1,4 +1,4 @@
-- name: lib/client/kotlin-frontend.jar
+- name: lib/frontend-split/kotlin-frontend.jar
   modules:
   - name: kotlin.frontend
 - name: lib/jps/kotlin-jps-plugin.jar
@@ -120,7 +120,9 @@
   - name: kotlin.ide
   - name: kotlin.idea
   - name: kotlin.fir.frontend-independent
-  - name: kotlin.jvm
+  - name: kotlin.jvm.shared
+  - name: kotlin.jvm.k2
+  - name: kotlin.jvm.k1
   - name: kotlin.compiler-reference-index
   - name: kotlin.compiler-plugins.parcelize.common
   - name: kotlin.compiler-plugins.parcelize.k1
@@ -162,6 +164,9 @@
   - name: kotlin.gradle.gradle-java
   - name: kotlin.gradle.gradle-java.k1
   - name: kotlin.gradle.gradle-java.k2
+  - name: kotlin.gradle.scripting.k1
+  - name: kotlin.gradle.scripting.k2
+  - name: kotlin.gradle.scripting.shared
   - name: kotlin.gradle.code-insight-groovy
   - name: kotlin.gradle.code-insight-toml
   - name: kotlin.native
@@ -224,6 +229,7 @@
   - name: kotlin.base.fir.analysis-api-platform
   - name: kotlin.base.fir.code-insight
   - name: kotlin.base.fir.project-structure
+  - name: kotlin.base.fir.scripting
   - name: kotlin.code-insight.api
   - name: kotlin.code-insight.utils
   - name: kotlin.code-insight.intentions.shared

@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.platform.editor.ex` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "editor-ex_resources",
@@ -12,11 +11,9 @@ jvm_library(
   name = "editor-ex",
   module_name = "intellij.platform.editor.ex",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/util",
     "//platform/core-impl",
     "//platform/indexing-impl",
@@ -27,11 +24,6 @@ jvm_library(
     "//platform/core-ui",
     "//platform/util/jdom",
     "//platform/statistics",
-  ],
-  exports = [
-    "//platform/editor-ui-api:editor",
-    "//platform/util",
-    "//platform/core-impl",
   ],
   runtime_deps = [":editor-ex_resources"]
 )

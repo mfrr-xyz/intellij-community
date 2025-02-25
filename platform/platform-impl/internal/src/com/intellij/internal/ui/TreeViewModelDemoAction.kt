@@ -38,9 +38,7 @@ import javax.swing.GroupLayout.DEFAULT_SIZE
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JScrollPane
-import javax.swing.LayoutStyle
 import javax.swing.LayoutStyle.ComponentPlacement.RELATED
-import javax.swing.plaf.ScrollPaneUI
 import kotlin.io.path.relativeTo
 
 internal class TreeViewModelDemoAction : AnAction() {
@@ -148,7 +146,7 @@ private class MyTreeDomainModel : TreeDomainModel {
   override suspend fun computeRoot(): TreeNodeDomainModel? = MyTreeNodeDomainModel(ModelPath())
 }
 
-private class MyTreeNodeDomainModel(private val path: ModelPath) : TreeNodeDomainModel {
+private class MyTreeNodeDomainModel(val path: ModelPath) : TreeNodeDomainModel {
   override suspend fun computeIsLeaf(): Boolean = !path.isDirectory() || path.isEmptyDirectory()
 
   override suspend fun computePresentation(builder: TreeNodePresentationBuilder): Flow<TreeNodePresentation> {
@@ -166,8 +164,6 @@ private class MyTreeNodeDomainModel(private val path: ModelPath) : TreeNodeDomai
     MyTreeNodeDomainModel(it)
   }
 
-  override fun getUserObject(): ModelPath = path
-
   override fun toString(): String = "node($path)"
 }
 
@@ -175,7 +171,7 @@ private class PathVisitor(path: String, private val logTextArea: JBTextArea) : T
   private val path = ModelPath(ROOT.resolve(path))
 
   override suspend fun visit(node: TreeNodeViewModel): TreeVisitor.Action {
-    val nodePath = node.getUserObject() as ModelPath
+    val nodePath = (node.domainModel as MyTreeNodeDomainModel).path
     return when {
       nodePath == path -> {
         log("found: $nodePath")

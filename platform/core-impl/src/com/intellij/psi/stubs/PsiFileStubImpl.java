@@ -23,7 +23,9 @@ import java.util.Arrays;
 import java.util.List;
 
 public class PsiFileStubImpl<T extends PsiFile> extends StubBase<T> implements PsiFileStub<T> {
+  @ApiStatus.Internal
   public static final IStubFileElementType TYPE = new IStubFileElementType(Language.ANY);
+
   private volatile T myFile;
   private volatile String myInvalidationReason;
   private volatile PsiFileStub<?>[] myStubRoots;
@@ -58,6 +60,18 @@ public class PsiFileStubImpl<T extends PsiFile> extends StubBase<T> implements P
     return null;
   }
 
+  @ApiStatus.Experimental
+  @Override
+  public IElementType getElementType() {
+    return null;
+  }
+
+  @ApiStatus.Experimental
+  @Override
+  public ObjectStubSerializer<?, ? extends Stub> getStubSerializer() {
+    return null;
+  }
+
   @Override
   public @NotNull IStubFileElementType<?> getType() {
     return TYPE;
@@ -79,8 +93,8 @@ public class PsiFileStubImpl<T extends PsiFile> extends StubBase<T> implements P
     StubTree baseTree = getOrCalcStubTree(stubBindingRoot);
     if (baseTree != null) {
       List<PsiFileStub<?>> roots = new SmartList<>(baseTree.getRoot());
-      List<Pair<IStubFileElementType<?>, PsiFile>> stubbedRoots = StubTreeBuilder.getStubbedRoots(viewProvider);
-      for (Pair<IStubFileElementType<?>, PsiFile> stubbedRoot : stubbedRoots) {
+      List<Pair<LanguageStubDescriptor, PsiFile>> stubbedRoots = StubTreeBuilder.getStubbedRootDescriptors(viewProvider);
+      for (Pair<LanguageStubDescriptor, PsiFile> stubbedRoot : stubbedRoots) {
         if (stubbedRoot.second == stubBindingRoot) continue;
         StubTree secondaryStubTree = getOrCalcStubTree(stubbedRoot.second);
         if (secondaryStubTree != null) {

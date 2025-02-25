@@ -15,6 +15,7 @@ import com.intellij.psi.xml.XmlTag;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.xml.DomElement;
 import com.intellij.util.xml.DomFileElement;
 import com.intellij.util.xml.DomManager;
 import com.intellij.util.xml.DomService;
@@ -25,6 +26,7 @@ import org.jetbrains.idea.devkit.DevKitBundle;
 import org.jetbrains.idea.devkit.dom.Dependency;
 import org.jetbrains.idea.devkit.dom.IdeaPlugin;
 import org.jetbrains.idea.devkit.dom.productModules.ProductModulesElement;
+import org.jetbrains.idea.devkit.dom.templates.TemplateSet;
 import org.jetbrains.idea.devkit.module.PluginModuleType;
 
 import java.util.ArrayList;
@@ -89,25 +91,29 @@ public final class DescriptorUtil {
     return getIdeaPluginFileElement((XmlFile)file) != null;
   }
 
-  @Nullable
-  public static DomFileElement<IdeaPlugin> getIdeaPluginFileElement(@NotNull XmlFile file) {
+  public static @Nullable DomFileElement<IdeaPlugin> getIdeaPluginFileElement(@NotNull XmlFile file) {
     return DomManager.getDomManager(file.getProject()).getFileElement(file, IdeaPlugin.class);
   }
 
-  @Nullable
-  public static IdeaPlugin getIdeaPlugin(@NotNull XmlFile file) {
+  public static @Nullable IdeaPlugin getIdeaPlugin(@NotNull XmlFile file) {
     final DomFileElement<IdeaPlugin> plugin = getIdeaPluginFileElement(file);
     return plugin != null ? plugin.getRootElement() : null;
   }
 
   public static boolean isProductModulesXml(@Nullable PsiFile file) {
-    if (!(file instanceof XmlFile xmlFile)) return false;
-    return DomManager.getDomManager(file.getProject()).getFileElement(xmlFile, ProductModulesElement.class) != null;
+    return isDomXml(file, ProductModulesElement.class);
   }
 
-  @NotNull
-  @Unmodifiable
-  public static Collection<IdeaPlugin> getPlugins(Project project, GlobalSearchScope scope) {
+  public static boolean isTemplatesXml(@Nullable PsiFile file) {
+    return isDomXml(file, TemplateSet.class);
+  }
+
+  private static boolean isDomXml(PsiFile file, Class<? extends DomElement> domElementClass) {
+    if (!(file instanceof XmlFile xmlFile)) return false;
+    return DomManager.getDomManager(xmlFile.getProject()).getFileElement(xmlFile, domElementClass) != null;
+  }
+
+  public static @NotNull @Unmodifiable Collection<IdeaPlugin> getPlugins(Project project, GlobalSearchScope scope) {
     if (DumbService.isDumb(project)) return Collections.emptyList();
 
     List<DomFileElement<IdeaPlugin>> files = DomService.getInstance().getFileElements(IdeaPlugin.class, project, scope);

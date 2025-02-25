@@ -10,8 +10,9 @@ import fleet.util.async.catching
 import fleet.util.async.use
 import fleet.util.logging.KLogger
 import fleet.util.logging.logger
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet
+import fleet.fastutil.ints.Int2ObjectOpenHashMap
+import fleet.fastutil.ints.IntOpenHashSet
+import fleet.util.computeIfAbsentShim
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
@@ -19,7 +20,7 @@ import kotlin.reflect.KClass
 import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 
-object Storage {
+private object Storage {
   val logger = logger<Storage>()
 }
 
@@ -41,10 +42,11 @@ suspend fun <T> withStorage(
       spannedScope("transact snapshot") {
         if (snapshot != DurableSnapshotWithPartitions.Empty) {
           Storage.logger.info { "applying non-empty snapshot $storageKey" }
+          val isFailFast = currentCoroutineContext()[FailFastMarker] != null
           hackyNonBlockingChange {
             span("apply snapshot") {
               DbContext.threadBound.ensureMutable {
-                applyDurableSnapshotWithPartitions(snapshot)
+                applyDurableSnapshotWithPartitions(snapshotWithPartitions = snapshot, isFailFast = isFailFast)
               }
             }
           }
@@ -52,7 +54,7 @@ suspend fun <T> withStorage(
       }
     }.onFailure { x ->
       // Throwing exception only if we're in test mode
-      if (coroutineContext[NoSupervisorForSagas] != null)
+      if (coroutineContext[FailFastMarker] != null)
         throw x
       else
         Storage.logger.error(x) { "couldn't restore state for $storageKey" }
@@ -66,7 +68,7 @@ suspend fun <T> withStorage(
             is SubscriptionEvent.First, is SubscriptionEvent.Reset -> {
               asOf(event.db) {
                 queryIndex(IndexQuery.LookupMany(Durable.StorageKeyAttr.attr as Attribute<StorageKey>, storageKey))
-                  .mapTo(storedEntitiesCache, Datom::eid)
+                  .forEach { storedEntitiesCache.add(it.eid) }
               }
               event.db
             }
@@ -127,20 +129,23 @@ data class DurableSnapshotWithPartitions(
   val partitions: Map<UID, Int>,
 ) {
   companion object {
-    val Empty = DurableSnapshotWithPartitions(DurableSnapshot.Empty, emptyMap())
+    val Empty: DurableSnapshotWithPartitions = DurableSnapshotWithPartitions(DurableSnapshot.Empty, emptyMap())
   }
 }
 
-private fun DbContext<Mut>.applyDurableSnapshotWithPartitions(snapshotWithPartitions: DurableSnapshotWithPartitions) {
+private fun DbContext<Mut>.applyDurableSnapshotWithPartitions(snapshotWithPartitions: DurableSnapshotWithPartitions, isFailFast: Boolean) {
   span("applyDurableSnapshotWithPartitions") {
     val memoizedEIDs = HashMap<UID, EID>()
-    applySnapshot(snapshotWithPartitions.snapshot) { uid ->
+    applySnapshotNew(snapshotWithPartitions.snapshot) { uid ->
       val partition = snapshotWithPartitions.partitions[uid]!!
-      memoizedEIDs.computeIfAbsent(uid) { EidGen.freshEID(partition) }
+      memoizedEIDs.computeIfAbsentShim(uid) { EidGen.freshEID(partition) }
     }
 
     val attrIdents = snapshotWithPartitions.snapshot.entities.flatMapTo(HashSet()) { e -> e.attrs.keys }
     val deserializationProblems = deserializationProblems(attrIdents.mapNotNull { k -> attributeByIdent(k.ident) })
+    if (isFailFast) {
+      check(deserializationProblems.isEmpty()) { deserializationProblems.joinToString(separator = "\n") }
+    }
 
     val schemaProblems = uidAttribute().let { uidAttr ->
       snapshotWithPartitions.snapshot.entities.flatMap { durableEntity ->
@@ -154,6 +159,9 @@ private fun DbContext<Mut>.applyDurableSnapshotWithPartitions(snapshotWithPartit
 
     reportDeserializationProblems(deserializationProblems, Storage.logger)
     reportSchemaProblems(schemaProblems, Storage.logger)
+    if (isFailFast) {
+      check(schemaProblems.isEmpty()) { schemaProblems.joinToString(separator = "\n") }
+    }
 
     val entitiesToRetract = (deserializationProblems.map { problem -> problem.datom.eid }
                              + schemaProblems.map(MissingRequiredAttribute::eid))
@@ -206,7 +214,7 @@ private fun durableSnapshotWithPartitions(
       }
 
     queryIndex(IndexQuery.LookupMany(storageKeyAttr, storageKey)).forEach { datom -> dfs(datom.eid) }
-    val datoms = datomsToStore.values.flatten()
+    val datoms = datomsToStore.values.asSequence().toList().flatten()
     val snapshot = buildDurableSnapshot(datoms.asSequence(), serializationRestrictions)
     DurableSnapshotWithPartitions(snapshot = snapshot,
                                   partitions = datoms.mapNotNull { (e, a, v) ->
@@ -238,4 +246,3 @@ fun DbContext<Q>.reportSchemaProblems(problems: List<MissingRequiredAttribute>, 
     }
   }
 }
-

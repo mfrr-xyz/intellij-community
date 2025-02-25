@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 // The package directive doesn't match the file location to prevent API breakage
 package org.jetbrains.kotlin.idea.debugger
@@ -12,6 +12,7 @@ import com.intellij.debugger.engine.DebuggerUtils.isSynthetic
 import com.intellij.debugger.engine.evaluation.EvaluationContext
 import com.intellij.debugger.impl.DebuggerUtilsAsync
 import com.intellij.debugger.impl.DebuggerUtilsEx
+import com.intellij.debugger.impl.DexDebugFacility
 import com.intellij.debugger.jdi.StackFrameProxyImpl
 import com.intellij.debugger.jdi.VirtualMachineProxyImpl
 import com.intellij.debugger.requests.ClassPrepareRequestor
@@ -24,6 +25,7 @@ import com.intellij.openapi.application.smartReadAction
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.DumbService
+import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.openapi.util.io.FileUtil
@@ -103,6 +105,7 @@ class KotlinPositionManager(private val debugProcess: DebugProcess) : MultiReque
     }
 
     override fun createStackFrames(descriptor: StackFrameDescriptorImpl): List<XStackFrame>? {
+        DebuggerManagerThreadImpl.assertIsManagerThread()
         if (descriptor.location?.isInKotlinSources() != true) {
             return null
         }
@@ -415,7 +418,7 @@ class KotlinPositionManager(private val debugProcess: DebugProcess) : MultiReque
     private fun KtCallExpression.getBytecodeMethodName(): String? = runDumbAnalyze(this, fallback = null) f@{
         val resolvedCall = resolveToCall()?.successfulFunctionCallOrNull() ?: return@f null
         val symbol = resolvedCall.partiallyAppliedSymbol.symbol as? KaNamedFunctionSymbol ?: return@f null
-        symbol.getByteCodeMethodName()
+        getByteCodeMethodName(symbol)
     }
 
     private fun PsiElement.calculatedClassNameMatches(currentLocationClassName: String, isLambda: Boolean): Boolean {
@@ -589,9 +592,12 @@ class KotlinPositionManager(private val debugProcess: DebugProcess) : MultiReque
     private fun getClassesWithInlinedCode(candidatesWithInline: List<String>, line: Int): List<ReferenceType> {
         val candidatesWithInlineInternalNames = candidatesWithInline.map { it.fqnToInternalName() }
         val futures = debugProcess.virtualMachineProxy.allClasses().map { type ->
-            hasInlinedLinesToAsync(type, line, candidatesWithInlineInternalNames).thenApply { hasInlinedLines ->
-                type.takeIf { hasInlinedLines }
-            }
+            hasInlinedLinesToAsync(type, line, candidatesWithInlineInternalNames)
+                .thenApply { hasInlinedLines -> type.takeIf { hasInlinedLines } }
+                .exceptionally { e ->
+                    val exception = DebuggerUtilsAsync.unwrap(e)
+                    if (exception is ObjectCollectedException) null else throw e
+                }
         }.toTypedArray()
         CompletableFuture.allOf(*futures).join()
         return futures.mapNotNull { it.get() }
@@ -793,12 +799,16 @@ private suspend fun findFileCandidatesWithBackgroundProcess(
         project, KotlinDebuggerCoreBundle.message("progress.title.kt.file.search"),
         cancellable = false
     ) {
-        val files = readAction {
-            FileBasedIndex.getInstance().ignoreDumbMode(DumbModeAccessType.RELIABLE_DATA_ONLY, ThrowableComputable {
-                val files = DebuggerUtils.findSourceFilesForClass(project, scopes, className, sourceName)
-                if (files.isNotEmpty()) return@ThrowableComputable files
-                DebuggerUtils.tryFindFileByClassNameAndFileName(project, className, sourceName, scopes)
-            })
+        val files = try {
+            readAction {
+                FileBasedIndex.getInstance().ignoreDumbMode(DumbModeAccessType.RELIABLE_DATA_ONLY, ThrowableComputable {
+                    val files = DebuggerUtils.findSourceFilesForClass(project, scopes, className, sourceName)
+                    if (files.isNotEmpty()) return@ThrowableComputable files
+                    DebuggerUtils.tryFindFileByClassNameAndFileName(project, className, sourceName, scopes)
+                })
+            }
+        } catch (_: IndexNotReadyException) {
+            emptyList()
         }
         if (files.isNotEmpty()) return@withBackgroundProgress files
 

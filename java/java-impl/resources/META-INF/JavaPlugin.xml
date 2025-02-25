@@ -11,6 +11,8 @@
   <xi:include href="intellij.java.debugger.impl.shared.xml"/>
   <xi:include href="/META-INF/JavaIndexingPlugin.xml"/>
   <xi:include href="/META-INF/JavaPsiPlugin.xml"/>
+  <xi:include href="/META-INF/JavaCodeServerCore.xml"/>
+  <xi:include href="/META-INF/JavaCodeServerHighlighting.xml"/>
   <xi:include href="/META-INF/JavaAnalysisPlugin.xml"/>
   <xi:include href="/META-INF/IntentionPowerPack.xml">
     <xi:fallback/>
@@ -78,6 +80,9 @@
     <extensionPoint qualifiedName="com.intellij.conversion.rule" interface="com.intellij.refactoring.typeMigration.rules.TypeConversionRule"
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.repositoryLibrary" beanClass="com.intellij.jarRepository.RepositoryLibraryDefinition"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.disableCompilationDependenciesResolutionTask"
+                    interface="com.intellij.jarRepository.DisableCompilationDependenciesResolutionTask"
                     dynamic="true"/>
     <!--suppress PluginXmlValidity -->
     <extensionPoint qualifiedName="com.intellij.encapsulateFields.Helper" beanClass="com.intellij.lang.LanguageExtensionPoint"
@@ -292,20 +297,6 @@
 
     <extensionPoint qualifiedName="com.intellij.gotoByName.defaultProvider.ignoreLanguage" dynamic="true"
                     beanClass="com.intellij.ide.util.gotoByName.IgnoreLanguageInDefaultProvider"/>
-
-
-    <!--todo move to main-->
-    <extensionPoint qualifiedName="com.intellij.codeInsight.completion.command.factory"
-                    beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
-      <with attribute="implementationClass" implements="com.intellij.codeInsight.completion.commands.CommandCompletionFactory"/>
-    </extensionPoint>
-
-    <extensionPoint qualifiedName="com.intellij.codeInsight.completion.command"
-                    dynamic="true"
-                    interface="com.intellij.codeInsight.completion.commands.api.CompletionCommand" />
-    <extensionPoint qualifiedName="com.intellij.codeInsight.completion.command.provider"
-                    dynamic="true"
-                    interface="com.intellij.codeInsight.completion.commands.api.CommandProvider" />
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -325,6 +316,9 @@
                        key="dialog.title.infer.nullity"/>
     <notificationGroup id="JDK Arch Check" displayType="STICKY_BALLOON" bundle="messages.JavaBundle" key="notification.group.arch.checker"/>
     <notificationGroup id="Unsupported JDK" displayType="STICKY_BALLOON" bundle="messages.JavaBundle" key="notification.group.unsupported.jdk"/>
+
+    <registryKey key="java.test.enable.tree.live.time" defaultValue="true"
+                 description="Enable live time for tests" restartRequired="true"/>
 
     <registryKey key="index.ids.from.java.sources.in.jar" defaultValue="true"
                  description="Index ids from class files instead of source files in JARs" restartRequired="false"/>
@@ -406,12 +400,12 @@
                         serviceImplementation="com.intellij.psi.impl.file.PsiPackageImplementationHelperImpl"/>
     <applicationService serviceInterface="com.intellij.psi.codeStyle.JavaFileCodeStyleFacadeFactory"
                         serviceImplementation="com.intellij.psi.codeStyle.JavaFileCodeStyleFacadeImpl$Factory"/>
-    <applicationService serviceInterface="com.intellij.psi.JavaModuleGraphHelper"
-                        serviceImplementation="com.intellij.codeInsight.daemon.impl.analysis.JavaModuleGraphHelperImpl"/>
 
     <projectService serviceImplementation="com.intellij.jarRepository.RemoteRepositoriesConfiguration"/>
     <projectService serviceImplementation="com.intellij.jarRepository.services.MavenRepositoryServicesManager"/>
     <projectService serviceImplementation="com.intellij.codeInsight.JavaProjectCodeInsightSettings"/>
+    <optionController implementation="com.intellij.codeInsight.JavaProjectCodeInsightSettings$Provider"/>
+    <applicationService serviceImplementation="com.intellij.codeInsight.JavaIdeCodeInsightSettings"/>
     <projectService serviceInterface="com.intellij.testIntegration.TestFailedLineManager"
                     serviceImplementation="com.intellij.execution.codeInspection.TestFailedLineManagerImpl"/>
     <projectService serviceInterface="com.intellij.codeInspection.ex.EntryPointsManager"
@@ -651,8 +645,6 @@
     <externalSystem.beforeRunTaskImporter
       implementation="com.intellij.openapi.externalSystem.service.project.settings.BuildArtifactsTaskImporter"/>
     <externalSystemConfigurationHandler implementation="com.intellij.openapi.externalSystem.service.project.settings.ArtifactsImporter"/>
-    <externalSystem.moduleDataServiceExtension
-      implementation="com.intellij.openapi.externalSystem.service.project.ModuleDataServiceJavaExtension"/>
     <externalSystem.runConfigurationEx implementation="com.intellij.execution.ExternalSystemRunConfigurationJavaExtension"/>
     <applicationService serviceInterface="com.intellij.openapi.externalSystem.service.execution.ExternalSystemJdkProvider"
                         serviceImplementation="com.intellij.openapi.externalSystem.service.execution.ExternalSystemJavaSdkProvider"
@@ -662,7 +654,7 @@
     <programRunner id="defaultRunRunner" implementation="com.intellij.execution.impl.DefaultJavaProgramRunner"/>
     <java.programPatcher implementation="com.intellij.execution.ClasspathModificationPatcher" order="last"/>
 
-    <runConfigurationExtension implementation="com.intellij.execution.JavaVersionChecker"/>
+    <postStartupActivity implementation="com.intellij.openapi.projectRoots.JavaVersionChecker"/>
 
     <checkinHandlerFactory implementation="com.intellij.compiler.impl.vcs.UnloadedModulesCompilationCheckinHandler$Factory"/>
 
@@ -829,6 +821,7 @@
     <internalFileTemplate name="Enum"/>
     <internalFileTemplate name="Record"/>
     <internalFileTemplate name="AnnotationType" subject="@interface"/>
+    <internalFileTemplate name="Exception"/>
     <internalFileTemplate name="package-info"/>
     <internalFileTemplate name="module-info"/>
 
@@ -864,8 +857,14 @@
     <projectStructureDetector implementation="com.intellij.ide.util.projectWizard.importSources.impl.JavaProjectStructureDetector"
                               order="first"/>
 
+    <registryKey key="testDiscovery.enabled"
+                 defaultValue="false"
+                 description="Enable instrumentation during tests to be able to start 'tests which pass this code' later"/>
+
     <runConfigurationExtension implementation="com.intellij.execution.testDiscovery.TestDiscoveryExtension"/>
     <runConfigurationExtension implementation="com.intellij.execution.impl.JavaDebuggerAutoAttach"/>
+
+    <editorFloatingToolbarProvider implementation="com.intellij.execution.testDiscovery.JavaAutoRunFloatingToolbarProvider"/>
 
     <completion.contributor language="JAVA" id="methodsChainsCompletionContributor" order="first"
                             implementationClass="com.intellij.compiler.chainsSearch.completion.MethodChainCompletionContributor"/>
@@ -929,7 +928,7 @@
     <jvm.logging implementation="com.intellij.lang.logging.UnspecifiedLogger"/>
 
     <javaModuleSystem implementation="com.intellij.psi.impl.JavaPlatformModuleSystem"/>
-    <java.error.fix errorCode="lambda.variable.must.be.final"
+    <java.error.fix errorCode="variable.must.be.effectively.final.lambda"
                     implementationClass="com.intellij.codeInspection.streamMigration.SimplifyForEachInspection$ForEachNonFinalFix"/>
     <lang.jvm.actions.jvmElementActionsFactory implementation="com.intellij.codeInsight.intention.impl.JavaElementActionsFactory"/>
     <longLineInspectionPolicy implementation="com.intellij.codeInspection.JavaLongLineInspectionPolicy"/>
@@ -971,7 +970,6 @@
     <codeInsight.externalLibraryResolver implementation="com.intellij.codeInspection.concurrencyAnnotations.JCiPExternalLibraryResolver"/>
     <codeInsight.externalLibraryResolver
       implementation="com.intellij.codeInsight.daemon.impl.quickfix.JetBrainsAnnotationsExternalLibraryResolver"/>
-    <codeInsight.unresolvedReferenceQuickFixProvider implementation="com.intellij.jarFinder.FindJarQuickFixProvider"/>
     <generation.toStringClassFilter implementation="org.jetbrains.generate.tostring.GenerateToStringInterfaceFilter" order="last"/>
     <gotoDeclarationHandler implementation="com.intellij.codeInsight.navigation.actions.GotoVarTypeHandler"/>
     <annotator language="SPI" implementationClass="com.intellij.spi.SPIAnnotator"/>
@@ -1494,24 +1492,32 @@
                             implementationClass="com.intellij.codeInsight.completion.JvmLoggerCompletionContributor"/>
     <completion.contributor language="JAVA" id="jigsaw"
                             implementationClass="com.intellij.codeInsight.completion.JigsawCompletionContributor"/>
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.InlineVariableCompletionCommand" />
-    <codeInsight.completion.command.provider implementation="com.intellij.codeInsight.completion.commands.impl.ExtensionPointCommandProvider" />
-    <codeInsight.completion.command.provider implementation="com.intellij.codeInsight.completion.commands.impl.IntentionCommandProvider"  order="first"/>
-    <codeInsight.completion.command.provider implementation="com.intellij.codeInsight.completion.commands.impl.GenerateCommandProvider" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.GoToDeclarationCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.RenameActionCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.OptimizeImportCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.FormatCodeCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.RefactorThisCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.RecentFilesCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.ProjectViewCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.CommentCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.IntroduceVariableCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.ShowUsagesActionCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.GenerateGetterSetterHandleCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.GenerateSetterHandleCompletionCommand" />
-    <codeInsight.completion.command implementation="com.intellij.codeInsight.completion.commands.impl.GenerateGetterHandleCompletionCommand" />
 
+    <codeInsight.completion.command.factory language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.JavaCommandCompletionFactory" />
+    <codeInsight.completion.intention.skipper language="JAVA"
+                                              implementationClass="com.intellij.codeInsight.completion.commands.JavaCommandCompletionFactory$JavaIntentionCommandSkipper"/>
+    <codeInsight.completion.intention.offset.provider language="JAVA"
+                                                      implementationClass="com.intellij.codeInsight.completion.commands.JavaCommandCompletionFactory$JavaIntentionCommandOffsetProvider"/>
+    <codeInsight.completion.command.provider language="JAVA" implementationClass="com.intellij.codeInsight.completion.command.commands.SimpleRunMarkerCommandProvider" />
+    <codeInsight.completion.command.provider language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaGenerateCommandCompletion" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaInlineVariableCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaGoToDeclarationCommandCompletion" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.command.commands.RenameActionCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.command.commands.OptimizeImportCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaFormatCodeCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.command.commands.RecentFilesCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.command.commands.ProjectViewCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.command.commands.LineCommentCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.command.commands.PsiElementCommentCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaIntroduceVariableCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaShowUsagesActionCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.GenerateGetterSetterHandleCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.GenerateSetterHandleCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.GenerateGetterHandleCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaDeleteCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaCopyFQNCompletionCommand" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaGoToImplementationCommandCompletion" />
+    <codeInsight.completion.applicable.command language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaChangeSignatureCompletionCommand" />
 
     <weigher implementationClass="com.intellij.codeInsight.completion.LoggerWeigher" key="completion" id="logger"/>
 
@@ -1566,9 +1572,9 @@
     <lang.namesValidator language="JAVA" implementationClass="com.intellij.lang.refactoring.JavaNamesValidator"/>
     <actionPromoter implementation="com.intellij.codeInsight.editorActions.JavaMethodOverloadSwitchActionPromoter"/>
     <actionPromoter implementation="com.intellij.codeInsight.editorActions.JavaNextParameterActionPromoter"/>
-    <java.error.fix errorCode="lambda.variable.must.be.final"
+    <java.error.fix errorCode="variable.must.be.effectively.final.lambda"
                     implementationClass="com.intellij.codeInsight.daemon.impl.quickfix.VariableAccessFromInnerClassJava10Fix"/>
-    <java.error.fix errorCode="guarded.pattern.variable.must.be.final"
+    <java.error.fix errorCode="variable.must.be.effectively.final.guard"
                     implementationClass="com.intellij.codeInsight.daemon.impl.quickfix.VariableAccessFromInnerClassJava10Fix"/>
     <stripTrailingSpacesFilterFactory implementation="com.intellij.codeEditor.JavaStripTrailingSpacesFilterFactory"/>
 
@@ -1957,6 +1963,11 @@
                      level="INFORMATION"
                      implementationClass="com.intellij.codeInspection.streamToLoop.StreamToLoopInspection"
                      key="inspection.stream.to.loop.display.name" bundle="messages.JavaBundle"/>
+    <localInspection groupPath="Java" language="JAVA" shortName="UnreachableCatch"
+                     groupKey="group.names.verbose.or.redundant.code.constructs" groupBundle="messages.InspectionsBundle" 
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="com.intellij.codeInspection.deadCode.UnreachableCatchInspection"
+                     key="inspection.unreachable.catch.name" bundle="messages.JavaAnalysisBundle"/>
     <localInspection groupPath="Java" language="JAVA" shortName="OptionalToIf"
                      groupKey="group.names.code.style.issues" groupBundle="messages.InspectionsBundle" enabledByDefault="true"
                      level="INFORMATION"
@@ -2280,6 +2291,10 @@
     <registryKey defaultValue="false"
                  description="Use shallow unused declaration analysis in batch mode (like in the editor, Java only)"
                  key="java.unused.declaration.inspection.use.shallow.local.anaysis.as.global"/>
+    <localInspection groupPath="Java" language="JAVA" key="inspection.static.import.can.be.used.display.name"
+                     groupBundle="messages.InspectionsBundle" groupKey="group.names.imports" enabledByDefault="true"
+                     level="WARNING" cleanupTool="true" editorAttributes="NOT_USED_ELEMENT_ATTRIBUTES"
+                     implementationClass="com.intellij.codeInspection.StaticImportCanBeUsedInspection" bundle="messages.JavaBundle"/>
 
     <intentionAction>
       <language>JAVA</language>
@@ -2362,6 +2377,12 @@
     <intentionAction>
       <language>JAVA</language>
       <className>com.intellij.codeInsight.intention.impl.AddOnDemandStaticImportAction</className>
+      <bundleName>messages.JavaBundle</bundleName>
+      <categoryKey>intention.category.imports</categoryKey>
+    </intentionAction>
+    <intentionAction>
+      <language>JAVA</language>
+      <className>com.intellij.codeInsight.intention.impl.AddOnDemandStaticImportToAutoImportAction</className>
       <bundleName>messages.JavaBundle</bundleName>
       <categoryKey>intention.category.imports</categoryKey>
     </intentionAction>
@@ -2761,17 +2782,17 @@
 
     <trigramIndexFilterExcludeExtension implementation="com.intellij.java.impl.find.ngrams.JavaTrigramFilterExcludeExtension"/>
 
-    <codeInsight.completion.command.factory language="JAVA" implementationClass="com.intellij.codeInsight.completion.commands.impl.JavaCommandCompletionFactory" />
-    <completion.contributor language="JAVA" id="commands" order="first, after liveTemplates"
-                            implementationClass="com.intellij.codeInsight.completion.commands.core.CommandCompletionContributor"/>
-    <lookup.charFilter implementation="com.intellij.codeInsight.completion.commands.core.CommandCompletionCharFilter" order="first" id="commandCompletion"/>
-    <typedHandler implementation="com.intellij.codeInsight.completion.commands.core.CommandTypeHandler" id="commandPreviousCompletion" order="first"/>
-
-    <show.intention.cached.intentions.handler implementation="com.intellij.codeInsight.completion.commands.core.CommandCompletionServiceImpl"/>
-
-    <registryKey key="java.completion.command.enabled" defaultValue="false"
-                 description="Enable experimental support command completion" restartRequired="true"/>
-
+    <registryKey key="java.completion.argument.live.template" defaultValue="false"
+                 description="When completing a method call, start a live template with all arguments"/>
+    <registryKey key="java.completion.argument.live.template.completion" defaultValue="false"
+                 description="If java.completion.argument.live.template is enabled, show completion for method arguments immediately"/>
+    <registryKey key="java.completion.show.constructors" defaultValue="false"
+                 description="Show separate constructors when completing constructor call, instead of a single class name"/>
+    <registryKey key="java.javadoc.use.templates" defaultValue="true"
+                 description="Use code templates to generate JavaDoc stubs"/>
+    <registryKey key="java.completion.methods.use.tags"
+                 defaultValue="true"
+                 description="Use additional tags for methods for completion"/>
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains">
@@ -2835,7 +2856,5 @@
               topic="com.intellij.refactoring.listeners.RefactoringEventListener"/>
     <listener class="com.intellij.openapi.roots.impl.LanguageLevelChangedListener"
               topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
-    <listener class="com.intellij.codeInsight.completion.commands.core.CommandCompletionListener"
-              topic="com.intellij.codeInsight.lookup.LookupManagerListener"/>
   </projectListeners>
 </idea-plugin>

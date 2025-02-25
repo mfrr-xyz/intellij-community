@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection.actions;
 
 import com.intellij.CommonBundle;
@@ -124,13 +124,19 @@ public final class RunInspectionAction extends GotoActionBase implements DataPro
                                    @Nullable PsiFile psiFile) {
     final PsiElement element = psiFile == null ? psiElement : psiFile;
     final InspectionProfile currentProfile = InspectionProjectProfileManager.getInstance(project).getCurrentProfile();
-    final InspectionToolWrapper<?, ?> toolWrapper = element != null
-                                                    ? currentProfile.getInspectionTool(shortName, element)
-                                                    : currentProfile.getInspectionTool(shortName, project);
-    LOGGER.assertTrue(toolWrapper != null, "Missed inspection: " + shortName);
-    record BaseAnalysisActionDialogInfo(@NotNull AnalysisScope analysisScope, @NotNull List<ModelScopeItem> items) {}
+
+    record BaseAnalysisActionDialogInfo(
+      @NotNull InspectionToolWrapper<?, ?> toolWrapper,
+      @NotNull AnalysisScope analysisScope,
+      @NotNull List<ModelScopeItem> items
+    ) {
+    }
 
     ReadAction.nonBlocking(() -> {
+      final InspectionToolWrapper<?, ?> toolWrapper = element != null
+                                                      ? currentProfile.getInspectionTool(shortName, element)
+                                                      : currentProfile.getInspectionTool(shortName, project);
+      LOGGER.assertTrue(toolWrapper != null, "Missed inspection: " + shortName);
       final Module module = findModuleForFiles(project, virtualFiles);
 
       AnalysisScope analysisScope = null;
@@ -152,10 +158,10 @@ public final class RunInspectionAction extends GotoActionBase implements DataPro
         }
       }
       List<ModelScopeItem> items = BaseAnalysisActionDialog.standardItems(project, analysisScope, module, psiElement);
-      return new BaseAnalysisActionDialogInfo(analysisScope, items);
+      return new BaseAnalysisActionDialogInfo(toolWrapper, analysisScope, items);
     })
       .finishOnUiThread(ModalityState.nonModal(),
-                        info -> new RunInspectionDialog(toolWrapper, project, info.items, info.analysisScope).showAndGet())
+                        info -> new RunInspectionDialog(info.toolWrapper, project, info.items, info.analysisScope).showAndGet())
       .submit(AppExecutorUtil.getAppExecutorService());
   }
 
@@ -184,10 +190,10 @@ public final class RunInspectionAction extends GotoActionBase implements DataPro
       myFileFilterPanel = new FileFilterPanel();
       myFileFilterPanel.init(getOptions());
       myInitialAnalysisScope = initialAnalysisScope;
+      super.init();
 
       //don't show if called for regexp inspection which makes no sense without injection
       setShowInspectInjectedCode(!(Language.findLanguageByID(toolWrapper.getLanguage()) instanceof InjectableLanguage));
-      super.init();
     }
 
     @Override

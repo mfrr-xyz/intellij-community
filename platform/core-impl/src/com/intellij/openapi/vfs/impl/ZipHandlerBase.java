@@ -13,11 +13,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodType;
 import java.nio.file.FileSystem;
-import java.lang.invoke.MethodHandles;
-import java.lang.NoSuchMethodException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.List;
@@ -26,32 +22,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class ZipHandlerBase extends ArchiveHandler {
   private static final Logger LOG = Logger.getInstance(ZipHandlerBase.class);
-  private static final boolean USE_NIO_HANDLER = Boolean.getBoolean("zip.handler.use.nio");
-  private static final MethodHandle ourRoutingMethodHandle;
-
-  static {
-    // This file is located in the module `platform.core.impl`, which is included in kotlinc.
-    // We do not want to have references to MultiRoutingFileSystem in kotlinc,
-    // hence we are using reflection to access the needed methods
-    MethodHandle methodHandle = null;
-    try {
-      MethodHandles.Lookup lookup = MethodHandles.publicLookup();
-      MethodType type = MethodType.methodType(boolean.class, Path.class);
-      Class<?> mrfs = Class.forName("com.intellij.platform.core.nio.fs.MultiRoutingFileSystem");
-      methodHandle = lookup.findVirtual(mrfs, "isRoutable", type);
-    }
-    catch (ClassNotFoundException e) {
-      // acceptable, sometimes we do not have MRFS in the classpath
-    }
-    catch (NoSuchMethodException | IllegalAccessException e) {
-      LOG.error("Error accessing MultiRoutingFileSystem#isRoutable", e);
-    }
-    catch (Throwable e) {
-      // let's avoid NCDFE
-      LOG.error("Unexpected exception initializing ourRoutingMethodHandle", e);
-    }
-    ourRoutingMethodHandle = methodHandle;
-  }
 
   @ApiStatus.Internal
   public static boolean getUseCrcInsteadOfTimestampPropertyValue() {
@@ -60,16 +30,7 @@ public abstract class ZipHandlerBase extends ArchiveHandler {
 
   @ApiStatus.Internal
   public static @NotNull GenericZipFile getZipFileWrapper(@NotNull Path file) throws IOException {
-    GenericZipFile wrapper;
-    if (USE_NIO_HANDLER) {
-      wrapper = new JavaNioZipFileWrapper(file);
-    }
-    else if (isFileLocal(file)) {
-      wrapper = new JavaZipFileWrapper(file.toFile());
-    }
-    else {
-      wrapper = new JBZipFileWrapper(file.toFile());
-    }
+    GenericZipFile wrapper = isFileLocal(file) ? new JavaZipFileWrapper(file.toFile()) : new JBZipFileWrapper(file.toFile());
     if (LOG.isTraceEnabled()) {
       LOG.trace("Using " + wrapper.getClass().getName() + " to open " + file);
     }
@@ -81,20 +42,16 @@ public abstract class ZipHandlerBase extends ArchiveHandler {
    * JVM internals assume that all files are local to it.
    */
   private static boolean isFileLocal(Path file) {
-    FileSystem pathFileSystem = file.getFileSystem();
-
-    if (ourRoutingMethodHandle != null && pathFileSystem.equals(FileSystems.getDefault())) {
-      // now we know that the default FS is MRFS
+    FileSystem fileFs = file.getFileSystem();
+    if (fileFs.equals(FileSystems.getDefault())) {
       try {
-        return !(boolean)ourRoutingMethodHandle.invoke(pathFileSystem, file);
+        // This class is located in the module `platform.core.impl`, which is included in kotlinc.
+        // We do not want to have references to MultiRoutingFileSystem in the latter, hence reflection.
+        return !(boolean)fileFs.getClass().getMethod("isRoutable", Path.class).invoke(fileFs, file);
       }
-      catch (Throwable e) {
-        return true;
-      }
+      catch (Throwable ignored) { }
     }
-    else {
-      return true;
-    }
+    return true;
   }
 
   public ZipHandlerBase(@NotNull String path) {

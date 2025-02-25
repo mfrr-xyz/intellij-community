@@ -27,7 +27,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
-import com.intellij.openapi.util.io.CanonicalPathPrefixTreeFactory;
+import com.intellij.openapi.util.io.CanonicalPathPrefixTree;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.NioPathUtil;
 import com.intellij.openapi.util.registry.Registry;
@@ -41,7 +41,10 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Scope;
 import org.gradle.api.ProjectConfigurationException;
-import org.gradle.tooling.*;
+import org.gradle.tooling.BuildActionFailureException;
+import org.gradle.tooling.CancellationTokenSource;
+import org.gradle.tooling.GradleConnector;
+import org.gradle.tooling.ProjectConnection;
 import org.gradle.tooling.model.ProjectModel;
 import org.gradle.tooling.model.build.BuildEnvironment;
 import org.gradle.tooling.model.idea.IdeaModule;
@@ -164,8 +167,6 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     var listener = resolverContext.getListener();
     var cancellationToken = resolverContext.getCancellationToken();
 
-    var projectResolverChain = createProjectResolverChain(resolverContext);
-
     ExternalSystemSyncActionsCollector.logSyncStarted(id.findProject(), id.getId(), settings.isParallelModelFetch());
 
     var gradleExecutionSpan = ExternalSystemTelemetryUtil.getTracer(GradleConstants.SYSTEM_ID)
@@ -175,10 +176,7 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
 
       GradleWrapperHelper.ensureInstalledWrapper(id, projectPath, settings, listener, cancellationToken);
 
-      var buildEnvironment = executeProjectResolverTask(resolverContext, projectResolverChain, connection ->
-        GradleExecutionHelper.getBuildEnvironment(connection, id, listener, cancellationToken, settings)
-      );
-      resolverContext.setBuildEnvironment(buildEnvironment);
+      var projectResolverChain = createProjectResolverChain(resolverContext);
 
       var projectDataNode = executeProjectResolverTask(resolverContext, projectResolverChain, connection ->
         doResolveProjectInfo(connection, resolverContext, projectResolverChain)
@@ -229,10 +227,15 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     var settings = resolverContext.getSettings();
     var listener = resolverContext.getListener();
     var cancellationToken = resolverContext.getCancellationToken();
-    var buildEnvironment = resolverContext.getBuildEnvironment();
 
     return GradleExecutionHelper.execute(projectPath, settings, id, listener, cancellationToken, connection -> {
+      BuildEnvironment buildEnvironment = null;
       try {
+        buildEnvironment = GradleExecutionHelper.getBuildEnvironment(connection, id, listener, cancellationToken, settings);
+        if (buildEnvironment != null) {
+          resolverContext.setBuildEnvironment(buildEnvironment);
+        }
+
         return task.apply(connection);
       }
       catch (ProcessCanceledException e) {
@@ -849,10 +852,10 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
       for (var sourceSetNode : findAll(moduleNode, GradleSourceSetData.KEY)) {
         var contentRootPaths = contentRootIndex.resolveContentRoots(externalProject, sourceSetNode);
 
-        var contentRootNodes = CanonicalPathPrefixTreeFactory.INSTANCE.<ContentRootData>createMap();
+        var contentRootNodes = CanonicalPathPrefixTree.INSTANCE.<ContentRootData>createMap();
         for (var contentRootPath : contentRootPaths) {
           var contentRootData = new ContentRootData(GradleConstants.SYSTEM_ID, contentRootPath);
-          contentRootNodes.set(contentRootPath, contentRootData);
+          contentRootNodes.put(contentRootPath, contentRootData);
         }
 
         for (var contentRootNode : findAll(sourceSetNode, ProjectKeys.CONTENT_ROOT)) {
@@ -972,12 +975,11 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     }
 
     GradleProjectResolverExtension chainWrapper = new AbstractProjectResolverExtension() {
-      @NotNull
       @Override
-      public ExternalSystemException getUserFriendlyError(@Nullable BuildEnvironment buildEnvironment,
-                                                          @NotNull Throwable error,
-                                                          @NotNull String projectPath,
-                                                          @Nullable String buildFilePath) {
+      public @NotNull ExternalSystemException getUserFriendlyError(@Nullable BuildEnvironment buildEnvironment,
+                                                                   @NotNull Throwable error,
+                                                                   @NotNull String projectPath,
+                                                                   @Nullable String buildFilePath) {
         ExternalSystemException friendlyError = super.getUserFriendlyError(buildEnvironment, error, projectPath, buildFilePath);
         return new BaseProjectImportErrorHandler()
           .checkErrorsWithoutQuickFixes(buildEnvironment, error, projectPath, buildFilePath, friendlyError);

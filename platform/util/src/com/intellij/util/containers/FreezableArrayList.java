@@ -36,15 +36,7 @@ public class FreezableArrayList<T> extends ArrayList<T> {
   }
   private void checkForFrozen() {
     if (modCount == -1) {
-      //try {
-      //  String text = ExceptionUtil.getThrowableText(new UnsupportedOperationException("This list is unmodifiable"));
-      //  Files.write(FileSystems.getDefault().getPath("C:/temp/ou" ), Arrays.asList(text, "packageNameRef = "), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-      //}
-      //catch (IOException e) {
-      //  throw new RuntimeException(e);
-      //}
-
-      throw new UnsupportedOperationException("This list is unmodifiable");
+      throw new UnsupportedOperationException("This list is unmodifiable. For a temporary workaround, please run IDE in non-internal mode.");
     }
   }
 
@@ -132,8 +124,7 @@ public class FreezableArrayList<T> extends ArrayList<T> {
     super.sort(c);
   }
 
-  @Unmodifiable
-  public List<T> emptyOrFrozen() {
+  public @Unmodifiable List<T> emptyOrFrozen() {
     return isEmpty() ? ContainerUtil.emptyList() :
            ContainerUtil.Options.RETURN_REALLY_UNMODIFIABLE_COLLECTION_FROM_METHODS_MARKED_UNMODIFIABLE ? freeze() : this;
   }

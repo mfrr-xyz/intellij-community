@@ -1,11 +1,9 @@
 ### auto-generated section `build kotlin.code-insight.structural-search.k2` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   context_receivers = True,
   opt_in = ["org.jetbrains.kotlin.analysis.api.KaIdeApi"]
 )
@@ -20,20 +18,20 @@ jvm_library(
   name = "kotlin-code-insight-structural-search-k2",
   module_name = "kotlin.code-insight.structural-search.k2",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_analysis-api",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-analysis-api",
     "@lib//:guava",
     "//platform/core-ui",
+    "//platform/core-impl",
     "//platform/ide-core",
     "//platform/platform-api:ide",
     "//platform/platform-impl:ide-impl",
     "//platform/structuralsearch:structuralSearch",
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//java/java-psi-api:psi",
     "//plugins/kotlin/base/analysis:kotlin-base-analysis",
     "//plugins/kotlin/base/psi:kotlin-base-psi",

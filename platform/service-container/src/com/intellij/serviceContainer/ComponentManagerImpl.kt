@@ -9,6 +9,7 @@ import com.intellij.codeWithMe.ClientIdContextElementPrecursor
 import com.intellij.concurrency.currentTemporaryThreadContextOrNull
 import com.intellij.concurrency.resetThreadContext
 import com.intellij.concurrency.withThreadLocal
+import com.intellij.configurationStore.ProjectIdManager
 import com.intellij.configurationStore.SettingsSavingComponent
 import com.intellij.diagnostic.ActivityCategory
 import com.intellij.diagnostic.LoadingState
@@ -646,11 +647,8 @@ abstract class ComponentManagerImpl(
         (component is PersistentStateComponent<*> ||
          component is SettingsSavingComponent ||
          component is com.intellij.openapi.util.JDOMExternalizable)) {
-      if (!LoadingState.CONFIGURATION_STORE_INITIALIZED.isOccurred) {
-        if (!getApplication()!!.isUnitTestMode) {
-          throw IllegalStateException("You cannot get $component before component store is initialized")
-        }
-        return
+      check(canBeInitOutOfOrder(component) || componentStore.isStoreInitialized || getApplication()!!.isUnitTestMode) {
+        "You cannot get $component before component store is initialized"
       }
 
       componentStore.initComponent(component = component, serviceDescriptor = serviceDescriptor, pluginId = pluginId)
@@ -659,6 +657,10 @@ abstract class ComponentManagerImpl(
 
   protected open fun isPreInitialized(service: Any): Boolean {
     return service is PathMacroManager || service is IComponentStore || service is MessageBusFactory
+  }
+
+  private fun canBeInitOutOfOrder(service: Any): Boolean {
+    return service is ProjectIdManager
   }
 
   protected abstract fun getContainerDescriptor(pluginDescriptor: IdeaPluginDescriptorImpl): ContainerDescriptor
@@ -861,8 +863,8 @@ abstract class ComponentManagerImpl(
           // => but [parentDisposable] is [UsefulTestCase.getTestRootDisposable] which might be disposed after the fixture.
           //
           // This indicates a problem with scoping.
-          // The [parentDisposable] should be disposed on the same level as the code which replaces the service, i.e.,
-          // if the service is registered in a [setUp] method before a test,
+          // The [parentDisposable] should be disposed on the same level as the code which replaces the service.
+          // If the service is registered in a [setUp] method before a test,
           // then the [parentDisposable] should be disposed in [tearDown] right after the test.
           // In other words, it's generally incorrect to use [UsefulTestCase.getTestRootDisposable]
           // as a [parentDisposable] for the replacement service.
@@ -1064,7 +1066,11 @@ abstract class ComponentManagerImpl(
             LOG.error(PluginException(message, plugin.pluginId))
           }
           else if (!isKnown || !impl.startsWith("com.intellij.")) {
-            LOG.warn(message)
+            val application = ApplicationManager.getApplication()
+            if (application == null || application.isUnitTestMode || application.isInternal) {
+              // logged only during development, let's not spam users
+              LOG.warn(message)
+            }
           }
         }
 
@@ -1670,7 +1676,7 @@ private fun <X> runBlockingInitialization(action: suspend CoroutineScope.() -> X
       val contextForInitializer =
         (ctx.contextModality()?.asContextElement() ?: EmptyCoroutineContext) + // leak modality state into initialization coroutine
         (ctx[Job] ?: EmptyCoroutineContext) + // bind to caller Job
-        getLockPermitContext() + // capture whether the caller holds the read lock
+        getLockPermitContext(ctx, false) + // capture whether the caller holds the read lock
         (currentTemporaryThreadContextOrNull() ?: EmptyCoroutineContext) + // propagate modality state/CurrentlyInitializingInstance
         NestedBlockingEventLoop(Thread.currentThread()) // avoid processing events from outer runBlocking (if any)
       @Suppress("RAW_RUN_BLOCKING")

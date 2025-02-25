@@ -15,7 +15,7 @@
  */
 package org.jetbrains.idea.maven.project.importing
 
-import com.intellij.openapi.application.writeAction
+import com.intellij.openapi.application.edtWriteAction
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.UsefulTestCase
@@ -1807,7 +1807,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
     finally {
       embeddersManager.releaseInTests()
     }
-    val f = dir.toPath().resolve("tree.dat")
+    val f = dir.resolve("tree.dat")
     tree.save(f)
     val read = MavenProjectsTree.read(project, f)
     val roots = read!!.rootProjects
@@ -2081,7 +2081,7 @@ class MavenProjectsTreeReadingTest : MavenProjectsTreeTestCase() {
     updateAll(mutableListOf<String?>("one", "two"), projectPom)
     assertUnorderedElementsAreEqual(
       tree.explicitProfiles.enabledProfiles, "one", "two")
-    writeAction {
+    edtWriteAction {
       m.delete(this)
     }
     deleteProject(m)

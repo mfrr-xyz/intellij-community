@@ -54,6 +54,7 @@ public abstract class TestConsoleProperties extends StoringPropertyContainer imp
   public static final BooleanProperty SHOW_INLINE_STATISTICS = new BooleanProperty("showInlineStatistics", true);
   public static final BooleanProperty INCLUDE_NON_STARTED_IN_RERUN_FAILED = new BooleanProperty("includeNonStarted", true);
   public static final BooleanProperty HIDE_SUCCESSFUL_CONFIG = new BooleanProperty("hideConfig", false);
+  public static final BooleanProperty SHOW_AUTO_TEST_TOOLBAR = new BooleanProperty("autoTestToolbar", true);
 
   private final Project myProject;
   private final Executor myExecutor;
@@ -77,16 +78,14 @@ public abstract class TestConsoleProperties extends StoringPropertyContainer imp
   /**
    * @return scope which was used to compose tests classpath
    */
-  @NotNull
-  public GlobalSearchScope getScope() {
+  public @NotNull GlobalSearchScope getScope() {
     if (myScope == null) {
       myScope = initScope();
     }
     return myScope;
   }
 
-  @NotNull
-  protected GlobalSearchScope initScope() {
+  protected @NotNull GlobalSearchScope initScope() {
     RunProfile configuration = getConfiguration();
     if (!(configuration instanceof ModuleRunProfile)) {
       return GlobalSearchScope.allScope(myProject);
@@ -187,8 +186,7 @@ public abstract class TestConsoleProperties extends StoringPropertyContainer imp
   /**
    * Override to customize console used
    */
-  @NotNull
-  public ConsoleView createConsole() {
+  public @NotNull ConsoleView createConsole() {
     return new TestsConsoleBuilderImpl(getProject(),
                                        getScope(),
                                        !isEditable(),
@@ -212,8 +210,7 @@ public abstract class TestConsoleProperties extends StoringPropertyContainer imp
   /**
    * If supported by the framework, can be used in additional actions toolbar
    */
-  @NotNull
-  protected ToggleBooleanProperty createIncludeNonStartedInRerun(TestConsoleProperties target) {
+  protected @NotNull ToggleBooleanProperty createIncludeNonStartedInRerun(TestConsoleProperties target) {
     String text = ExecutionBundle.message("junit.runing.info.include.non.started.in.rerun.failed.action.name");
     return new DumbAwareToggleBooleanProperty(text, null, null, target, INCLUDE_NON_STARTED_IN_RERUN_FAILED);
   }
@@ -221,8 +218,7 @@ public abstract class TestConsoleProperties extends StoringPropertyContainer imp
   /**
    * If supported by the framework, can be used in additional actions toolbar
    */
-  @NotNull
-  protected ToggleBooleanProperty createHideSuccessfulConfig(TestConsoleProperties target) {
+  protected @NotNull ToggleBooleanProperty createHideSuccessfulConfig(TestConsoleProperties target) {
     String text = ExecutionBundle.message("junit.runing.info.hide.successful.config.action.name");
     setIfUndefined(HIDE_SUCCESSFUL_CONFIG, true);
     return new DumbAwareToggleBooleanProperty(text, null, null, target, HIDE_SUCCESSFUL_CONFIG);
@@ -236,16 +232,14 @@ public abstract class TestConsoleProperties extends StoringPropertyContainer imp
     return TreeSelectionModel.SINGLE_TREE_SELECTION;
   }
 
-  @NotNull
-  public ExecutionTarget getExecutionTarget() {
+  public @NotNull ExecutionTarget getExecutionTarget() {
     return DefaultExecutionTarget.INSTANCE;
   }
 
   /**
    * Override to choose toolwindow where test finished notification would be shown
    */
-  @NotNull
-  public String getWindowId() {
+  public @NotNull String getWindowId() {
     return isDebug() ? ToolWindowId.DEBUG : ToolWindowId.RUN;
   }
 

@@ -17,28 +17,31 @@ import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunCo
 import com.intellij.openapi.externalSystem.util.ExternalSystemTelemetryUtil;
 import com.intellij.openapi.externalSystem.util.OutputWrapper;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.util.Couple;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.*;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.containers.MultiMap;
 import com.intellij.util.lang.JavaVersion;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Scope;
+import org.gradle.process.internal.JvmOptions;
 import org.gradle.tooling.*;
 import org.gradle.tooling.events.OperationType;
 import org.gradle.tooling.model.build.BuildEnvironment;
 import org.gradle.util.GradleVersion;
-import org.jetbrains.annotations.*;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 import org.jetbrains.plugins.gradle.jvmcompat.GradleJvmSupportMatrix;
 import org.jetbrains.plugins.gradle.properties.GradlePropertiesFile;
 import org.jetbrains.plugins.gradle.service.execution.cmd.GradleCommandLineOptionsProvider;
 import org.jetbrains.plugins.gradle.service.project.GradleExecutionHelperExtension;
 import org.jetbrains.plugins.gradle.settings.GradleExecutionSettings;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
-import org.jetbrains.plugins.gradle.util.cmd.jvmArgs.GradleJvmArgument;
-import org.jetbrains.plugins.gradle.util.cmd.jvmArgs.GradleJvmArguments;
 import org.jetbrains.plugins.gradle.util.cmd.node.GradleCommandLine;
-import org.jetbrains.plugins.gradle.util.cmd.node.GradleCommandLineOption;
 import org.jetbrains.plugins.gradle.util.cmd.node.GradleCommandLineTask;
 
 import java.io.File;
@@ -58,6 +61,59 @@ public final class GradleExecutionHelper {
   public GradleExecutionHelper() { }
 
   private static final Logger LOG = Logger.getInstance(GradleExecutionHelper.class);
+
+  /**
+   * @deprecated Use the {@link ProjectConnection#newBuild} function directly.
+   * Or use the {@link com.intellij.openapi.externalSystem.util.ExternalSystemUtil#runTask} API for the high-level Gradle task execution.
+   */
+  @Deprecated
+  public @NotNull BuildLauncher getBuildLauncher(
+    @NotNull ProjectConnection connection,
+    @NotNull ExternalSystemTaskId id,
+    @NotNull List<String> tasksAndArguments,
+    @NotNull GradleExecutionSettings settings,
+    @NotNull ExternalSystemTaskNotificationListener listener
+  ) {
+    BuildLauncher operation = connection.newBuild();
+    prepare(connection, operation, id, tasksAndArguments, settings, listener);
+    return operation;
+  }
+
+  /**
+   * @deprecated Use the {@link ProjectConnection#newTestLauncher} function directly.
+   * Or use the {@link com.intellij.openapi.externalSystem.util.ExternalSystemUtil#runTask} API for the high-level Gradle task execution.
+   */
+  @Deprecated
+  public @NotNull TestLauncher getTestLauncher(
+    @NotNull ProjectConnection connection,
+    @NotNull ExternalSystemTaskId id,
+    @NotNull List<String> tasksAndArguments,
+    @NotNull GradleExecutionSettings settings,
+    @NotNull ExternalSystemTaskNotificationListener listener
+  ) {
+    var operation = connection.newTestLauncher();
+    prepare(connection, operation, id, tasksAndArguments, settings, listener);
+    return operation;
+  }
+
+  /**
+   * @deprecated Existed for the {@link #getBuildLauncher} and {@link #getTestLauncher} functions.
+   */
+  @Deprecated
+  private static void prepare(
+    @NotNull ProjectConnection connection,
+    @NotNull LongRunningOperation operation,
+    @NotNull ExternalSystemTaskId id,
+    @NotNull List<String> tasksAndArguments,
+    @NotNull GradleExecutionSettings settings,
+    @NotNull ExternalSystemTaskNotificationListener listener
+  ) {
+    GradleExecutionSettings effectiveSettings = new GradleExecutionSettings(settings);
+    effectiveSettings.setTasks(ContainerUtil.concat(effectiveSettings.getTasks(), tasksAndArguments));
+    CancellationToken cancellationToken = GradleConnector.newCancellationTokenSource().token();
+    BuildEnvironment buildEnvironment = getBuildEnvironment(connection, id, listener, cancellationToken, effectiveSettings);
+    prepareForExecution(operation, cancellationToken, id, effectiveSettings, listener, buildEnvironment);
+  }
 
   /**
    * @deprecated Use instead the static variant of this method.
@@ -205,63 +261,23 @@ public final class GradleExecutionHelper {
     @NotNull GradleExecutionSettings settings,
     @Nullable BuildEnvironment buildEnvironment
   ) {
-    var jvmArguments = GradleJvmArguments.EMPTY
-      .plus(getJvmArgumentsFromBuildEnvironment(buildEnvironment))
-      .plus(getJvmArgumentsFromGradleProperties(settings, buildEnvironment))
-      .plus(getJvmArgumentsFromSettings(settings));
-    LOG.debug("Passing JVM args to Gradle Tooling API: " + jvmArguments.getTokens());
-    operation.addJvmArguments(jvmArguments.getTokens());
-  }
+    var jvmArgs = ContainerUtil.filter(settings.getJvmArguments(), it -> !StringUtil.isEmpty(it));
 
-  private static @NotNull GradleJvmArguments getJvmArgumentsFromBuildEnvironment(
-    @Nullable BuildEnvironment buildEnvironment
-  ) {
-    if (buildEnvironment != null) {
-      var jvmArguments = GradleJvmArguments.parse(buildEnvironment.getJava().getJvmArguments());
-      return removeAddOpensAndExportsFromJvmArguments(jvmArguments);
+    if (jvmArgs.isEmpty()) {
+      return;
     }
-    return GradleJvmArguments.EMPTY;
-  }
 
-  /**
-   * Remove `--add-opens` and `--add-exports` options, because same options will be added by Gradle producing the option duplicates.
-   * And the daemon will become uncompilable with the CLI invocations.
-   *
-   * @see <a href="https://github.com/gradle/gradle/blob/v5.1.1/subprojects/launcher/src/main/java/org/gradle/launcher/daemon/configuration/DaemonParameters.java#L125">https://github.com/gradle/../DaemonParameters.java</a>
-   */
-  private static @NotNull GradleJvmArguments removeAddOpensAndExportsFromJvmArguments(@NotNull GradleJvmArguments jvmArguments) {
-    var result = new ArrayList<GradleJvmArgument>();
-    for (var jvmArgument : jvmArguments.getArguments()) {
-      if (jvmArgument instanceof GradleJvmArgument.OptionNotation jvmOption) {
-        var jvmOptionName = jvmOption.getOption().getName();
-        if (jvmOptionName.equals("--add-opens") || jvmOptionName.equals("--add-exports")) {
-          continue;
-        }
-      }
-      result.add(jvmArgument);
+    var buildEnvironmentRoot = getBuildRoot(buildEnvironment);
+    var buildEnvironmentJvmArgs = getJvmArgs(buildEnvironment);
+
+    // the BuildEnvironment jvm arguments of the main build should be used for the 'buildSrc' import
+    // to avoid spawning of the second Gradle daemon
+    if (buildEnvironmentRoot != null && !"buildSrc".equals(buildEnvironmentRoot.getFileName().toString())) {
+      // merge gradle args e.g. defined in gradle.properties
+      jvmArgs = mergeBuildJvmArguments(buildEnvironmentJvmArgs, jvmArgs);
     }
-    return new GradleJvmArguments(result);
-  }
 
-  private static @NotNull GradleJvmArguments getJvmArgumentsFromGradleProperties(
-    @NotNull GradleExecutionSettings settings,
-    @Nullable BuildEnvironment buildEnvironment
-  ) {
-    var buildRoot = getBuildRoot(buildEnvironment);
-    if (buildRoot != null) {
-      var properties = GradlePropertiesFile.getProperties(settings.getServiceDirectory(), buildRoot);
-      var jvmArgsProperty = properties.getJvmOptions();
-      if (jvmArgsProperty != null) {
-        return GradleJvmArguments.parse(jvmArgsProperty.getValue());
-      }
-    }
-    return GradleJvmArguments.EMPTY;
-  }
-
-  private static @NotNull GradleJvmArguments getJvmArgumentsFromSettings(
-    @NotNull GradleExecutionSettings settings
-  ) {
-    return GradleJvmArguments.parse(settings.getJvmArguments());
+    operation.setJvmArguments(ArrayUtilRt.toStringArray(jvmArgs));
   }
 
   private static void setupJavaHome(
@@ -302,19 +318,10 @@ public final class GradleExecutionHelper {
     var tasks = new ArrayList<GradleCommandLineTask>();
     for (var task : commandLine.getTasks()) {
       var name = task.getName();
-      var options = ContainerUtil.filter(task.getOptions(), it -> !isWildcardTestPattern(it));
+      var options = ContainerUtil.filter(task.getOptions(), it -> !GradleCommandLineUtil.isWildcardTestPattern(it));
       tasks.add(new GradleCommandLineTask(name, options));
     }
     return new GradleCommandLine(tasks, commandLine.getOptions());
-  }
-
-  private static boolean isWildcardTestPattern(@NotNull GradleCommandLineOption option) {
-    return option.getName().equals(GradleConstants.TESTS_ARG_NAME) &&
-           option.getValues().size() == 1 && (
-             option.getValues().get(0).equals("*") ||
-             option.getValues().get(0).equals("'*'") ||
-             option.getValues().get(0).equals("\"*\"")
-           );
   }
 
   private static void setupTestLauncherArguments(
@@ -349,8 +356,12 @@ public final class GradleExecutionHelper {
     }
   }
 
-  private static void setupLogging(@NotNull GradleExecutionSettings settings,
-                                   @Nullable BuildEnvironment buildEnvironment) {
+  @ApiStatus.Internal
+  @VisibleForTesting
+  public static void setupLogging(
+    @NotNull GradleExecutionSettings settings,
+    @Nullable BuildEnvironment buildEnvironment
+  ) {
     var arguments = settings.getArguments();
     var options = GradleCommandLineOptionsProvider.LOGGING_OPTIONS.getOptions();
     var optionsNames = GradleCommandLineOptionsProvider.getAllOptionsNames(options);
@@ -387,11 +398,19 @@ public final class GradleExecutionHelper {
     }
   }
 
-  private static @Nullable Path getBuildRoot(@Nullable BuildEnvironment buildEnvironment) {
+  public static @Nullable Path getBuildRoot(@Nullable BuildEnvironment buildEnvironment) {
     if (buildEnvironment == null) {
       return null;
     }
     return buildEnvironment.getBuildIdentifier().getRootDir().toPath();
+  }
+
+  private static @NotNull List<String> getJvmArgs(@Nullable BuildEnvironment buildEnvironment) {
+    if (buildEnvironment == null) {
+      return Collections.emptyList();
+    }
+    var jvmArgs = buildEnvironment.getJava().getJvmArguments();
+    return ContainerUtil.filter(jvmArgs, it -> !StringUtil.isEmpty(it));
   }
 
   private static void setupEnvironment(
@@ -416,12 +435,90 @@ public final class GradleExecutionHelper {
     operation.setEnvironmentVariables(effectiveEnvironment);
   }
 
-  @Nullable
-  public static BuildEnvironment getBuildEnvironment(@NotNull ProjectConnection connection,
-                                                     @NotNull ExternalSystemTaskId taskId,
-                                                     @NotNull ExternalSystemTaskNotificationListener listener,
-                                                     @Nullable CancellationToken cancellationToken,
-                                                     @Nullable GradleExecutionSettings settings) {
+  @ApiStatus.Internal
+  @VisibleForTesting
+  public static @NotNull List<String> mergeBuildJvmArguments(@NotNull List<String> jvmArgs, @NotNull List<String> jvmArgsFromIdeSettings) {
+    List<String> mergedJvmArgs = mergeJvmArgs(jvmArgs, jvmArgsFromIdeSettings);
+    JvmOptions jvmOptions = new JvmOptions(null);
+    jvmOptions.setAllJvmArgs(mergedJvmArgs);
+    return jvmOptions.getAllJvmArgs();
+  }
+
+  private static @NotNull List<String> mergeJvmArgs(@NotNull List<String> jvmArgs, @NotNull List<String> jvmArgsFromIdeSettings) {
+    List<String> mergedJvmArgs = ContainerUtil.concat(jvmArgs, jvmArgsFromIdeSettings);
+    MultiMap<String, String> argumentsMap = parseJvmArgs(mergedJvmArgs);
+
+    Map<String, String> mergedKeys = new LinkedHashMap<>();
+    Set<String> argKeySet = new LinkedHashSet<>(argumentsMap.keySet());
+    for (String argKey : argKeySet) {
+      Collection<String> values = argumentsMap.getModifiable(argKey);
+      if (values.size() == 1 && values.iterator().next().isEmpty()) {
+        Couple<String> couple = splitArg(argKey);
+        mergedKeys.put(couple.first, couple.second);
+      }
+      else {
+        mergedKeys.put(argKey, "");
+        Map<String, String> mergedArgs = new LinkedHashMap<>();
+        for (String jvmArg : values) {
+          if (jvmArg.isEmpty()) continue;
+          Couple<String> couple = splitArg(jvmArg);
+          mergedArgs.put(couple.first, couple.second);
+        }
+        values.clear();
+        mergedArgs.forEach((key, value) -> values.add(key + value));
+      }
+    }
+
+    List<String> mergedArgs = new SmartList<>();
+    mergedKeys.forEach((s1, s2) -> mergedArgs.add(s1 + s2));
+    argKeySet.stream().filter(argKey -> !mergedArgs.contains(argKey)).forEach(argumentsMap::remove);
+
+    // remove `--add-opens` options, because same options will be added by gradle producing the option duplicates.
+    // And the daemon will become uncompilable with the CLI invocations.
+    // see https://github.com/gradle/gradle/blob/v5.1.1/subprojects/launcher/src/main/java/org/gradle/launcher/daemon/configuration/DaemonParameters.java#L125
+    argumentsMap.remove("--add-opens");
+
+    List<String> result = new SmartList<>();
+    argumentsMap.keySet().forEach(key -> argumentsMap.get(key).forEach(val -> {
+      result.add(key);
+      if (StringUtil.isNotEmpty(val)) {
+        result.add(val);
+      }
+    }));
+    return result;
+  }
+
+  private static @NotNull MultiMap<@NotNull String, @NotNull String> parseJvmArgs(@NotNull List<@NotNull String> args) {
+    MultiMap<String, String> result = MultiMap.createLinkedSet();
+    String lastKey = null;
+    for (String jvmArg : args) {
+      if (jvmArg.startsWith("-")) {
+        result.putValue(jvmArg, "");
+        lastKey = jvmArg;
+      }
+      else {
+        if (lastKey != null) {
+          result.putValue(lastKey, jvmArg);
+          lastKey = null;
+        }
+        else {
+          result.putValue(jvmArg, "");
+        }
+      }
+    }
+    return result;
+  }
+
+  private static Couple<String> splitArg(String arg) {
+    int i = arg.indexOf('=');
+    return i <= 0 ? Couple.of(arg, "") : Couple.of(arg.substring(0, i), arg.substring(i));
+  }
+
+  public static @Nullable BuildEnvironment getBuildEnvironment(@NotNull ProjectConnection connection,
+                                                               @NotNull ExternalSystemTaskId taskId,
+                                                               @NotNull ExternalSystemTaskNotificationListener listener,
+                                                               @Nullable CancellationToken cancellationToken,
+                                                               @Nullable GradleExecutionSettings settings) {
     Span span = ExternalSystemTelemetryUtil.getTracer(GradleConstants.SYSTEM_ID)
       .spanBuilder("GetBuildEnvironment")
       .startSpan();
@@ -513,9 +610,9 @@ public final class GradleExecutionHelper {
     }
   }
 
-  @NotNull
+  @ApiStatus.Internal
   @VisibleForTesting
-  static List<String> obfuscatePasswordParameters(@NotNull List<String> commandLineArguments) {
+  public static @NotNull List<String> obfuscatePasswordParameters(@NotNull List<String> commandLineArguments) {
     List<String> replaced = new ArrayList<>(commandLineArguments.size());
     final String PASSWORD_PARAMETER_IDENTIFIER = ".password=";
     for (String option : commandLineArguments) {

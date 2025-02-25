@@ -1,11 +1,9 @@
 ### auto-generated section `build kotlin.compiler-plugins.parcelize.common` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   context_receivers = True
 )
 
@@ -19,13 +17,12 @@ jvm_library(
   name = "kotlin-compiler-plugins-parcelize-common",
   module_name = "kotlin.compiler-plugins.parcelize.common",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_parcelize-compiler-plugin",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-parcelize-compiler-plugin",
     "//java/java-psi-api:psi",
     "//java/java-psi-impl:psi-impl",
     "//plugins/kotlin/base/psi:kotlin-base-psi",
@@ -34,7 +31,7 @@ jvm_library(
     "//plugins/kotlin/base/analysis:kotlin-base-analysis",
     "//plugins/kotlin/base/code-insight:kotlin-base-code-insight",
     "//plugins/kotlin/code-insight/api:kotlin-code-insight-api",
-    "//platform/editor-ui-api:editor",
+    "//platform/editor-ui-api:editor-ui",
     "//platform/lang-impl",
     "//plugins/kotlin/base/compiler-configuration:kotlin-base-compiler-configuration",
     "//plugins/kotlin/base/facet:kotlin-base-facet",

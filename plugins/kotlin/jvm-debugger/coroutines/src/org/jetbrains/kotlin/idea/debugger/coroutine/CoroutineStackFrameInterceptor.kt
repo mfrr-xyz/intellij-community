@@ -1,16 +1,17 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.debugger.coroutine
 
 import com.intellij.debugger.actions.AsyncStacksToggleAction
 import com.intellij.debugger.engine.DebugProcessImpl
+import com.intellij.debugger.engine.DebuggerManagerThreadImpl
 import com.intellij.debugger.engine.MethodInvokeUtils
 import com.intellij.debugger.engine.SuspendContextImpl
 import com.intellij.debugger.engine.SuspendManagerUtil
-import com.intellij.debugger.engine.evaluation.EvaluateException
-import com.intellij.debugger.impl.ClassLoadingUtils
 import com.intellij.debugger.impl.DebuggerUtilsEx
 import com.intellij.debugger.impl.DebuggerUtilsImpl
+import com.intellij.debugger.impl.HelperClassNotAvailableException
+import com.intellij.debugger.impl.MethodNotFoundException
 import com.intellij.debugger.jdi.StackFrameProxyImpl
 import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.openapi.diagnostic.thisLogger
@@ -37,6 +38,7 @@ import org.jetbrains.kotlin.idea.debugger.coroutine.util.*
 
 private class CoroutineStackFrameInterceptor : StackFrameInterceptor {
     override fun createStackFrames(frame: StackFrameProxyImpl, debugProcess: DebugProcessImpl): List<XStackFrame>? {
+        DebuggerManagerThreadImpl.assertIsManagerThread()
         if (debugProcess.xdebugProcess?.session !is XDebugSessionImpl
             || frame is SkipCoroutineStackFrameProxyImpl
             || !AsyncStacksToggleAction.isAsyncStacksEnabled(debugProcess.xdebugProcess?.session as XDebugSessionImpl)) {
@@ -258,30 +260,18 @@ private class CoroutineStackFrameInterceptor : StackFrameInterceptor {
 
 internal fun callMethodFromHelper(
     helperClass: Class<*>, context: DefaultExecutionContext, methodName: String, args: List<Value?>,
-    vararg additionalClassesToLoad: Class<*>
+    vararg additionalClassesToLoad: String
 ): Value? {
     try {
-        if (!loadClasses(context, *additionalClassesToLoad)) return null
-        return DebuggerUtilsImpl.invokeHelperMethod(context.evaluationContext, helperClass, methodName, args)
+        return DebuggerUtilsImpl.invokeHelperMethod(context.evaluationContext, helperClass, methodName, args, true, *additionalClassesToLoad)
+    } catch (e: HelperClassNotAvailableException) {
+        fileLogger().warn(e)
+    } catch (e: MethodNotFoundException) {
+        fileLogger().warn(e)
     } catch (e: Exception) {
         val helperExceptionStackTrace = MethodInvokeUtils.getHelperExceptionStackTrace(context.evaluationContext, e)
         DebuggerUtilsImpl.logError("Exception from helper: ${e.message}", e,
                                    *listOfNotNull(helperExceptionStackTrace).toTypedArray()) // log helper exception if available
     }
     return null
-}
-
-private fun loadClasses(context: DefaultExecutionContext, vararg additionalClassesToLoad: Class<*>): Boolean {
-    for (clazz in additionalClassesToLoad) {
-        try {
-            if (ClassLoadingUtils.getHelperClass(clazz, context.evaluationContext) == null) {
-                fileLogger().warn("Cannot load '${clazz.canonicalName}' to the debuggee process")
-                return false
-            }
-        } catch (e: EvaluateException) {
-            fileLogger().warn("Cannot load '${clazz.canonicalName}' to the debuggee process", e)
-            return false
-        }
-    }
-    return true
 }

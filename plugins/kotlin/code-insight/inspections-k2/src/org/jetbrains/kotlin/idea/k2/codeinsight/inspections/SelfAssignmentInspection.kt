@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.inspections
 
 import com.intellij.codeInspection.CleanupLocalInspectionTool
@@ -7,6 +7,7 @@ import com.intellij.modcommand.ModPsiUpdater
 import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
+import org.jetbrains.kotlin.analysis.api.resolution.KaSmartCastedReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
@@ -28,7 +29,7 @@ internal class SelfAssignmentInspection : KotlinApplicableInspectionBase.Simple<
     override fun createQuickFix(
         element: KtBinaryExpression,
         context: String,
-    ) = object : KotlinModCommandQuickFix<KtBinaryExpression>() {
+    ): KotlinModCommandQuickFix<KtBinaryExpression> = object : KotlinModCommandQuickFix<KtBinaryExpression>() {
 
         override fun getFamilyName(): String =
             KotlinBundle.message("remove.self.assignment.fix.text")
@@ -52,8 +53,7 @@ internal class SelfAssignmentInspection : KotlinApplicableInspectionBase.Simple<
         }
     }
 
-    context(KaSession)
-    override fun prepareContext(element: KtBinaryExpression): String? {
+    override fun KaSession.prepareContext(element: KtBinaryExpression): String? {
         val left = element.left
         val right = element.right
 
@@ -100,9 +100,21 @@ internal class SelfAssignmentInspection : KotlinApplicableInspectionBase.Simple<
             is KtNameReferenceExpression -> return receiverExpression.mainReference.resolveToSymbol()
         }
 
+        return getImplicitReceiverSymbolIfExists()
+    }
+
+    context(KaSession)
+    private fun KtExpression.getImplicitReceiverSymbolIfExists(): KaSymbol? {
         val implicitReceiver = this.resolveToCall()?.singleVariableAccessCall()?.partiallyAppliedSymbol?.let {
             it.dispatchReceiver ?: it.extensionReceiver
         }
-        return (implicitReceiver as? KaImplicitReceiverValue)?.symbol
+
+        return when (implicitReceiver) {
+            is KaImplicitReceiverValue -> implicitReceiver.symbol
+            is KaSmartCastedReceiverValue -> {
+                implicitReceiver.original.safeAs<KaImplicitReceiverValue>()?.symbol
+            }
+            else -> null
+        }
     }
 }

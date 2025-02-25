@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package git4idea.commands;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -30,6 +30,7 @@ import com.intellij.vcsUtil.VcsUtil;
 import git4idea.GitContentRevision;
 import git4idea.GitUtil;
 import git4idea.branch.GitRebaseParams;
+import git4idea.config.GitConfigUtil;
 import git4idea.config.GitExecutable;
 import git4idea.config.GitExecutableManager;
 import git4idea.config.GitVersionSpecialty;
@@ -64,7 +65,7 @@ public class GitImpl extends GitImplBase {
   /**
    * @see GitRebaseUtils#createRebaseEditor(Project, VirtualFile, boolean)
    */
-  public static final List<String> REBASE_CONFIG_PARAMS = singletonList("core.commentChar=" + COMMENT_CHAR);
+  public static final List<String> REBASE_CONFIG_PARAMS = singletonList("%s=%s".formatted(GitConfigUtil.CORE_COMMENT_CHAR, COMMENT_CHAR));
 
   public GitImpl() {
   }
@@ -139,8 +140,7 @@ public class GitImpl extends GitImplBase {
    * @return Unversioned not ignored files from the given scope.
    */
   @Override
-  @Unmodifiable
-  public @NotNull Set<VirtualFile> untrackedFiles(@NotNull Project project, @NotNull VirtualFile root,
+  public @Unmodifiable @NotNull Set<VirtualFile> untrackedFiles(@NotNull Project project, @NotNull VirtualFile root,
                                          @Nullable Collection<? extends VirtualFile> files) throws VcsException {
     return ContainerUtil.map2SetNotNull(
       untrackedFilePaths(project, root,

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.eel.impl.local
 
 import com.intellij.openapi.diagnostic.Logger
@@ -7,13 +7,10 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.fs.EelFileSystemApi
-import com.intellij.platform.eel.fs.EelFileSystemApi.CreateTemporaryDirectoryError
-import com.intellij.platform.eel.fs.EelFileSystemPosixApi
-import com.intellij.platform.eel.fs.EelFileSystemWindowsApi
-import com.intellij.platform.eel.fs.getPath
-import com.intellij.platform.eel.impl.fs.EelFsResultImpl
+import com.intellij.platform.eel.fs.EelFileSystemApi.CreateTemporaryEntryError
+import com.intellij.platform.eel.fs.LocalEelFileSystemPosixApi
+import com.intellij.platform.eel.fs.LocalEelFileSystemWindowsApi
 import com.intellij.platform.eel.impl.fs.EelFsResultImpl.Ok
-import com.intellij.platform.eel.impl.fs.EelFsResultImpl.Other
 import com.intellij.platform.eel.impl.fs.EelUserPosixInfoImpl
 import com.intellij.platform.eel.impl.fs.EelUserWindowsInfoImpl
 import com.intellij.platform.eel.impl.fs.PosixNioBasedEelFileSystemApi
@@ -21,33 +18,16 @@ import com.intellij.platform.eel.impl.fs.WindowsNioBasedEelFileSystemApi
 import com.intellij.platform.eel.impl.local.tunnels.EelLocalTunnelsPosixApi
 import com.intellij.platform.eel.impl.local.tunnels.EelLocalTunnelsWindowsApi
 import com.intellij.platform.eel.path.EelPath
-import com.intellij.platform.eel.provider.LocalPosixEelApi
-import com.intellij.platform.eel.provider.LocalWindowsEelApi
+import com.intellij.platform.eel.provider.*
+import com.intellij.platform.eel.provider.utils.toEelArch
+import com.intellij.util.system.CpuArch
 import com.intellij.util.text.nullize
 import com.sun.security.auth.module.UnixSystem
-import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.annotations.VisibleForTesting
+import java.io.File
 import java.nio.file.FileSystem
 import java.nio.file.FileSystems
 import java.nio.file.Path
-
-internal class LocalEelPathMapper(private val eelApi: EelApi) : EelPathMapper {
-  override fun getOriginalPath(path: Path): EelPath.Absolute {
-    return eelApi.fs.getPath(path.toString())
-  }
-
-  override suspend fun maybeUploadPath(path: Path, scope: CoroutineScope, options: EelFileSystemApi.CreateTemporaryDirectoryOptions): EelPath.Absolute {
-    return getOriginalPath(path)
-  }
-
-  override fun toNioPath(path: EelPath.Absolute): Path {
-    return Path.of(path.toString())
-  }
-
-  override fun pathPrefix(): String {
-    return ""
-  }
-}
 
 internal class LocalWindowsEelApiImpl(nioFs: FileSystem = FileSystems.getDefault()) : LocalWindowsEelApi {
   init {
@@ -55,95 +35,106 @@ internal class LocalWindowsEelApiImpl(nioFs: FileSystem = FileSystems.getDefault
   }
 
   override val tunnels: EelTunnelsWindowsApi get() = EelLocalTunnelsWindowsApi
-  override val platform: EelPlatform.Windows get() = if (SystemInfo.isAarch64) EelPlatform.Arm64Windows else EelPlatform.X64Windows
+  override val descriptor: EelDescriptor get() = LocalEelDescriptor
+  override val platform: EelPlatform.Windows get() = EelPlatform.Windows(CpuArch.CURRENT.toEelArch())
   override val exec: EelExecApi = EelLocalExecApi()
-  override val userInfo: EelUserWindowsInfo = EelUserWindowsInfoImpl(getLocalUserHome(EelPath.Absolute.OS.WINDOWS))
-  override val mapper: EelPathMapper = LocalEelPathMapper(this)
+  override val userInfo: EelUserWindowsInfo = EelUserWindowsInfoImpl(getLocalUserHome())
   override val archive: EelArchiveApi = LocalEelArchiveApiImpl
 
-  override val fs: EelFileSystemWindowsApi = object : WindowsNioBasedEelFileSystemApi(nioFs, userInfo) {
+  override val fs: LocalEelFileSystemWindowsApi = object : WindowsNioBasedEelFileSystemApi(nioFs, userInfo) {
+    override val descriptor: EelDescriptor = LocalEelDescriptor
+
     override suspend fun createTemporaryDirectory(
-      options: EelFileSystemApi.CreateTemporaryDirectoryOptions,
-    ): EelResult<EelPath.Absolute, CreateTemporaryDirectoryError> =
-      doCreateTemporaryDirectory(mapper, options)
+      options: EelFileSystemApi.CreateTemporaryEntryOptions,
+    ): EelResult<EelPath, CreateTemporaryEntryError> =
+      doCreateTemporaryDirectory(options)
+
+    override suspend fun createTemporaryFile(options: EelFileSystemApi.CreateTemporaryEntryOptions): EelResult<EelPath, CreateTemporaryEntryError> {
+      return doCreateTemporaryFile(options)
+    }
   }
 }
 
 @VisibleForTesting
-class LocalPosixEelApiImpl(nioFs: FileSystem = FileSystems.getDefault()) : LocalPosixEelApi {
+class LocalPosixEelApiImpl(private val nioFs: FileSystem = FileSystems.getDefault()) : LocalPosixEelApi {
   init {
     check(SystemInfo.isUnix)
   }
 
   override val tunnels: EelTunnelsPosixApi get() = EelLocalTunnelsPosixApi
-  override val platform: EelPlatform.Posix = if (SystemInfo.isMac) {
-    if (SystemInfo.isAarch64) {
-      EelPlatform.Arm64Darwin
+  override val descriptor: EelDescriptor get() = LocalEelDescriptor
+  override val platform: EelPlatform.Posix
+    get() {
+      val arch = CpuArch.CURRENT.toEelArch()
+      return when {
+        SystemInfo.isMac -> EelPlatform.Darwin(arch)
+        SystemInfo.isLinux -> EelPlatform.Linux(arch)
+        SystemInfo.isFreeBSD -> EelPlatform.FreeBSD(arch)
+        else -> {
+          LOG.info("Eel is not supported on current platform")
+          EelPlatform.Linux(arch)
+        }
+      }
     }
-    else {
-      EelPlatform.X8664Darwin
-    }
-  }
-  else if (SystemInfo.isLinux) {
-    if (SystemInfo.isAarch64) {
-      EelPlatform.Aarch64Linux
-    }
-    else {
-      EelPlatform.X8664Linux
-    }
-  }
-  else {
-    LOG.info("Eel is not supported on current platform")
-    EelPlatform.X8664Linux
-  }
+
   override val exec: EelExecApi = EelLocalExecApi()
-  override val mapper: EelPathMapper = LocalEelPathMapper(this)
   override val archive: EelArchiveApi = LocalEelArchiveApiImpl
 
   override val userInfo: EelUserPosixInfo = run {
     val unix = UnixSystem()
-    EelUserPosixInfoImpl(uid = unix.uid.toInt(), gid = unix.gid.toInt(), home = getLocalUserHome(EelPath.Absolute.OS.UNIX))
+    EelUserPosixInfoImpl(uid = unix.uid.toInt(), gid = unix.gid.toInt(), home = getLocalUserHome())
   }
 
-  override val fs: EelFileSystemPosixApi = object : PosixNioBasedEelFileSystemApi(nioFs, userInfo) {
-    override val pathOs: EelPath.Absolute.OS = EelPath.Absolute.OS.UNIX
+  override val fs: LocalEelFileSystemPosixApi = object : PosixNioBasedEelFileSystemApi(nioFs, userInfo) {
+    override val pathOs: EelPath.OS = EelPath.OS.UNIX
+    override val descriptor: EelDescriptor get() = LocalEelDescriptor
 
     override suspend fun createTemporaryDirectory(
-      options: EelFileSystemApi.CreateTemporaryDirectoryOptions,
-    ): EelResult<EelPath.Absolute, CreateTemporaryDirectoryError> =
-      doCreateTemporaryDirectory(mapper, options)
+      options: EelFileSystemApi.CreateTemporaryEntryOptions,
+    ): EelResult<EelPath, CreateTemporaryEntryError> =
+      doCreateTemporaryDirectory(options)
+
+    override suspend fun createTemporaryFile(options: EelFileSystemApi.CreateTemporaryEntryOptions): EelResult<EelPath, CreateTemporaryEntryError> {
+      return doCreateTemporaryFile(options)
+    }
   }
 }
 
 private fun doCreateTemporaryDirectory(
-  mapper: EelPathMapper,
-  options: EelFileSystemApi.CreateTemporaryDirectoryOptions,
-): EelResult<EelPath.Absolute, CreateTemporaryDirectoryError> {
+  options: EelFileSystemApi.CreateTemporaryEntryOptions,
+): EelResult<EelPath, CreateTemporaryEntryError> {
+  return doCreateTemporaryEntry(options) { dir, prefix, suffix, deleteOnExit ->
+    FileUtil.createTempDirectory(dir, prefix, suffix, deleteOnExit)
+  }
+}
+
+private fun doCreateTemporaryFile(
+  options: EelFileSystemApi.CreateTemporaryEntryOptions,
+): EelResult<EelPath, CreateTemporaryEntryError> {
+  return doCreateTemporaryEntry(options) { dir, prefix, suffix, deleteOnExit ->
+    FileUtil.createTempFile(dir, prefix, suffix, deleteOnExit)
+  }
+}
+
+private fun doCreateTemporaryEntry(
+  options: EelFileSystemApi.CreateTemporaryEntryOptions,
+  localCreator: (File, String, String?, Boolean) -> File,
+): EelResult<EelPath, CreateTemporaryEntryError> {
   val dir =
-    options.parentDirectory?.let(mapper::toNioPath)?.toFile()
+    options.parentDirectory?.asNioPathOrNull()?.toFile()
     ?: run {
       val path = Path.of(FileUtilRt.getTempDirectory())
-      if (mapper.getOriginalPath(path) == null) {
-        return EelFsResultImpl.Error(Other(EelPath.Absolute.parse(path.toString(), null), "Can't map this path"))
-      }
       path.toFile()
     }
-  val tempDirectory = FileUtil.createTempDirectory(
-    dir,
-    options.prefix,
-    options.suffix.nullize(),
-    options.deleteOnExit,
-  )
-  val tempDirectoryEel = mapper.getOriginalPath(tempDirectory.toPath())
-  return if (tempDirectoryEel != null)
-    Ok(tempDirectoryEel)
-  else
-    EelFsResultImpl.Error(Other(EelPath.Absolute.parse(tempDirectory.toString(), null), "Can't map this path"))
+  val tempEntry = localCreator(dir, options.prefix, options.suffix.nullize(), options.deleteOnExit)
+  val tempDirectoryEel = tempEntry.toPath().asEelPath()
+  return Ok(tempDirectoryEel)
 }
+
 
 private val LOG = Logger.getInstance(EelApi::class.java)
 
-private fun getLocalUserHome(os: EelPath.Absolute.OS): EelPath.Absolute {
+private fun getLocalUserHome(): EelPath {
   val homeDirPath = Path.of(System.getProperty("user.home")).toAbsolutePath().toString()
-  return checkNotNull(EelPath.Absolute.parse(homeDirPath, os)) { "Can't parse home dir path: $homeDirPath" }
+  return checkNotNull(EelPath.parse(homeDirPath, LocalEelDescriptor)) { "Can't parse home dir path: $homeDirPath" }
 }

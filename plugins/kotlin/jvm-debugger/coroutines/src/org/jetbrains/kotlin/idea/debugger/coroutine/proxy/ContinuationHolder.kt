@@ -6,7 +6,6 @@ import com.intellij.debugger.engine.JavaValue
 import com.intellij.debugger.impl.DebuggerUtilsImpl.logError
 import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.rt.debugger.coroutines.CoroutinesDebugHelper
-import com.intellij.rt.debugger.coroutines.JsonUtils
 import com.sun.jdi.ArrayReference
 import com.sun.jdi.ObjectReference
 import com.sun.jdi.StringReference
@@ -20,24 +19,16 @@ import org.jetbrains.kotlin.idea.debugger.coroutine.data.CoroutineStacksInfoData
 import org.jetbrains.kotlin.idea.debugger.coroutine.data.CreationCoroutineStackFrameItem
 import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.mirror.*
 import java.lang.StackTraceElement
+import com.intellij.debugger.impl.DebuggerUtilsEx
 
 private val LOG by lazy { fileLogger() }
 
-internal class ContinuationHolder private constructor(val context: DefaultExecutionContext) {
-    internal val locationCache = LocationCache(context)
-
-    internal fun extractCoroutineStacksInfoData(continuation: ObjectReference): CoroutineStacksInfoData? {
-        return try {
-            fetchContinuationStack(continuation, context, locationCache)
-        } catch (e: Exception) {
-            logError("Error while looking for stack frame", e)
-            null
-        }
-    }
-
-    companion object {
-        fun instance(context: DefaultExecutionContext) =
-            ContinuationHolder(context)
+internal fun fetchCoroutineStacksInfoData(context: DefaultExecutionContext, continuation: ObjectReference): CoroutineStacksInfoData? {
+    return try {
+        fetchContinuationStack(continuation, context)
+    } catch (e: Exception) {
+        logError("Error while looking for stack frame", e)
+        null
     }
 }
 
@@ -65,14 +56,13 @@ private fun FieldVariable.toJavaValue(continuation: ObjectReference, context: De
 
 private fun fetchContinuationStack(
     continuation: ObjectReference?,
-    context: DefaultExecutionContext,
-    locationCache: LocationCache
+    context: DefaultExecutionContext
 ): CoroutineStacksInfoData? {
     if (continuation == null) return null
     val (coroutineStack, creationStack) = collectCoroutineAndCreationStack(continuation, context) ?: return null
-    val continuationStackFrames = coroutineStack.mapNotNull { it.toCoroutineStackFrameItem(context, locationCache) }
+    val continuationStackFrames = coroutineStack.mapNotNull { it.toCoroutineStackFrameItem(context) }
     val creationStackFrames = creationStack?.mapIndexed { index, ste ->
-        CreationCoroutineStackFrameItem(locationCache.createLocation(ste), index == 0)
+        CreationCoroutineStackFrameItem(findOrCreateLocation(context, ste), index == 0)
     } ?: emptyList()
     return CoroutineStacksInfoData(continuationStackFrames, creationStackFrames)
 }
@@ -82,7 +72,7 @@ private fun collectCoroutineAndCreationStack(
     context: DefaultExecutionContext
 ): Pair<List<MirrorOfStackFrame>, List<StackTraceElement>?>? {
     val array = callMethodFromHelper(CoroutinesDebugHelper::class.java, context, "getCoroutineStackTraceDump", listOf(continuation),
-                                     JsonUtils::class.java)
+                                     "com.intellij.rt.debugger.coroutines.JsonUtils")
         ?: return fallbackToOldFetchContinuationStack(continuation, context)
     return parseResultFromHelper(array)
 }
@@ -120,3 +110,6 @@ private fun fallbackToOldFetchContinuationStack(
     val coroutineInfo = DebugProbesImpl.instance(context)?.getCoroutineInfo(coroutineOwner, context)
     return continuationStack to coroutineInfo?.creationStackTraceProvider?.getStackTrace()?.map { it.stackTraceElement() }
 }
+
+internal fun findOrCreateLocation(context: DefaultExecutionContext, stackTraceElement: StackTraceElement) =
+    DebuggerUtilsEx.findOrCreateLocation(context.suspendContext.virtualMachineProxy.virtualMachine, stackTraceElement)

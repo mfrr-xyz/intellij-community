@@ -152,7 +152,6 @@
       <with attribute="forClass" implements="com.intellij.model.search.SearchParameters"/>
       <with attribute="implementationClass" implements="com.intellij.model.search.Searcher"/>
     </extensionPoint>
-    <extensionPoint name="lang.codeReferenceSearcher" dynamic="true" interface="com.intellij.model.search.CodeReferenceSearcher"/>
     <extensionPoint name="definitionsScopedSearch" interface="com.intellij.util.QueryExecutor" dynamic="true"/>
     <extensionPoint name="indexPatternSearch" interface="com.intellij.util.QueryExecutor" dynamic="true"/>
 
@@ -173,6 +172,7 @@
     <extensionPoint name="searchEverywhereMlService" interface="com.intellij.ide.actions.searcheverywhere.SearchEverywhereMlService" dynamic="true"/>
     <extensionPoint name="searchEverywhereMlContributorReplacement" interface="com.intellij.ide.actions.searcheverywhere.SearchEverywhereMlContributorReplacement" dynamic="true"/>
     <extensionPoint name="searchEverywhereSpellingCorrector" interface="com.intellij.ide.actions.searcheverywhere.SearchEverywhereSpellingCorrectorFactory" dynamic="true"/>
+    <extensionPoint name="searchEverywhereEssentialContributorsMarker" interface="com.intellij.ide.actions.searcheverywhere.SearchEverywhereEssentialContributorMarker" dynamic="true"/>
     <extensionPoint name="searchEverywhereRemoteConverter" interface="com.intellij.ide.actions.searcheverywhere.remote.RemoteSearchEverywhereConverterSupplier" dynamic="true"/>
     <extensionPoint name="searchEverywhereReorderingService" interface="com.intellij.ide.actions.searcheverywhere.SearchEverywhereReorderingService" dynamic="true"/>
     <extensionPoint name="searchEverywherePreviewPrimaryUsageFinder" interface="com.intellij.ide.actions.searcheverywhere.SearchEverywherePreviewPrimaryUsageFinder" dynamic="true" />
@@ -647,6 +647,8 @@
       <with attribute="implementationClass" implements="com.intellij.ide.scratch.ScratchFileCreationHelper"/>
     </extensionPoint>
 
+    <extensionPoint name="pluginExternalResources.unpackToPlugin" beanClass="com.intellij.ide.extensionResources.ExternalResourcesUnpackExtensionBean" dynamic="true"/>
+
     <extensionPoint name="packageDependencies.visitor" beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
       <with attribute="implementationClass" implements="com.intellij.packageDependencies.DependencyVisitorFactory"/>
     </extensionPoint>
@@ -725,7 +727,50 @@
     <extensionPoint qualifiedName="com.intellij.inlinePrompt" dynamic="true"
                     interface="com.intellij.inlinePrompt.InlinePromptExtension"/>
 
-    <extensionPoint qualifiedName="com.intellij.show.intention.cached.intentions.handler" dynamic="true"
-                    interface="com.intellij.codeInsight.daemon.impl.CollectedCachedIntentionHandler"/>
+    <extensionPoint interface="com.intellij.microservices.endpoints.EndpointsProvider"
+                    qualifiedName="com.intellij.microservices.endpointsProvider" dynamic="true"/>
+    <extensionPoint interface="com.intellij.microservices.endpoints.EndpointsSidePanelProvider"
+                    qualifiedName="com.intellij.microservices.endpointsSidePanelProvider" dynamic="true"/>
+    <extensionPoint interface="com.intellij.microservices.endpoints.EndpointsProjectModel"
+                    qualifiedName="com.intellij.microservices.endpointsProjectModel" dynamic="true"/>
+
+    <extensionPoint interface="com.intellij.microservices.url.UrlResolverFactory"
+                    qualifiedName="com.intellij.microservices.urlResolverFactory" dynamic="true"/>
+    <extensionPoint interface="com.intellij.microservices.url.inlay.UrlPathInlayAction"
+                    qualifiedName="com.intellij.microservices.urlInlayAction" dynamic="true"/>
+    <extensionPoint interface="com.intellij.microservices.url.inlay.UrlPathInlayLanguagesProvider"
+                    qualifiedName="com.intellij.microservices.urlInlayLanguagesProvider" dynamic="true"/>
+    <extensionPoint interface="com.intellij.microservices.http.request.RequestNavigator"
+                    qualifiedName="com.intellij.microservices.requestNavigator" dynamic="true"/>
+    <extensionPoint interface="com.intellij.microservices.oas.OasSpecificationProvider"
+                    qualifiedName="com.intellij.microservices.oasSpecificationProvider" dynamic="true"/>
+    <extensionPoint interface="com.intellij.microservices.client.generator.ClientGenerator"
+                    qualifiedName="com.intellij.microservices.clientGenerator" dynamic="true" />
+    <extensionPoint interface="com.intellij.microservices.MicroservicesFeaturesAvailabilityProvider"
+                    qualifiedName="com.intellij.microservices.featuresAvailabilityProvider" dynamic="true"/>
+    <extensionPoint interface="com.intellij.microservices.oas.serialization.OasSerializationCompatibilityProvider"
+                    qualifiedName="com.intellij.microservices.oasSerializationCompatibilityProvider" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.codeInsight.completion.command.factory"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
+      <with attribute="implementationClass" implements="com.intellij.codeInsight.completion.command.CommandCompletionFactory"/>
+    </extensionPoint>
+    <extensionPoint qualifiedName="com.intellij.codeInsight.completion.command.provider"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
+      <with attribute="implementationClass" implements="com.intellij.codeInsight.completion.command.CommandProvider"/>
+    </extensionPoint>
+    <extensionPoint qualifiedName="com.intellij.codeInsight.completion.applicable.command"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
+      <with attribute="implementationClass" implements="com.intellij.codeInsight.completion.command.ApplicableCompletionCommand"/>
+    </extensionPoint>
+    <extensionPoint qualifiedName="com.intellij.codeInsight.completion.intention.skipper"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
+      <with attribute="implementationClass" implements="com.intellij.codeInsight.completion.command.commands.IntentionCommandSkipper"/>
+    </extensionPoint>
+
+    <extensionPoint qualifiedName="com.intellij.codeInsight.completion.intention.offset.provider"
+                    beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
+      <with attribute="implementationClass" implements="com.intellij.codeInsight.completion.command.commands.IntentionCommandOffsetProvider"/>
+    </extensionPoint>
+
   </extensionPoints>
 </idea-plugin>

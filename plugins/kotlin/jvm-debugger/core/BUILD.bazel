@@ -1,11 +1,9 @@
 ### auto-generated section `build kotlin.jvm-debugger.core` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   context_receivers = True,
   opt_in = ["org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction"]
 )
@@ -20,14 +18,13 @@ jvm_library(
   name = "kotlin-jvm-debugger-core",
   module_name = "kotlin.jvm-debugger.core",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_analysis-api",
-    "@lib//:kotlinc_analysis-api-impl-base",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-analysis-api",
+    "@lib//:kotlinc-analysis-api-impl-base",
     "@lib//:asm",
     "@lib//:jb-jdi",
     "//plugins/kotlin/base/frontend-agnostic:kotlin-base-frontend-agnostic",
@@ -46,9 +43,11 @@ jvm_library(
     "//platform/util:util-ui",
     "//platform/script-debugger/debugger-ui:scriptDebugger-ui",
     "//platform/platform-impl:ide-impl",
+    "//java/debugger/openapi:java-debugger",
     "//platform/lang-impl",
     "//platform/platform-util-io-impl:ide-util-io-impl",
     "//java/openapi:java",
+    "//platform/util/progress",
     "//java/execution/openapi:java-execution",
     "//java/debugger/impl:java-debugger-impl",
     "//java/java-psi-impl:psi-impl",

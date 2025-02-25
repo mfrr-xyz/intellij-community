@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.java.debugger.impl.shared` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "java-debugger-impl-shared_resources",
@@ -12,9 +11,7 @@ jvm_library(
   name = "java-debugger-impl-shared",
   module_name = "intellij.java.debugger.impl.shared",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
     "//platform/util/jdom",
@@ -22,6 +19,11 @@ jvm_library(
     "//platform/xdebugger-api:debugger",
     "//platform/xdebugger-impl:debugger-impl",
     "//platform/platform-impl:ide-impl",
+    "//platform/kernel/shared:kernel",
+    "//platform/core-ui",
+    "@lib//:kotlinx-coroutines-core",
+    "@lib//:kotlinx-serialization-core",
+    "@lib//:kotlinx-serialization-json",
   ],
   runtime_deps = [":java-debugger-impl-shared_resources"]
 )

@@ -12,14 +12,17 @@ import kotlin.reflect.KClass
 class KotlinQuickFixesList @ForKtQuickFixesListBuilder constructor(
     private val quickFixes: Map<KClass<out KaDiagnosticWithPsi<*>>, List<KotlinQuickFixFactory<*>>>
 ) {
-    context(KaSession)
-    fun getQuickFixesFor(diagnostic: KaDiagnosticWithPsi<*>): List<IntentionAction> {
+    fun KaSession.getQuickFixesFor(diagnostic: KaDiagnosticWithPsi<*>): List<IntentionAction> {
         val factories = quickFixes[diagnostic.diagnosticClass]
             ?: return emptyList()
 
         return factories.asSequence()
             .map { @Suppress("UNCHECKED_CAST") (it as KotlinQuickFixFactory<KaDiagnosticWithPsi<*>>) }
-            .flatMap { it.createQuickFixes(diagnostic) }
+            .flatMap {
+                with(it) {
+                    createQuickFixes(diagnostic)
+                }
+            }
             .map { it.asIntention() }
             .toList()
     }
@@ -66,6 +69,10 @@ class KtQuickFixesListBuilder private constructor() {
         diagnosticClass: KClass<DIAGNOSTIC>,
         factory: KotlinQuickFixFactory<DIAGNOSTIC>,
     ) {
+        require(diagnosticClass != KaDiagnosticWithPsi::class) {
+            "Specific diagnostic class expected instead of generic ${KaDiagnosticWithPsi::class}."
+        }
+
         quickFixes.getOrPut(diagnosticClass) { mutableListOf() } += factory
     }
 
@@ -73,7 +80,7 @@ class KtQuickFixesListBuilder private constructor() {
     private fun build() = KotlinQuickFixesList(quickFixes)
 
     companion object {
-        fun registerPsiQuickFix(init: KtQuickFixesListBuilder.() -> Unit) = KtQuickFixesListBuilder().apply(init).build()
+        fun registerPsiQuickFix(init: KtQuickFixesListBuilder.() -> Unit): KotlinQuickFixesList = KtQuickFixesListBuilder().apply(init).build()
     }
 }
 

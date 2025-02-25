@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.externalSystem.testFramework;
 
 import com.intellij.find.FindManager;
@@ -42,12 +42,12 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.platform.externalSystem.testFramework.utils.module.ExternalSystemSourceRootAssertion;
 import com.intellij.platform.testFramework.assertion.moduleAssertion.ContentRootAssertions;
+import com.intellij.platform.testFramework.assertion.moduleAssertion.ModuleAssertions;
+import com.intellij.platform.testFramework.assertion.moduleAssertion.SourceRootAssertions;
 import com.intellij.psi.PsiElement;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.RunAll;
-import com.intellij.platform.testFramework.assertion.moduleAssertion.ModuleAssertions;
-import com.intellij.platform.testFramework.assertion.moduleAssertion.SourceRootAssertions;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.util.CommonProcessors;
 import com.intellij.util.containers.ContainerUtil;
@@ -58,7 +58,6 @@ import org.jetbrains.jps.model.java.JavaSourceRootType;
 import org.jetbrains.jps.model.module.JpsModuleSourceRootType;
 
 import java.io.IOException;
-import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.BiPredicate;
@@ -79,15 +78,7 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
   @Override
   protected void setUp() throws Exception {
     super.setUp();
-
-    var notificationManager = ExternalSystemProgressNotificationManager.getInstance();
-    var notificationListener = new ExternalSystemTaskNotificationListener() {
-      @Override
-      public void onTaskOutput(@NotNull ExternalSystemTaskId id, @NotNull String text, boolean stdOut) {
-        printOutput(text, stdOut);
-      }
-    };
-    notificationManager.addNotificationListener(notificationListener, getTestDisposable());
+    installExecutionOutputPrinter(getTestDisposable());
   }
 
   @Override
@@ -103,6 +94,33 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
       myTestDisposable = Disposer.newDisposable();
     }
     return myTestDisposable;
+  }
+
+  public static void installExecutionOutputPrinter(@NotNull Disposable parentDisposable) {
+    var notificationManager = ExternalSystemProgressNotificationManager.getInstance();
+    var notificationListener = new ExternalSystemTaskNotificationListener() {
+
+      @Override
+      public void onStart(@NotNull String projectPath, @NotNull ExternalSystemTaskId id) {
+        System.out.print(id + "\\n");
+      }
+
+      @Override
+      public void onTaskOutput(@NotNull ExternalSystemTaskId id, @NotNull String text, boolean stdOut) {
+        if (stdOut) {
+          System.out.print(text.replace("\n", "\\n").replace("\r", "\\r"));
+        }
+        else {
+          System.err.print(text);
+        }
+      }
+
+      @Override
+      public void onEnd(@NotNull String projectPath, @NotNull ExternalSystemTaskId id) {
+        System.out.println();
+      }
+    };
+    notificationManager.addNotificationListener(notificationListener, parentDisposable);
   }
 
   protected void assertModulesContains(String... expectedNames) {
@@ -341,8 +359,7 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
     assertUnorderedElementsAreEqual(ContainerUtil.map2Array(deps, entry -> entry.getScope()), scopes);
   }
 
-  @NotNull
-  private List<ModuleOrderEntry> getModuleModuleDeps(@NotNull String moduleName, @NotNull String depName) {
+  private @NotNull List<ModuleOrderEntry> getModuleModuleDeps(@NotNull String moduleName, @NotNull String depName) {
     return getModuleDep(moduleName, depName, ModuleOrderEntry.class);
   }
 
@@ -361,8 +378,7 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
     return collectModuleDepsNames(moduleName, entry -> clazz.isInstance(entry));
   }
 
-  @NotNull
-  private <T> List<T> getModuleDep(@NotNull String moduleName, @NotNull String depName, @NotNull Class<T> clazz) {
+  private @NotNull <T> List<T> getModuleDep(@NotNull String moduleName, @NotNull String depName, @NotNull Class<T> clazz) {
     List<T> deps = new ArrayList<>();
 
     for (OrderEntry e : getRootManager(moduleName).getOrderEntries()) {
@@ -435,7 +451,8 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
     for (DataNode<?> node : nodes) {
       node.visit(dataNode -> dataNode.setIgnored(ignored));
     }
-    ProjectDataManager.getInstance().importData(projectDataNode, myProject);
+
+    ExternalSystemTestUtilKt.importData(projectDataNode, myProject);
   }
 
   protected void importProject(@NotNull String config, @Nullable Boolean skipIndexing) throws IOException {
@@ -469,7 +486,7 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
     if (callback == null || callback instanceof ImportSpecBuilder.DefaultProjectRefreshCallback) {
       importSpec = new ImportSpecBuilder(importSpec).callback(new ExternalProjectRefreshCallback() {
         @Override
-        public void onSuccess(@Nullable final DataNode<ProjectData> externalProject) {
+        public void onSuccess(final @Nullable DataNode<ProjectData> externalProject) {
           if (externalProject == null) {
             System.err.println("Got null External project after import");
             return;
@@ -480,7 +497,6 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
             ex.printStackTrace(System.err);
             error.set(Couple.of("Exception occurred in `ProjectDataManager.importData` (see output for the details)", null));
           }
-          System.out.println("External project was successfully imported");
         }
 
         @Override
@@ -500,15 +516,6 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
     // (specifically, all the invokeLater that schedule indexing after language level change performed by import)
     runInEdtAndWait(() -> PlatformTestUtil.dispatchAllEventsInIdeEventQueue());
     IndexingTestUtil.waitUntilIndexesAreReady(myProject);
-  }
-
-  protected void printOutput(@NotNull String text, boolean stdOut) {
-    if (StringUtil.isEmptyOrSpaces(text)) return;
-    printOutput(stdOut ? System.out : System.err, text);
-  }
-
-  protected void printOutput(@NotNull PrintStream stream, @NotNull String text) {
-    stream.print(text);
   }
 
   protected void handleImportFailure(@NotNull String errorMessage, @Nullable String errorDetails) {
@@ -551,13 +558,11 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
     });
   }
 
-  @Nullable
-  protected SourceFolder findSource(@NotNull String moduleName, @NotNull String sourcePath) {
+  protected @Nullable SourceFolder findSource(@NotNull String moduleName, @NotNull String sourcePath) {
     return findSource(getRootManager(moduleName), sourcePath);
   }
 
-  @Nullable
-  protected SourceFolder findSource(@NotNull ModuleRootModel moduleRootManager, @NotNull String sourcePath) {
+  protected @Nullable SourceFolder findSource(@NotNull ModuleRootModel moduleRootManager, @NotNull String sourcePath) {
     ContentEntry[] contentRoots = moduleRootManager.getContentEntries();
     Module module = moduleRootManager.getModule();
     String rootUrl = getAbsolutePath(ExternalSystemApiUtil.getExternalProjectPath(module));

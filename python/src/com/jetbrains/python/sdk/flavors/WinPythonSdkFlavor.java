@@ -26,7 +26,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
 
-import static com.jetbrains.python.sdk.PythonSdkUtilKtKt.tryResolvePath;
+import static com.jetbrains.python.venvReader.ResolveUtilKt.tryResolvePath;
 import static com.jetbrains.python.sdk.WinAppxToolsKt.getAppxFiles;
 import static com.jetbrains.python.sdk.WinAppxToolsKt.getAppxProduct;
 
@@ -83,11 +83,6 @@ public class WinPythonSdkFlavor extends CPythonSdkFlavor<PyFlavorData.Empty> {
 
     findInRegistry(candidates);
     candidates.addAll(myAppxCache.getValue());
-  }
-
-  @Override
-  public final void resetHomePathCache() {
-    myRegistryCache.drop();
   }
 
   @Override
@@ -159,8 +154,7 @@ public class WinPythonSdkFlavor extends CPythonSdkFlavor<PyFlavorData.Empty> {
     }
   }
 
-  @Unmodifiable
-  private static @NotNull Set<String> getPythonsFromStore() {
+  private static @Unmodifiable @NotNull Set<String> getPythonsFromStore() {
     return ContainerUtil.map2Set(getAppxFiles(APPX_PRODUCT, PYTHON_EXE), file -> file.toAbsolutePath().toString());
   }
 

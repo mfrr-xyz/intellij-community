@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.popup;
 
 import com.intellij.CommonBundle;
@@ -265,6 +265,18 @@ public class PopupFactoryImpl extends JBPopupFactory {
            disposeCallback, dataContext, options.getMaxRowCount());
       UiInspectorUtil.registerProvider(getList(), () -> UiInspectorActionUtil.collectActionGroupInfo(
         "Menu", actionGroup, actionPlace, ((ActionPopupStep)getStep()).getPresentationFactory()));
+
+      addListener(new JBPopupListener() {
+        @Override
+        public void beforeShown(@NotNull LightweightWindowEvent event) {
+          ActionGroupPopupActivity.start(ActionGroupPopup.this, actionGroup, actionPlace);
+        }
+
+        @Override
+        public void onClosed(@NotNull LightweightWindowEvent event) {
+          ActionGroupPopupActivity.stop(ActionGroupPopup.this, event.isOk());
+        }
+      });
     }
 
     protected ActionGroupPopup(@Nullable WizardPopup aParent,
@@ -315,6 +327,10 @@ public class PopupFactoryImpl extends JBPopupFactory {
     @Override
     public void handleSelect(boolean handleFinalChoices, InputEvent e) {
       ActionItem item = ObjectUtils.tryCast(getList().getSelectedValue(), ActionItem.class);
+      var fusActivity = ActionGroupPopupActivity.getCurrentActivity(this);
+      if (fusActivity != null && item != null) {
+        fusActivity.itemSelected(item.myAction, null);
+      }
       ActionPopupStep step = ObjectUtils.tryCast(getListStep(), ActionPopupStep.class);
       if (step != null && item != null && step.isSelectable(item) &&
           Utils.isKeepPopupOpen(item.getKeepPopupOnPerform(), e)) {
@@ -639,8 +655,7 @@ public class PopupFactoryImpl extends JBPopupFactory {
   }
 
   @Override
-  @Unmodifiable
-  public @NotNull List<JBPopup> getChildPopups(@NotNull Component component) {
+  public @Unmodifiable @NotNull List<JBPopup> getChildPopups(@NotNull Component component) {
     return AbstractPopup.getChildPopups(component);
   }
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.projectImport;
 
 import com.intellij.ide.JavaUiBundle;
@@ -32,7 +32,7 @@ public abstract class SelectImportedProjectsStep<T> extends ProjectImportWizardS
       }
 
       @Override
-      protected Icon getItemIcon(@NotNull final T item) {
+      protected Icon getItemIcon(final @NotNull T item) {
         return getElementIcon(item);
       }
     };
@@ -70,8 +70,7 @@ public abstract class SelectImportedProjectsStep<T> extends ProjectImportWizardS
                                                               GridConstraints.SIZEPOLICY_FIXED, null, null, null));
   }
 
-  @Nullable
-  protected Icon getElementIcon(final T item) {
+  protected @Nullable Icon getElementIcon(final T item) {
     return null;
   }
 
@@ -105,7 +104,7 @@ public abstract class SelectImportedProjectsStep<T> extends ProjectImportWizardS
   @Override
   public boolean validate() throws ConfigurationException {
     getContext().setList(fileChooser.getMarkedElements());
-    if (fileChooser.getMarkedElements().size() == 0) {
+    if (fileChooser.getMarkedElements().isEmpty()) {
       throw new ConfigurationException(JavaUiBundle.message("select.imported.projects.dialog.message.nothing.found"),
                                        JavaUiBundle.message("select.imported.projects.dialog.title.unable.to.proceed"));
     }

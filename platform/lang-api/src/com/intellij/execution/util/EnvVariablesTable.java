@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.util;
 
 import com.intellij.execution.ExecutionBundle;
@@ -15,6 +15,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.ListTableModel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import javax.swing.*;
 import javax.swing.table.TableCellEditor;
@@ -65,9 +66,8 @@ public class EnvVariablesTable extends ListTableWithButtons<EnvironmentVariable>
   }
 
   @Override
-  public void setValues(List<? extends EnvironmentVariable> list) {
-    list.sort(Comparator.comparing(EnvironmentVariable::getName, NaturalComparator.INSTANCE));
-    super.setValues(list);
+  public void setValues(@Unmodifiable List<? extends EnvironmentVariable> list) {
+    super.setValues(ContainerUtil.sorted(list, Comparator.comparing(EnvironmentVariable::getName, NaturalComparator.INSTANCE)));
   }
 
   public List<EnvironmentVariable> getEnvironmentVariables() {
@@ -215,7 +215,7 @@ public class EnvVariablesTable extends ListTableWithButtons<EnvironmentVariable>
       List<EnvironmentVariable> variables = getSelection();
       for (EnvironmentVariable environmentVariable : variables) {
         if (isEmpty(environmentVariable)) continue;
-        if (sb.length() > 0) sb.append(';');
+        if (!sb.isEmpty()) sb.append(';');
         sb.append(StringUtil.escapeChars(environmentVariable.getName(), '=', ';')).append('=')
           .append(StringUtil.escapeChars(environmentVariable.getValue(), '=', ';'));
       }

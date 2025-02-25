@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.util.text;
 
 import com.intellij.ReviseWhenPortedToJDK;
@@ -125,8 +125,7 @@ public class StringUtil {
   public static final java.util.function.Function<String, String> SINGLE_QUOTER = s -> "'" + s + "'";
 
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull List<String> getWordsInStringLongestFirst(@NotNull String find) {
+  public static @Unmodifiable @NotNull List<String> getWordsInStringLongestFirst(@NotNull String find) {
     List<String> words = getWordsIn(find);
     // hope long words are rare
     return ContainerUtil.sorted(words, (o1, o2) -> o2.length() - o1.length());
@@ -1291,8 +1290,7 @@ public class StringUtil {
   }
 
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull List<String> splitHonorQuotes(@NotNull String s, char separator) {
+  public static @Unmodifiable @NotNull List<String> splitHonorQuotes(@NotNull String s, char separator) {
     return Collections.unmodifiableList(StringUtilRt.splitHonorQuotes(s, separator));
   }
 
@@ -1402,8 +1400,7 @@ public class StringUtil {
    * The <b>word</b> here means the maximum sub-string consisting entirely of characters which are {@code Character.isJavaIdentifierPart(c)}.
    */
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull List<String> getWordsIn(@NotNull String text) {
+  public static @Unmodifiable @NotNull List<String> getWordsIn(@NotNull String text) {
     FreezableArrayList<String> result = null;
     int start = -1;
     for (int i = 0; i < text.length(); i++) {
@@ -1433,8 +1430,7 @@ public class StringUtil {
   }
 
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull List<TextRange> getWordIndicesIn(@NotNull String text) {
+  public static @Unmodifiable @NotNull List<TextRange> getWordIndicesIn(@NotNull String text) {
     return getWordIndicesIn(text, null);
   }
 
@@ -1445,8 +1441,7 @@ public class StringUtil {
    * @return ranges of words in passed text.
    */
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull List<TextRange> getWordIndicesIn(@NotNull String text, @Nullable Set<Character> separatorsSet) {
+  public static @Unmodifiable @NotNull List<TextRange> getWordIndicesIn(@NotNull String text, @Nullable Set<Character> separatorsSet) {
     FreezableArrayList<TextRange> result = new FreezableArrayList<>();
     int start = -1;
     for (int i = 0; i < text.length(); i++) {
@@ -1611,17 +1606,6 @@ public class StringUtil {
   }
 
   /**
-   * Formats duration given in milliseconds as a sum of time units (example: {@code formatDuration(123456, "") = "2m 3s 456ms"}).
-   * @deprecated use NlsMessages#formatDurationApproximateNarrow for localized output
-   */
-  @Contract(pure = true)
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated
-  public static @NotNull @NonNls String formatDuration(long duration, @NotNull String unitSeparator) {
-    return Formats.formatDuration(duration, unitSeparator);
-  }
-
-  /**
    * Returns unpluralized variant using English based heuristics like properties -> property, names -> name, children -> child.
    * Returns {@code null} if failed to match appropriate heuristic.
    *
@@ -1703,14 +1687,12 @@ public class StringUtil {
   }
 
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull List<String> findMatches(@NotNull String s, @NotNull Pattern pattern) {
+  public static @Unmodifiable @NotNull List<String> findMatches(@NotNull String s, @NotNull Pattern pattern) {
     return findMatches(s, pattern, 1);
   }
 
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull List<String> findMatches(@NotNull String s, @NotNull Pattern pattern, int groupIndex) {
+  public static @Unmodifiable @NotNull List<String> findMatches(@NotNull String s, @NotNull Pattern pattern, int groupIndex) {
     FreezableArrayList<String> result = new FreezableArrayList<>();
     Matcher m = pattern.matcher(s);
     while (m.find()) {
@@ -2641,8 +2623,7 @@ public class StringUtil {
     return Splitters.EOL_SPLIT_KEEP_SEPARATORS.split(string);
   }
   @Contract(pure = true)
-  @Unmodifiable
-  public static @NotNull List<Pair<String, Integer>> getWordsWithOffset(@NotNull String s) {
+  public static @Unmodifiable @NotNull List<Pair<String, Integer>> getWordsWithOffset(@NotNull String s) {
     FreezableArrayList<Pair<String, Integer>> result = new FreezableArrayList<>();
     s += " ";
     StringBuilder name = new StringBuilder();
@@ -2851,6 +2832,14 @@ public class StringUtil {
   }
 
   @Contract(pure = true)
+  public static boolean isLowerCase(@NotNull CharSequence sequence) {
+    for (int i = 0; i < sequence.length(); i++) {
+      if (!Character.isLowerCase(sequence.charAt(i))) return false;
+    }
+    return true;
+  }
+
+  @Contract(pure = true)
   public static @Nullable LineSeparator detectSeparators(@NotNull CharSequence text) {
     int index = indexOfAny(text, "\n\r");
     if (index == -1) return null;
@@ -2900,7 +2889,12 @@ public class StringUtil {
 
   @Contract(pure = true)
   public static <E extends Enum<E>> E parseEnum(@NotNull String string, E defaultValue, @NotNull Class<E> clazz) {
-    return StringUtilRt.parseEnum(string, defaultValue, clazz);
+    try {
+      return Enum.valueOf(clazz, string);
+    }
+    catch (Exception e) {
+      return defaultValue;
+    }
   }
 
   @Contract(pure = true)
@@ -2996,13 +2990,12 @@ public class StringUtil {
    */
   @Contract(pure = true)
   public static boolean hasUpperCaseChar(@NotNull String s) {
-      char[] chars = s.toCharArray();
-      for (char c : chars) {
-          if (Character.isUpperCase(c)) {
-              return true;
-          }
+    for (char c : s.toCharArray()) {
+      if (Character.isUpperCase(c)) {
+        return true;
       }
-      return false;
+    }
+    return false;
   }
 
   /**
@@ -3012,34 +3005,56 @@ public class StringUtil {
    */
   @Contract(pure = true)
   public static boolean hasLowerCaseChar(@NotNull String s) {
-      char[] chars = s.toCharArray();
-      for (char c : chars) {
-          if (Character.isLowerCase(c)) {
-              return true;
-          }
+    for (char c : s.toCharArray()) {
+      if (Character.isLowerCase(c)) {
+        return true;
       }
-      return false;
+    }
+    return false;
   }
-
-  private static final Pattern UNICODE_CHAR = Pattern.compile("\\\\u[\\da-fA-F]{4}");
 
   @Contract(pure = true)
   public static String replaceUnicodeEscapeSequences(String text) {
     if (text == null) return null;
-
-    Matcher matcher = UNICODE_CHAR.matcher(text);
-    if (!matcher.find()) return text; // fast path
-
-    matcher.reset();
-    int lastEnd = 0;
+    final int length = text.length();
     StringBuilder sb = new StringBuilder(text.length());
-    while (matcher.find()) {
-      sb.append(text, lastEnd, matcher.start());
-      char c = (char)Integer.parseInt(matcher.group().substring(2), 16);
-      sb.append(c);
-      lastEnd = matcher.end();
+    outer:
+    for (int i = 0; i < length; i++) {
+      char c = text.charAt(i);
+      if (c == '\\') {
+        int j = i + 1;
+        boolean escape = true;
+        while (j < length && (c = text.charAt(j)) == '\\') {
+          escape = !escape;
+          j++;
+        }
+        if (!escape || c != 'u') {
+          sb.append(text, i, j);
+          i = j - 1;
+          continue;
+        }
+        while (j < length && (c = text.charAt(j)) == 'u') j++;
+        if (j > length - 4) {
+          sb.append(text, i, j);
+          i = j - 1;
+          continue;
+        }
+        for (int k = 0; k < 4; k++) {
+          if (!isHexDigit(text.charAt(j + k))) {
+            sb.append(text, i, j + k);
+            i = j + k - 1;
+            continue outer;
+          }
+        }
+        final char d = (char)Integer.parseInt(text.substring(j, j + 4), 16);
+        sb.append(d);
+        i = j + 3;
+      }
+      else {
+        sb.append(c);
+      }
     }
-    sb.append(text.substring(lastEnd));
+
     return sb.toString();
   }
 
@@ -3274,12 +3289,11 @@ public class StringUtil {
     return StringUtilRt.convertLineSeparators(text, newSeparator, offsetsToKeep);
   }
 
-  @NotNull
   @Contract(pure = true)
-  public static String convertLineSeparators(@NotNull String text,
-                                             @NotNull String newSeparator,
-                                             int @Nullable [] offsetsToKeep,
-                                             boolean keepCarriageReturn) {
+  public static @NotNull String convertLineSeparators(@NotNull String text,
+                                                      @NotNull String newSeparator,
+                                                      int @Nullable [] offsetsToKeep,
+                                                      boolean keepCarriageReturn) {
     return StringUtilRt.convertLineSeparators(text, newSeparator, offsetsToKeep, keepCarriageReturn);
   }
 
@@ -3293,18 +3307,16 @@ public class StringUtil {
     return StringUtilRt.endsWithIgnoreCase(text, suffix);
   }
 
-  @NotNull
   @Contract(pure = true)
-  public static String formatFileSize(long fileSize, @NotNull String unitSeparator, int rank) {
+  public static @NotNull String formatFileSize(long fileSize, @NotNull String unitSeparator, int rank) {
     return StringUtilRt.formatFileSize(fileSize, unitSeparator, rank);
   }
 
   /**
    * @see StringUtilRt#formatFileSize(long, String, int, boolean)
    */
-  @NotNull
   @Contract(pure = true)
-  public static String formatFileSize(long fileSize, @NotNull String unitSeparator, int rank, boolean fixedFractionPrecision) {
+  public static @NotNull String formatFileSize(long fileSize, @NotNull String unitSeparator, int rank, boolean fixedFractionPrecision) {
     return StringUtilRt.formatFileSize(fileSize, unitSeparator, rank, fixedFractionPrecision);
   }
 

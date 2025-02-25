@@ -1,14 +1,17 @@
 ### auto-generated section `build intellij.platform.ide.internal` start
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
+
+jvm_resources(
+  name = "ide-internal_resources",
+  files = glob(["resources/**/*"]),
+  strip_prefix = "resources"
+)
 
 jvm_library(
   name = "ide-internal",
   module_name = "intellij.platform.ide.internal",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
-  plugins = ["@lib//:serialization_plugin"],
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "//platform/ui.jcef:ui-jcef",
     "//platform/platform-impl/bootstrap:ide-bootstrap",
@@ -18,6 +21,7 @@ jvm_library(
     "//platform/statistics",
     "//platform/editor-ui-ex:editor-ex",
     "//platform/analysis-impl",
+    "//platform/util/progress",
     "//platform/lang-api:lang",
     "//platform/backend/workspace",
     "//platform/workspace/jps",
@@ -35,6 +39,7 @@ jvm_library(
     "@lib//:gson",
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlin-reflect",
-  ]
+  ],
+  runtime_deps = [":ide-internal_resources"]
 )
 ### auto-generated section `build intellij.platform.ide.internal` end

@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.fileChooser;
 
 import com.intellij.ide.IdeCoreBundle;
@@ -38,6 +38,7 @@ public class FileChooserDescriptor implements Cloneable {
   private final boolean myChooseFolders;
   private final boolean myChooseJarContents;
   private final boolean myChooseMultiple;
+  private final @Nullable FileChooserDescriptor myBaseDescriptor;
 
   private @NlsContexts.DialogTitle String myTitle = IdeCoreBundle.message("file.chooser.default.title");
   private @NlsContexts.Label String myDescription;
@@ -58,27 +59,36 @@ public class FileChooserDescriptor implements Cloneable {
   public FileChooserDescriptor(
     boolean chooseFiles,
     boolean chooseFolders,
-    @SuppressWarnings("unused") boolean chooseJars,
-    @SuppressWarnings("unused") boolean chooseJarsAsFiles,
+    boolean chooseJars,
+    boolean chooseJarsAsFiles,
     boolean chooseJarContents,
     boolean chooseMultiple
   ) {
-    this(chooseFiles, chooseFolders, chooseJarContents, chooseMultiple);
+    this(chooseFiles || (chooseJars && !chooseJarContents) || chooseJarsAsFiles, chooseFolders, chooseJarContents, chooseMultiple);
   }
 
-  FileChooserDescriptor(boolean chooseFiles, boolean chooseFolders, boolean chooseJarContents, boolean chooseMultiple) {
+  @ApiStatus.Internal
+  public FileChooserDescriptor(boolean chooseFiles, boolean chooseFolders, boolean chooseJarContents, boolean chooseMultiple) {
+    this(chooseFiles, chooseFolders, chooseJarContents, chooseMultiple, null);
+  }
+
+  private FileChooserDescriptor(
+    boolean chooseFiles, boolean chooseFolders, boolean chooseJarContents, boolean chooseMultiple,
+    @Nullable FileChooserDescriptor baseDescriptor
+  ) {
     myChooseFiles = chooseFiles;
     myChooseFolders = chooseFolders;
     myChooseJarContents = chooseJarContents;
     myChooseMultiple = chooseMultiple;
+    myBaseDescriptor = baseDescriptor;
   }
 
   /**
-   * Prefer {@link FileChooserDescriptorFactory} and {@link #withExtensionFilter} / {@link #withFileFilter};
+   * Prefer {@link FileChooserDescriptorFactory} and {@link #withExtensionFilter};
    * use this way only for overriding default behavior.
    */
   public FileChooserDescriptor(@NotNull FileChooserDescriptor d) {
-    this(d.isChooseFiles(), d.isChooseFolders(), d.isChooseJarContents(), d.isChooseMultiple());
+    this(d.isChooseFiles(), d.isChooseFolders(), d.isChooseJarContents(), d.isChooseMultiple(), d);
     myTitle = d.getTitle();
     myDescription = d.getDescription();
     myHideIgnored = d.isHideIgnored();
@@ -216,8 +226,6 @@ public class FileChooserDescriptor implements Cloneable {
 
   /**
    * @see #withExtensionFilter(String, String...)
-   * @see FileChooserDescriptorFactory#createSingleFileDescriptor(FileType)
-   * @see FileChooserDescriptorFactory#createSingleFileOrFolderDescriptor(FileType)
    */
   public FileChooserDescriptor withExtensionFilter(@NotNull FileType type) {
     return withExtensionFilter(IdeCoreBundle.message("file.chooser.files.label", type.getName()), type);
@@ -239,7 +247,6 @@ public class FileChooserDescriptor implements Cloneable {
 
   /**
    * @see #withExtensionFilter(String, String...)
-   * @see FileChooserDescriptorFactory#createSingleFileDescriptor(String)
    */
   public FileChooserDescriptor withExtensionFilter(@NotNull String extension) {
     return withExtensionFilter(IdeCoreBundle.message("file.chooser.files.label", extension.toUpperCase(Locale.ROOT)), extension);
@@ -273,12 +280,7 @@ public class FileChooserDescriptor implements Cloneable {
     }
 
     if (!file.isDirectory()) {
-      if (isArchive(file)) {
-        if (!myChooseJarContents) {
-          return false;
-        }
-      }
-      else if (!myChooseFiles) {
+      if (!myChooseFiles && !(myChooseJarContents && isArchive(file))) {
         return false;
       }
       if (!matchesFilters(file)) {
@@ -315,7 +317,27 @@ public class FileChooserDescriptor implements Cloneable {
     return myChooseFiles || myChooseJarContents && isArchive(file);
   }
 
-  private boolean matchesFilters(VirtualFile file) {
+  @ApiStatus.Internal
+  @SuppressWarnings("MethodMayBeStatic")
+  public final boolean isHidden(@NotNull VirtualFile file) {
+    return file.is(VFileProperty.HIDDEN) || file.getName().startsWith(".") || FileTypeManager.getInstance().isFileIgnored(file);
+  }
+
+  @ApiStatus.Internal
+  public final boolean isSelectable(@NotNull VirtualFile file) {
+    if (file.is(VFileProperty.SYMLINK) && file.getCanonicalPath() == null) {
+      return false;
+    }
+    if (file.isDirectory()) {
+      return myChooseFolders;
+    }
+    if (!matchesFilters(file)) {
+      return false;
+    }
+    return myChooseFiles || myChooseJarContents && isArchive(file);
+  }
+
+  protected boolean matchesFilters(VirtualFile file) {
     return
       (myExtensionFilter == null || ContainerUtil.exists(myExtensionFilter.second, ext -> Strings.endsWithIgnoreCase(file.getName(), '.' + ext))) &&
       (myFileTypeFilter == null || ContainerUtil.exists(myFileTypeFilter, type -> FileTypeRegistry.getInstance().isFileOfType(file, type))) &&
@@ -328,12 +350,16 @@ public class FileChooserDescriptor implements Cloneable {
 
   /**
    * Called upon <em>OK</em> action before closing dialog (after closing for native choosers).
-   * Override to customize validation of user input.
+   * Override to customize the validation of user input.
    *
    * @param files selected files to be checked
    * @throws Exception if selected files cannot be accepted, the exception message will be shown in the UI.
    */
-  public void validateSelectedFiles(@NotNull VirtualFile @NotNull [] files) throws Exception { }
+  public void validateSelectedFiles(@NotNull VirtualFile @NotNull [] files) throws Exception {
+    if (myBaseDescriptor != null) {
+      myBaseDescriptor.validateSelectedFiles(files);
+    }
+  }
 
   public Icon getIcon(VirtualFile file) {
     return dressIcon(file, IconUtil.getIcon(file, Iconable.ICON_FLAG_READ_STATUS, null));
@@ -362,12 +388,12 @@ public class FileChooserDescriptor implements Cloneable {
   @ApiStatus.Internal
   public final @Nullable VirtualFile getFileToSelect(@NotNull VirtualFile file) {
     if (isFileSelectable(file)) {
-      if (file.isDirectory() || myChooseFiles) {
-        return file;
-      }
-      if (myChooseJarContents) {
+      if (!file.isDirectory() && myChooseJarContents && isArchive(file)) {
         var path = file.getPath();
         return JarFileSystem.getInstance().findFileByPath(path + JarFileSystem.JAR_SEPARATOR);
+      }
+      if (file.isDirectory() || myChooseFiles) {
+        return file;
       }
     }
     return null;

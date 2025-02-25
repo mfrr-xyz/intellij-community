@@ -20,9 +20,10 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
 
   override fun setUp() {
     super.setUp()
-    needFixForMaven4()
     myShortcutsManager = MavenShortcutsManager.getInstance(project)
     myShortcutsManager!!.doInit(project)
+
+    // turn auto-import on
     initProjectsManager(true)
   }
 
@@ -54,7 +55,7 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
       <artifactId>p2</artifactId>
       <version>1</version>
       """.trimIndent())
-    importProjects(p1, p2)
+    importProjectsAsync(p1, p2)
 
     assertEmptyKeymap()
   }
@@ -72,7 +73,9 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
     val goal = "clean"
     assignShortcut(projectPom, goal, "alt shift X")
 
-    importProjectAsync("""
+    // auto-import is turned on
+    waitForImportWithinTimeout {
+      updateProjectPom("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
@@ -86,6 +89,7 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
                       </plugins>
                     </build>
                     """.trimIndent())
+    }
 
     assertKeymapContains(projectPom, goal)
   }
@@ -103,7 +107,9 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
     val goal = "org.apache.maven.plugins:maven-surefire-plugin:2.4.3:test"
     assignShortcut(projectPom, goal, "alt shift X")
 
-    importProjectAsync("""
+    // auto-import is turned on
+    waitForImportWithinTimeout {
+      updateProjectPom("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
@@ -117,20 +123,22 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
                       </plugins>
                     </build>
                     """.trimIndent())
+    }
 
     assertKeymapContains(projectPom, goal)
   }
 
   @Test
   fun testActionWhenSeveralSimilarPlugins() = runBlocking {
-    needFixForMaven4()
     importProjectAsync("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
                     """.trimIndent())
 
-    importProjectAsync("""
+    // auto-import is turned on
+    waitForImportWithinTimeout {
+      updateProjectPom("""
                     <groupId>test</groupId>
                     <artifactId>project</artifactId>
                     <version>1</version>
@@ -149,6 +157,7 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
                       </plugins>
                     </build>
                     """.trimIndent())
+    }
     val goal = "org.apache.maven.plugins:maven-surefire-plugin:2.4.3:test"
     assignShortcut(projectPom, goal, "alt shift X")
 
@@ -172,7 +181,9 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
     val goal = "clean"
     assertKeymapDoesNotContain(m, goal)
 
-    createProjectPom("""
+    // auto-import is turned on
+    waitForImportWithinTimeout {
+      updateProjectPom("""
                        <groupId>test</groupId>
                        <artifactId>project</artifactId>
                        <version>1</version>
@@ -181,8 +192,7 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
                          <module>module</module>
                        </modules>
                        """.trimIndent())
-
-    importProjectAsync()
+    }
 
     assertEmptyKeymap()
     assignShortcut(m, goal, "alt shift X")
@@ -203,7 +213,7 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
       <version>1</version>
       """.trimIndent())
 
-    importProjects(p1, p2)
+    importProjectsAsync(p1, p2)
 
     assertModules("p1", "p2")
 
@@ -217,7 +227,7 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
 
     WriteCommandAction.writeCommandAction(project).run<IOException> { p1.delete(this) }
 
-    importProjects(p1, p2)
+    updateAllProjects()
 
     assertModules("p2")
 
@@ -238,7 +248,7 @@ class MavenShortcutsManagerTest : MavenMultiVersionImportingTestCase() {
       <artifactId>p2</artifactId>
       <version>1</version>
       """.trimIndent())
-    importProjects(p1, p2)
+    importProjectsAsync(p1, p2)
 
     assertEmptyKeymap()
     val goal = "clean"

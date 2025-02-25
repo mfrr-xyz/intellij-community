@@ -15,7 +15,7 @@ java_library(
     ":kotlin-plugin-k2_resources",
     "//plugins/kotlin/plugin/common:kotlin-plugin-common",
     "//plugins/kotlin/plugin",
-    "@lib//:kotlinc_kotlin-compiler-common",
+    "@lib//:kotlinc-kotlin-compiler-common",
     "//plugins/kotlin/base/analysis:kotlin-base-analysis",
     "//plugins/kotlin/base/analysis-api-platform:kotlin-base-analysis-api-platform",
     "//plugins/kotlin/base/code-insight:kotlin-base-code-insight",
@@ -52,6 +52,7 @@ java_library(
     "//plugins/kotlin/gradle/code-insight-toml:kotlin-gradle-code-insight-toml",
     "//plugins/kotlin/gradle/gradle:kotlin-gradle-gradle",
     "//plugins/kotlin/gradle/gradle-java:kotlin-gradle-gradle-java",
+    "//plugins/kotlin/gradle/gradle-java/k2:kotlin-gradle-gradle-java-k2",
     "//plugins/kotlin/gradle/gradle-tooling:kotlin-gradle-gradle-tooling",
     "//plugins/kotlin/gradle/gradle-tooling/impl:kotlin-gradle-gradle-tooling-impl",
     "//plugins/kotlin/grazie",
@@ -129,6 +130,11 @@ java_library(
     "//plugins/kotlin/jvm-debugger/evaluation/k2:kotlin-jvm-debugger-evaluation-k2",
     "//plugins/kotlin/features-trainer",
     "//plugins/kotlin/internal:k2-internal",
+    "//plugins/kotlin/base/fir/scripting:kotlin-base-fir-scripting",
+    "//plugins/kotlin/jvm/shared:kotlin-jvm-shared",
+    "//plugins/kotlin/jvm/k2:kotlin-jvm-k2",
+    "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.shared:kotlin-gradle-scripting-shared",
+    "//plugins/kotlin/gradle/scripting/kotlin.gradle.scripting.k2:kotlin-gradle-scripting-k2",
   ]
 )
 ### auto-generated section `build kotlin.plugin.k2` end

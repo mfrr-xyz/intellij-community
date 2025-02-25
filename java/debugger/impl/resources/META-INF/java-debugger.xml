@@ -35,6 +35,8 @@
                     interface="com.intellij.debugger.actions.JvmSmartStepIntoHandler" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.debugger.jvmSteppingCommandProvider"
                     interface="com.intellij.debugger.impl.JvmSteppingCommandProvider" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.debugger.jdiHelperClassLoader"
+                    interface="com.intellij.debugger.impl.JdiHelperClassLoader" dynamic="true"/>
 
     <extensionPoint qualifiedName="com.intellij.debugger.frameExtraVarsProvider"
                     interface="com.intellij.debugger.engine.FrameExtraVariablesProvider" dynamic="true"/>
@@ -68,8 +70,6 @@
     <extensionPoint qualifiedName="com.intellij.debugger.additionalContextProvider"
                     interface="com.intellij.debugger.engine.evaluation.AdditionalContextProvider" dynamic="true"/>
 
-    <extensionPoint qualifiedName="com.intellij.debugger.collectionVisualizer"
-                    interface="com.intellij.debugger.collections.visualizer.CollectionVisualizer" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.debuggerEditorTextProvider" beanClass="com.intellij.lang.LanguageExtensionPoint"
                     dynamic="true">
       <with attribute="implementationClass" implements="com.intellij.debugger.impl.EditorTextProvider"/>
@@ -81,6 +81,10 @@
     </extensionPoint>
     <extensionPoint qualifiedName="com.intellij.debugger.extraDebugNodesProvider"
                     interface="com.intellij.debugger.ui.tree.ExtraDebugNodesProvider" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.debugger.steppingListener"
+                    interface="com.intellij.debugger.engine.SteppingListener" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.debugger.dumpItemsProvider"
+                    interface="com.intellij.debugger.impl.ThreadDumpItemsProviderFactory" dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -95,6 +99,7 @@
     <projectService serviceInterface="com.intellij.debugger.DebuggerManager"
                     serviceImplementation="com.intellij.debugger.impl.DebuggerManagerImpl"/>
     <debugger.additionalContextProvider implementation="com.intellij.debugger.engine.evaluation.MarkedObjectAdditionalContextProvider"/>
+    <debugger.jdiHelperClassLoader implementation="com.intellij.debugger.impl.JdiHelperClassLoaderImpl"/>
     <debuggerEditorTextProvider language="JAVA" implementationClass="com.intellij.debugger.impl.JavaEditorTextProviderImpl"/>
     <javaExpressionSurrounder implementation="com.intellij.debugger.codeinsight.JavaWithRuntimeCastSurrounder"/>
 
@@ -132,6 +137,7 @@
 
     <debugger.asyncStackTraceProvider
       implementation="com.intellij.debugger.ui.breakpoints.StackCapturingLineBreakpoint$CaptureAsyncStackTraceProvider"/>
+    <debugger.dumpItemsProvider implementation="com.intellij.debugger.actions.JavaThreadsProvider"/>
     <xdebugger.controlExceptionBreakpointSupport implementation="com.intellij.debugger.codeinsight.ControlExceptionBreakpointJVMSupport"/>
     <iconProvider implementation="com.intellij.debugger.engine.evaluation.AdditionalContextIconProvider"/>
 
@@ -168,11 +174,10 @@
     <statistics.counterUsagesCollector implementationClass="com.intellij.debugger.statistics.DebuggerStatistics"/>
     <statistics.counterUsagesCollector
       implementationClass="com.intellij.debugger.engine.evaluation.statistics.JavaDebuggerEvaluatorStatisticsCollector"/>
-    <statistics.counterUsagesCollector
-      implementationClass="com.intellij.debugger.collections.visualizer.CollectionVisualizerStatisticsCollector"/>
     <statistics.counterUsagesCollector implementationClass="com.intellij.debugger.ui.breakpoints.JavaBreakpointsUsageCollector"/>
 
     <feedback.idleFeedbackSurvey implementation="com.intellij.debugger.feedback.KotlinDebuggerFeedbackSurvey"/>
+    <debugger.steppingListener implementation="com.intellij.debugger.engine.CancelingSteppingListener"/>
   </extensions>
 
   <actions>
@@ -398,9 +403,4 @@
     <action id="com.intellij.debugger.feedback.KotlinDebuggerFeedbackTestAction"
             class="com.intellij.debugger.feedback.KotlinDebuggerFeedbackTestAction" internal="true"/>
   </actions>
-
-  <applicationListeners>
-    <listener class="com.intellij.debugger.engine.CancelingSteppingListener"
-              topic="com.intellij.debugger.engine.SteppingListener"/>
-  </applicationListeners>
 </idea-plugin>

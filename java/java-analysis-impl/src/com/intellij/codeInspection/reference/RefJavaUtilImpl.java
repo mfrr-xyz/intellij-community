@@ -1,8 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection.reference;
 
-import com.intellij.codeInsight.daemon.impl.analysis.GenericsHighlightUtil;
 import com.intellij.java.analysis.JavaAnalysisBundle;
+import com.intellij.java.codeserver.core.JavaPsiMethodUtil;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
@@ -18,10 +18,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.uast.*;
 import org.jetbrains.uast.visitor.AbstractUastVisitor;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public final class RefJavaUtilImpl extends RefJavaUtil {
   private static final Logger LOG = Logger.getInstance(RefJavaUtilImpl.class);
@@ -36,7 +33,7 @@ public final class RefJavaUtilImpl extends RefJavaUtil {
   }
 
   @Override
-  public void addReferencesTo(@NotNull final UElement decl, @NotNull final RefJavaElement ref, final UElement @Nullable ... findIn) {
+  public void addReferencesTo(final @NotNull UElement decl, final @NotNull RefJavaElement ref, final UElement @Nullable ... findIn) {
     final RefJavaElementImpl refFrom = (RefJavaElementImpl)ref;
     final RefManagerImpl refManager = refFrom.getRefManager();
     if (findIn == null) {
@@ -561,8 +558,7 @@ public final class RefJavaUtilImpl extends RefJavaUtil {
   }
 
   @Override
-  @Nullable
-  public String getPackageName(RefEntity refEntity) {
+  public @Nullable String getPackageName(RefEntity refEntity) {
     if (refEntity instanceof RefProject || refEntity instanceof RefJavaModule) {
       return null;
     }
@@ -574,9 +570,8 @@ public final class RefJavaUtilImpl extends RefJavaUtil {
     return refPackage == null ? JavaAnalysisBundle.message("inspection.reference.default.package") : refPackage.getQualifiedName();
   }
 
-  @NotNull
   @Override
-  public String getAccessModifier(@NotNull PsiModifierListOwner psiElement) {
+  public @NotNull String getAccessModifier(@NotNull PsiModifierListOwner psiElement) {
     if (psiElement instanceof PsiParameter) return PsiModifier.PACKAGE_LOCAL;
 
     PsiModifierList list = psiElement.getModifierList();
@@ -601,8 +596,7 @@ public final class RefJavaUtilImpl extends RefJavaUtil {
   }
 
   @Override
-  @Nullable
-  public RefClass getOwnerClass(RefManager refManager, UElement uElement) {
+  public @Nullable RefClass getOwnerClass(RefManager refManager, UElement uElement) {
     while (uElement != null && !(uElement instanceof UClass)) {
       uElement = uElement.getUastParent();
     }
@@ -616,8 +610,7 @@ public final class RefJavaUtilImpl extends RefJavaUtil {
   }
 
   @Override
-  @Nullable
-  public RefClass getOwnerClass(RefElement refElement) {
+  public @Nullable RefClass getOwnerClass(RefElement refElement) {
     LOG.assertTrue(refElement.isInitialized(), refElement.getName() + " not initialized");
     RefEntity parent = refElement.getOwner();
 
@@ -664,8 +657,7 @@ public final class RefJavaUtilImpl extends RefJavaUtil {
         }
       }
       PsiClass aClass = javaMethod.getContainingClass();
-      if (aClass == null ||
-          GenericsHighlightUtil.getUnrelatedDefaultsMessage(aClass, Arrays.asList(superMethods), true) != null) {
+      if (aClass == null || hasUnrelatedDefaults(aClass, Arrays.asList(superMethods))) {
         return false;
       }
     }
@@ -796,5 +788,11 @@ public final class RefJavaUtilImpl extends RefJavaUtil {
       return element.getNavigationElement();
     }
     return element;
+  }
+
+  private static boolean hasUnrelatedDefaults(@NotNull PsiClass aClass,
+                                              @NotNull Collection<? extends PsiMethod> overrideEquivalentSuperMethods) {
+    return JavaPsiMethodUtil.getAbstractMethodToImplementWhenDefaultPresent(aClass, overrideEquivalentSuperMethods) != null ||
+           JavaPsiMethodUtil.getUnrelatedSuperMethods(aClass, overrideEquivalentSuperMethods) != null;
   }
 }

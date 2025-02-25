@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.target.eel
 
 import com.intellij.execution.Platform
@@ -9,20 +9,20 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.runBlockingCancellable
+import com.intellij.openapi.progress.runBlockingMaybeCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.platform.eel.*
 import com.intellij.platform.eel.fs.EelFileSystemApi
 import com.intellij.platform.eel.fs.getPath
-import com.intellij.platform.eel.provider.utils.EelPathUtils
-import com.intellij.platform.eel.provider.utils.forwardLocalPort
-import com.intellij.platform.util.coroutines.channel.ChannelInputStream
-import com.intellij.platform.util.coroutines.channel.ChannelOutputStream
+import com.intellij.platform.eel.path.EelPath
+import com.intellij.platform.eel.provider.asEelPath
+import com.intellij.platform.eel.provider.asNioPath
+import com.intellij.platform.eel.provider.utils.*
 import com.intellij.platform.util.coroutines.childScope
 import com.intellij.ui.icons.EMPTY_ICON
 import com.intellij.util.awaitCancellationAndInvoke
-import com.intellij.util.io.copyToAsync
 import com.intellij.util.net.NetUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
@@ -30,10 +30,12 @@ import kotlinx.coroutines.launch
 import org.jetbrains.annotations.ApiStatus
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import javax.swing.Icon
+import kotlin.io.path.isSameFileAs
 
 private fun EelPlatform.toTargetPlatform(): TargetPlatform = when (this) {
   is EelPlatform.Posix -> TargetPlatform(Platform.UNIX)
@@ -89,7 +91,7 @@ class EelTargetEnvironmentRequest(override val configuration: Configuration) : B
     override val asTargetConfig: TargetEnvironmentConfiguration = this
 
     override fun getTargetPathIfLocalPathIsOnTarget(probablyPathOnTarget: Path): FullPathOnTarget? {
-      return eel.mapper.getOriginalPath(probablyPathOnTarget)?.toString()
+      return probablyPathOnTarget.asEelPath().takeIf { it.descriptor == eel.descriptor }?.toString()
     }
   }
 
@@ -159,11 +161,10 @@ private class EelTargetEnvironment(override val request: EelTargetEnvironmentReq
           val connection = acceptor.incomingConnections.receive()
 
           launch {
-            socket.getInputStream().copyToAsync(ChannelOutputStream.forByteBuffers(connection.sendChannel))
+            copy(socket.consumeAsEelChannel(), connection.sendChannel).getOrThrow()  // TODO: Process error
           }
-
           launch {
-            ChannelInputStream.forByteBuffers(this, connection.receiveChannel).copyToAsync(socket.getOutputStream())
+            copy(connection.receiveChannel, socket.asEelChannel()).getOrThrow() // TODO: PRocess error
           }
         }
 
@@ -185,14 +186,23 @@ private class EelTargetEnvironment(override val request: EelTargetEnvironmentReq
     override val localRoot: Path,
     override val targetRoot: String,
   ) : UploadableVolume, DownloadableVolume {
+    init {
+      val x = 1
+    }
+
     private fun targetRootPath(): Path {
-      return eel.mapper.toNioPath(eel.fs.getPath(targetRoot))
+      return eel.fs.getPath(targetRoot).asNioPath()
     }
 
     override fun upload(relativePath: String, targetProgressIndicator: TargetProgressIndicator) {
       val from = localRoot.resolve(relativePath).normalize()
       val to = targetRootPath().resolve(relativePath).normalize()
-      if (from == to) return
+      try {
+        if (from.isSameFileAs(to)) return
+      }
+      catch (err: java.nio.file.NoSuchFileException) {
+        if (!Files.exists(from)) throw err
+      }
       // TODO: generalize com.intellij.execution.wsl.ijent.nio.IjentWslNioFileSystemProvider.copy
       EelPathUtils.walkingTransfer(from, to, removeSource = false, copyAttributes = true)
     }
@@ -200,13 +210,18 @@ private class EelTargetEnvironment(override val request: EelTargetEnvironmentReq
     override fun download(relativePath: String, progressIndicator: ProgressIndicator) {
       val from = targetRootPath().resolve(relativePath).normalize()
       val to = localRoot.resolve(relativePath).normalize()
-      if (from == to) return
+      try {
+        if (from.isSameFileAs(to)) return
+      }
+      catch (err: java.nio.file.NoSuchFileException) {
+        if (!Files.exists(from)) throw err
+      }
       // TODO: generalize com.intellij.execution.wsl.ijent.nio.IjentWslNioFileSystemProvider.copy
       EelPathUtils.walkingTransfer(from, to, removeSource = false, copyAttributes = true)
     }
 
     override fun resolveTargetPath(relativePath: String): String {
-      return eel.mapper.getOriginalPath(targetRootPath().resolve(relativePath))!!.toString()
+      return targetRootPath().resolve(relativePath).asEelPath().toString()
     }
 
     companion object {
@@ -215,14 +230,20 @@ private class EelTargetEnvironment(override val request: EelTargetEnvironmentReq
 
         val remoteRoot = when (val targetRootPath = targetPathGetter()) {
           is TargetPath.Temporary -> {
-            eel.mapper.getOriginalPath(localRootPath)?.toString() ?: runBlockingCancellable {
-              val options = EelFileSystemApi.CreateTemporaryDirectoryOptions.Builder()
+            val localEelPath = localRootPath.asEelPath()
+            if (localEelPath.descriptor == eel.descriptor) {
+              localEelPath.toString()
+            }
+            else {
+              runBlockingMaybeCancellable {
+                val options = EelFileSystemApi.CreateTemporaryEntryOptions.Builder()
 
-              targetRootPath.prefix?.let(options::prefix)
-              targetRootPath.parentDirectory?.let(eel.fs::getPath)?.let(options::parentDirectory)
-              options.deleteOnExit(true)
+                targetRootPath.prefix?.let(options::prefix)
+                targetRootPath.parentDirectory?.let(eel.fs::getPath)?.let(options::parentDirectory)
+                options.deleteOnExit(true)
 
-              eel.fs.createTemporaryDirectory(options.build()).getOrThrow().toString()
+                eel.fs.createTemporaryDirectory(options.build()).getOrThrow().toString()
+              }
             }
           }
           is TargetPath.Persistent -> targetRootPath.absolutePath
@@ -258,7 +279,7 @@ private class EelTargetEnvironment(override val request: EelTargetEnvironmentReq
 
     builder.args(command.drop(1))
     builder.env(commandLine.environmentVariables)
-    builder.workingDirectory(commandLine.workingDirectory)
+    builder.workingDirectory(commandLine.workingDirectory?.let { EelPath.parse(it, eel.descriptor) })
 
     return runBlockingCancellable { eel.exec.execute(builder.build()).getOrThrow().convertToJavaProcess() }
   }

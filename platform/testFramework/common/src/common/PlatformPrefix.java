@@ -17,13 +17,14 @@ public final class PlatformPrefix {
   private PlatformPrefix() { }
 
   private static final String[] PREFIX_CANDIDATES = {
-    "Rider", "GoLand", "CLion", "MobileIDE", "FleetBackend",
+    "Rider", "GoLand", "CLion", "FleetBackend",
     null,
-    "AppCode", "SwiftTests",
+    "AppCode",
     "Python", "DataSpell", "PyCharmCore",
     "DataGrip",
     "Ruby",
     "PhpStorm",
+    "RustRover",
     "UltimateLangXml", "Idea", "PlatformLangXml"
   };
 

@@ -66,12 +66,12 @@ public final class ImportUtils {
       return;
     }
     final String containingPackageName = javaFile.getPackageName();
-    @NonNls final String packageName = ClassUtil.extractPackageName(qualifiedName);
+    final @NonNls String packageName = ClassUtil.extractPackageName(qualifiedName);
 
     if (containingPackageName.equals(packageName) || importList.findSingleClassImportStatement(qualifiedName) != null) {
       return;
     }
-    OnDemandImportConflicts conflict = null;
+    OnDemandImportConflict conflict = null;
     ImplicitImportChecker implicitImportChecker = createImplicitImportChecker(javaFile);
     if (implicitImportChecker.isImplicitlyImported(qualifiedName, false)) {
       conflict = findOnDemandImportConflict(qualifiedName, javaFile);
@@ -83,14 +83,14 @@ public final class ImportUtils {
       if (conflict == null) {
         conflict = findOnDemandImportConflict(qualifiedName, javaFile);
       }
-      if (!conflict.conflictForOnDemand()) return;
+      if (!conflict.hasConflictForOnDemand()) return;
     }
     if (ContainerUtil.exists(importList.getImportModuleStatements(),
                              moduleStatement -> moduleStatement.findImportedPackage(packageName) != null)) {
       if (conflict == null) {
         conflict = findOnDemandImportConflict(qualifiedName, javaFile);
       }
-      if (!conflict.conflictForModules() && !conflict.conflictForOnDemand()) return;
+      if (conflict== OnDemandImportConflict.NO_CONFLICTS) return;
     }
     if (hasExactImportConflict(qualifiedName, javaFile)) {
       return;
@@ -149,7 +149,7 @@ public final class ImportUtils {
     if (hasExactImportConflict(fqName, file)) {
       return false;
     }
-    if (findOnDemandImportConflict(fqName, file, true, true, true) &&
+    if (hasOnDemandImportConflict(fqName, file, true, true, true) &&
         !isAlreadyImported(file, fqName)
     ) {
       return false;
@@ -245,15 +245,51 @@ public final class ImportUtils {
    * Represents the conflicts that can occur with on-demand imports in a Java file.
    * This record captures whether there is a conflict with on-demand imports involving
    * class names and module imports.
-   * The `conflictForOnDemand` indicates if there is a conflict when importing classes
-   * using on-demand imports, such as `import package.*;`.
-   * The `conflictForModules` indicates if there is a conflict when considering module-related
-   * imports.
-   *
-   * @param conflictForOnDemand true if there is a conflict with on-demand imports, false otherwise
-   * @param conflictForModules true if there is a conflict related to modules, false otherwise
    */
-  public record OnDemandImportConflicts(boolean conflictForOnDemand, boolean conflictForModules) {}
+  public enum OnDemandImportConflict {
+    NO_CONFLICTS(false, false),
+    ON_DEMAND_IMPORT_CONFLICTS(true, false),
+    MODULE_CONFLICTS(false, true),
+    ON_DEMAND_AND_MODULE_CONFLICT(true, true);
+
+    private final boolean myConflictForOnDemand;
+    private final boolean myConflictForModules;
+
+    OnDemandImportConflict(boolean conflictForOnDemand, boolean conflictForModules) {
+      myConflictForOnDemand = conflictForOnDemand;
+      myConflictForModules = conflictForModules;
+    }
+
+    /**
+     * @return true if there is a conflict related to on-demand imports, false otherwise.
+     */
+    public boolean hasConflictForOnDemand() {
+      return myConflictForOnDemand;
+    }
+
+    /**
+     * @return true if there is a conflict related to module imports, false otherwise.
+     */
+    public boolean hasConflictForModules() {
+      return myConflictForModules;
+    }
+
+    private static OnDemandImportConflict from(boolean conflictForOnDemand, boolean conflictForModules) {
+      if (conflictForOnDemand && conflictForModules) {
+        return ON_DEMAND_AND_MODULE_CONFLICT;
+      }
+      else if (conflictForOnDemand) {
+        return ON_DEMAND_IMPORT_CONFLICTS;
+      }
+      else if (conflictForModules) {
+        return MODULE_CONFLICTS;
+      }
+      else {
+        return NO_CONFLICTS;
+      }
+    }
+  }
+
 
   /**
    * Finds conflicts related to on-demand imports in the context of a given fully qualified name.
@@ -265,14 +301,14 @@ public final class ImportUtils {
    * @return an OnDemandImportConflicts object that contains information about whether there are
    *         conflicts for on-demand imports and module imports
    */
-  public static OnDemandImportConflicts findOnDemandImportConflict(@NotNull String fqName, @NotNull PsiElement context) {
+  public static @NotNull ImportUtils.OnDemandImportConflict findOnDemandImportConflict(@NotNull String fqName, @NotNull PsiElement context) {
     if(PsiUtil.isAvailable(JavaFeature.PACKAGE_IMPORTS_SHADOW_MODULE_IMPORTS, context)) {
-      boolean onDemandConflict = findOnDemandImportConflict(fqName, context, false, true, false);
-      boolean moduleConflict = findOnDemandImportConflict(fqName, context, false, false, true);
-      return new OnDemandImportConflicts(onDemandConflict, moduleConflict);
+      boolean onDemandConflict = hasOnDemandImportConflict(fqName, context, false, true, false);
+      boolean moduleConflict = hasOnDemandImportConflict(fqName, context, false, false, true);
+      return OnDemandImportConflict.from(onDemandConflict, moduleConflict);
     }
-    boolean demandImportConflict = findOnDemandImportConflict(fqName, context, false, true, true);
-    return new OnDemandImportConflicts(demandImportConflict, demandImportConflict) ;
+    boolean demandImportConflict = hasOnDemandImportConflict(fqName, context, false, true, true);
+    return OnDemandImportConflict.from(demandImportConflict, demandImportConflict) ;
   }
 
   /**
@@ -280,8 +316,8 @@ public final class ImportUtils {
    */
   @Deprecated(forRemoval = true)
   public static boolean hasOnDemandImportConflict(@NotNull String fqName, @NotNull PsiElement context) {
-    OnDemandImportConflicts conflict = findOnDemandImportConflict(fqName, context);
-    return conflict.conflictForOnDemand() || conflict.conflictForModules();
+    OnDemandImportConflict conflict = findOnDemandImportConflict(fqName, context);
+    return conflict != OnDemandImportConflict.NO_CONFLICTS;
   }
   /**
    * @param strict if strict is true this method checks if the conflicting
@@ -289,11 +325,11 @@ public final class ImportUtils {
    *               on demand import can be overridden with an exact import for the fqName
    *               without breaking stuff.
    */
-  private static boolean findOnDemandImportConflict(@NotNull String fqName,
-                                                    @NotNull PsiElement context,
-                                                    boolean strict,
-                                                    boolean considerOnDemand,
-                                                    boolean considerModules) {
+  private static boolean hasOnDemandImportConflict(@NotNull String fqName,
+                                                   @NotNull PsiElement context,
+                                                   boolean strict,
+                                                   boolean considerOnDemand,
+                                                   boolean considerModules) {
     final PsiFile containingFile = context.getContainingFile();
     if (!(containingFile instanceof PsiJavaFile javaFile)) {
       return false;
@@ -336,6 +372,7 @@ public final class ImportUtils {
                                                                  boolean checkModules) {
     final String shortName = ClassUtil.extractClassName(fqName);
     final String packageName = ClassUtil.extractPackageName(fqName);
+    @Nullable PsiClass importedClass = JavaPsiFacade.getInstance(javaFile.getProject()).findClass(packageName, javaFile.getResolveScope());
     for (final PsiImportStatementBase importStatement : importStatements) {
       if (!importStatement.isOnDemand()) {
         continue;
@@ -423,7 +460,15 @@ public final class ImportUtils {
               continue;
             }
             final String qualifiedName = containingClass.getQualifiedName() + '.' + method.getName();
-            if (!fqName.equals(qualifiedName) && (!strict || memberReferenced(method, javaFile))) {
+            boolean theSameMethod = fqName.equals(qualifiedName)
+                                    ||
+                                    //can reference through inheritances
+                                    (!containingClass.isInterface() && importedClass != null &&
+                                     importedClass.isInheritor(containingClass, true));
+            if (theSameMethod) {
+              break;
+            }
+            if (!strict || memberReferenced(method, javaFile)) {
               return ThreeState.YES;
             }
           }
@@ -466,7 +511,7 @@ public final class ImportUtils {
     final Project project = file.getProject();
     final JavaPsiFacade psiFacade = JavaPsiFacade.getInstance(project);
     final PsiPackage filePackage = psiFacade.findPackage(filePackageName);
-    return filePackage != null && filePackage.containsClassNamed(shortName);
+    return filePackage != null && filePackage.hasClassWithShortName(shortName, file.getResolveScope());
   }
 
   /**
@@ -504,7 +549,7 @@ public final class ImportUtils {
     final PsiImportStaticStatement onDemandImportStatement = findOnDemandImportStaticStatement(importList, qualifierClass);
     if (onDemandImportStatement != null &&
         //check only on demands
-        !findOnDemandImportConflict(qualifierClass + '.' + memberName, javaFile, false, true, false)) {
+        !hasOnDemandImportConflict(qualifierClass + '.' + memberName, javaFile, false, true, false)) {
       return true;
     }
     final Project project = context.getProject();
@@ -534,8 +579,7 @@ public final class ImportUtils {
     return true;
   }
 
-  @Nullable
-  private static PsiImportStaticStatement findOnDemandImportStaticStatement(PsiImportList importList, String qualifierClass) {
+  private static @Nullable PsiImportStaticStatement findOnDemandImportStaticStatement(PsiImportList importList, String qualifierClass) {
     final PsiImportStaticStatement[] importStaticStatements = importList.getImportStaticStatements();
     List<PsiImportStaticStatement> additionalOnDemandImports = new ArrayList<>();
     if (importList.getContainingFile() instanceof PsiJavaFile javaFile) {
@@ -612,7 +656,7 @@ public final class ImportUtils {
     }
     final PsiImportStaticStatement onDemandImportStatement = findOnDemandImportStaticStatement(importList, memberClassName);
     if (onDemandImportStatement != null) {
-      if (!findOnDemandImportConflict(memberClassName + '.' + memberName, javaFile, false, true, false)) {
+      if (!hasOnDemandImportConflict(memberClassName + '.' + memberName, javaFile, false, true, false)) {
         return true;
       }
     }
@@ -635,12 +679,9 @@ public final class ImportUtils {
    */
   public static class ImplicitImportChecker {
 
-    @NotNull
-    private final Map<String, PsiImportStaticStatement> myStaticImportStatements = new HashMap<>();
-    @NotNull
-    private final Set<PsiImportModuleStatement> myModulesStatements = new HashSet<>();
-    @NotNull
-    private final Map<String, PsiImportStatement> myPackageStatements = new HashMap<>();
+    private final @NotNull Map<String, PsiImportStaticStatement> myStaticImportStatements = new HashMap<>();
+    private final @NotNull Set<PsiImportModuleStatement> myModulesStatements = new HashSet<>();
+    private final @NotNull Map<String, PsiImportStatement> myPackageStatements = new HashMap<>();
 
     private ImplicitImportChecker(@NotNull PsiJavaFile file) {
       for (PsiImportStatementBase anImport : getAllImplicitImports(file)) {
@@ -663,15 +704,15 @@ public final class ImportUtils {
     }
 
     public boolean isImplicitlyImported(String qName, boolean isStatic) {
-      return isImplicitlyImported(qName, isStatic, null);
+      return isImplicitlyImported(qName, isStatic, OnDemandImportConflict.NO_CONFLICTS);
     }
 
     public boolean isImplicitlyImported(String qName, boolean isStatic,
-                                        @Nullable ImportUtils.OnDemandImportConflicts conflicts) {
+                                        @NotNull ImportUtils.OnDemandImportConflict conflicts) {
       String packageOrClassName = StringUtil.getPackageName(qName);
       String className = ClassUtil.extractClassName(qName);
       if (!isStatic) {
-        if(conflicts==null || (!conflicts.conflictForModules() && !conflicts.conflictForOnDemand())){
+        if (conflicts == OnDemandImportConflict.NO_CONFLICTS) {
           for (PsiImportModuleStatement psiImportModuleStatement : myModulesStatements) {
             PsiPackageAccessibilityStatement importedPackage = psiImportModuleStatement.findImportedPackage(packageOrClassName);
             if (importedPackage == null) continue;
@@ -683,10 +724,10 @@ public final class ImportUtils {
             }
           }
         }
-        if ((conflicts == null || !conflicts.conflictForOnDemand()) && myPackageStatements.containsKey(packageOrClassName)) return true;
+        if (!conflicts.hasConflictForOnDemand() && myPackageStatements.containsKey(packageOrClassName)) return true;
       }
       else {
-        if (conflicts == null || !conflicts.conflictForOnDemand()) {
+        if (!conflicts.hasConflictForOnDemand()) {
           PsiImportStaticStatement psiImportStaticStatement = myStaticImportStatements.get(packageOrClassName);
           if (psiImportStaticStatement != null) {
             if (psiImportStaticStatement.isOnDemand()) return true;

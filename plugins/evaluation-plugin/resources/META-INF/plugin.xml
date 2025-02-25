@@ -39,6 +39,9 @@
   </extensions>
 
   <extensionPoints>
+    <extensionPoint qualifiedName="com.intellij.cce.command"
+                    interface="com.intellij.cce.commands.EvaluationCommandExtension"
+                    dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.cce.completionEvaluationVisitor"
                     interface="com.intellij.cce.visitor.EvaluationVisitor"
                     dynamic="true"/>
@@ -61,13 +64,19 @@
                     interface="com.intellij.cce.evaluable.EvaluableFeature"
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.cce.apiCallExtractor"
-                    interface="com.intellij.cce.metric.ApiCallExtractor"
+                    interface="com.intellij.cce.metric.ApiCallExtractorProvider"
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.cce.exposedApiExtractor"
                     interface="com.intellij.cce.evaluable.ExposedApiExtractor"
                     dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.cce.datasetActionProvider"
                     interface="com.intellij.cce.ui.DatasetActionProvider"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.cce.codeExecutionManager"
+                    interface="com.intellij.cce.execution.manager.CodeExecutionManager"
+                    dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.cce.extraEvaluationStepProvider"
+                    interface="com.intellij.cce.evaluation.step.ExtraEvaluationStepProvider"
                     dynamic="true"/>
   </extensionPoints>
 

@@ -29,15 +29,15 @@ import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.roots.ui.configuration.SdkLookup
 import com.intellij.openapi.util.Disposer
 import com.intellij.pom.java.LanguageLevel
-import com.intellij.pom.java.LanguageLevel.HIGHEST
 import com.intellij.util.lang.JavaVersion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jetbrains.idea.maven.importing.MavenImportUtil
+import org.jetbrains.idea.maven.importing.MavenImportUtil.getMaxMavenJavaVersion
 import org.jetbrains.idea.maven.model.MavenConstants
 import org.jetbrains.idea.maven.project.MavenProject
 import org.jetbrains.idea.maven.project.MavenProjectBundle
 import org.jetbrains.idea.maven.project.MavenProjectsManager
+import org.jetbrains.idea.maven.utils.MavenAsyncUtil
 import org.jetbrains.idea.maven.utils.MavenLog
 import org.jetbrains.idea.maven.utils.MavenUtil
 import org.jetbrains.idea.maven.wizards.MavenOpenProjectProvider
@@ -93,8 +93,8 @@ class MavenCommandLineInspectionProjectConfigurator : CommandLineInspectionProje
       withContext(Dispatchers.EDT) {
         writeIntentReadAction {
           FileDocumentManager.getInstance().saveAllDocuments()
-          MavenUtil.setupProjectSdk(project)
         }
+        MavenAsyncUtil.setupProjectSdk(project, context.projectPath)
       }
 
       // GradleWarmupConfigurator sets "external.system.auto.import.disabled" to true, but we have to import the project nevertheless
@@ -153,11 +153,7 @@ class MavenCommandLineInspectionProjectConfigurator : CommandLineInspectionProje
   }
 
   fun setupJdkWithSuitableVersion(projects: List<MavenProject>, indicator: ProgressIndicator): CompletableFuture<Sdk?> {
-    val maxLevel = projects.flatMap {
-      val javaVersions = MavenImportUtil.getMavenJavaVersions(it)
-      listOf(javaVersions.sourceLevel, javaVersions.testSourceLevel, javaVersions.targetLevel, javaVersions.testTargetLevel)
-    }.filterNotNull().maxWithOrNull(Comparator.naturalOrder()) ?: HIGHEST
-
+    val maxLevel = getMaxMavenJavaVersion(projects)
     return iterateVersions(maxLevel, indicator)
   }
 

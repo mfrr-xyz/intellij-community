@@ -6,12 +6,12 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.readActionBlocking
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.UserDataHolderEx
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileWithId
 import com.intellij.openapi.vfs.newvfs.ManagingFS
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess.VfsRootAccessNotAllowedError
+import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.indexing.InitialScanningSkipReporter.FullScanningReason
 import com.intellij.util.indexing.InitialScanningSkipReporter.FullScanningReason.*
 import com.intellij.util.indexing.InitialScanningSkipReporter.NotSeenIdsBasedFullScanningDecision
@@ -58,7 +58,7 @@ internal fun scanAndIndexProjectAfterOpen(project: Project,
                                           sourceOfScanning: SourceOfScanning): Job {
   FileBasedIndex.getInstance().loadIndexes()
   val isFilterInvalidated = initialScanningLock.withLock {
-    (project as UserDataHolderEx).putUserDataIfAbsent(FIRST_SCANNING_REQUESTED, FirstScanningState.REQUESTED)
+    ConcurrencyUtil.computeIfAbsent(project, FIRST_SCANNING_REQUESTED) { FirstScanningState.REQUESTED }
     project.getUserData(PERSISTENT_INDEXABLE_FILES_FILTER_INVALIDATED) == true
   }
   val fileBasedIndex = FileBasedIndex.getInstance() as FileBasedIndexImpl
@@ -204,8 +204,8 @@ private suspend fun clearIndexesForDirtyFiles(project: Project,
 private fun OrphanDirtyFilesQueue.getNotSeenIds(project: Project, projectQueue: ProjectDirtyFilesQueue): GetNotSeenDirtyFileIdsResult {
   if (projectQueue.lastSeenIndexInOrphanQueue > untrimmedSize) {
     LOG.error("It should not happen that project has seen file id in orphan queue at index larger than number of files that orphan queue ever had. " +
-              "projectQueue.lastSeenIdsInOrphanQueue=${projectQueue.lastSeenIndexInOrphanQueue}, orphanQueue.lastId=${untrimmedSize}, " +
-              "project=$project")
+              "projectQueue.lastSeenIdsInOrphanQueue=${projectQueue.lastSeenIndexInOrphanQueue}, orphanQueue.untrimmedSize=${untrimmedSize}, " +
+              "orphanQueue.fileIds.size=${fileIds.size}, project=$project")
     return ProjectDirtyFilesQueuePointsToIncorrectPosition
   }
 

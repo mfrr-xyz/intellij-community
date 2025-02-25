@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.refactoring.move;
 
@@ -240,11 +240,6 @@ public class K2MoveNestedTestGenerated extends AbstractK2MoveNestedTest {
         runTest("../../idea/tests/testData/refactoring/moveNested/kotlin/moveMethod/moveToTopLevel/outerInstanceAddParameter/outerInstanceAddParameter.test");
     }
 
-    @TestMetadata("kotlin/moveMethod/moveToTopLevel/outerInstanceDontAddParameter/outerInstanceDontAddParameter.test")
-    public void testKotlin_moveMethod_moveToTopLevel_outerInstanceDontAddParameter_OuterInstanceDontAddParameter() throws Exception {
-        runTest("../../idea/tests/testData/refactoring/moveNested/kotlin/moveMethod/moveToTopLevel/outerInstanceDontAddParameter/outerInstanceDontAddParameter.test");
-    }
-
     @TestMetadata("kotlin/moveNestedClass/callableReferences/nestedToAnotherClass/nestedToAnotherClass.test")
     public void testKotlin_moveNestedClass_callableReferences_nestedToAnotherClass_NestedToAnotherClass() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveNested/kotlin/moveNestedClass/callableReferences/nestedToAnotherClass/nestedToAnotherClass.test");
@@ -305,11 +300,6 @@ public class K2MoveNestedTestGenerated extends AbstractK2MoveNestedTest {
         runTest("../../idea/tests/testData/refactoring/moveNested/kotlin/moveNestedClass/innerToTopLevelNoThis/innerToTopLevelNoThis.test");
     }
 
-    @TestMetadata("kotlin/moveNestedClass/innerToTopLevelSimpleThisNoInstanceParameter/innerToTopLevelSimpleThisNoInstanceParameter.test")
-    public void testKotlin_moveNestedClass_innerToTopLevelSimpleThisNoInstanceParameter_InnerToTopLevelSimpleThisNoInstanceParameter() throws Exception {
-        runTest("../../idea/tests/testData/refactoring/moveNested/kotlin/moveNestedClass/innerToTopLevelSimpleThisNoInstanceParameter/innerToTopLevelSimpleThisNoInstanceParameter.test");
-    }
-
     @TestMetadata("kotlin/moveNestedClass/innerToTopLevelSimpleThis/innerToTopLevelSimpleThis.test")
     public void testKotlin_moveNestedClass_innerToTopLevelSimpleThis_InnerToTopLevelSimpleThis() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveNested/kotlin/moveNestedClass/innerToTopLevelSimpleThis/innerToTopLevelSimpleThis.test");
@@ -358,6 +348,11 @@ public class K2MoveNestedTestGenerated extends AbstractK2MoveNestedTest {
     @TestMetadata("kotlin/moveNestedClass/nonInnerToTopLevelCompanionConflict/nonInnerToTopLevelCompanionConflict.test")
     public void testKotlin_moveNestedClass_nonInnerToTopLevelCompanionConflict_NonInnerToTopLevelCompanionConflict() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveNested/kotlin/moveNestedClass/nonInnerToTopLevelCompanionConflict/nonInnerToTopLevelCompanionConflict.test");
+    }
+
+    @TestMetadata("kotlin/moveNestedClass/nonInnerToTopLevelCompanionK2NoConflict/nonInnerToTopLevelCompanionK2NoConflict.test")
+    public void testKotlin_moveNestedClass_nonInnerToTopLevelCompanionK2NoConflict_NonInnerToTopLevelCompanionK2NoConflict() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveNested/kotlin/moveNestedClass/nonInnerToTopLevelCompanionK2NoConflict/nonInnerToTopLevelCompanionK2NoConflict.test");
     }
 
     @TestMetadata("kotlin/moveNestedClass/nonInnerToTopLevelPrivateClass/nonInnerToTopLevelPrivateClass.test")

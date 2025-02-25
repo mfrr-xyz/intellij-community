@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.testFramework.fixtures;
 
 import com.intellij.codeInsight.completion.CompletionType;
@@ -20,6 +20,7 @@ import com.intellij.model.psi.PsiSymbolReference;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
@@ -366,6 +367,7 @@ public interface CodeInsightTestFixture extends IdeaProjectTestFixture {
   List<IntentionAction> getAllQuickFixes(@TestDataFile String @NotNull ... filePaths);
 
   @NotNull
+  @Unmodifiable
   List<IntentionAction> getAvailableIntentions();
 
   /**
@@ -625,10 +627,16 @@ public interface CodeInsightTestFixture extends IdeaProjectTestFixture {
 
   void type(@NotNull String s);
 
+  /**
+   * @see IdeActions
+   */
   default void performEditorAction(@NotNull String actionId) {
     performEditorAction(actionId, null);
   }
 
+  /**
+   * @see IdeActions
+   */
   void performEditorAction(@NotNull String actionId, @Nullable AnActionEvent actionEvent);
 
   /**
@@ -719,7 +727,7 @@ public interface CodeInsightTestFixture extends IdeaProjectTestFixture {
 
   void testFolding(@NotNull String fileName);
 
-  void testFoldingWithCollapseStatus(@NotNull final String verificationFileName, @Nullable String destinationFileName);
+  void testFoldingWithCollapseStatus(final @NotNull String verificationFileName, @Nullable String destinationFileName);
 
   void testFoldingWithCollapseStatus(@NotNull String fileName);
 
@@ -838,8 +846,7 @@ public interface CodeInsightTestFixture extends IdeaProjectTestFixture {
    * It's disposed earlier than {@link UsefulTestCase#getTestRootDisposable()} and can be useful
    * e.g. for avoiding library virtual pointers leaks: {@code PsiTestUtil.addLibrary(myFixture.getProjectDisposable(), ...)}
    */
-  @NotNull
-  default Disposable getProjectDisposable() {
+  default @NotNull Disposable getProjectDisposable() {
     return ((ProjectEx)getProject()).getEarlyDisposable();
   }
 }

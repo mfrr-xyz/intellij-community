@@ -1,6 +1,5 @@
 ### auto-generated section `build kotlin.base.facet` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "kotlin-base-facet_resources",
@@ -12,13 +11,11 @@ jvm_library(
   name = "kotlin-base-facet",
   module_name = "kotlin.base.facet",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
     "@lib//:kotlin-stdlib",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_kotlin-jps-common",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-kotlin-jps-common",
     "//plugins/kotlin/base/frontend-agnostic:kotlin-base-frontend-agnostic",
     "//plugins/kotlin/base/util:kotlin-base-util",
     "//plugins/kotlin/base/compiler-configuration:kotlin-base-compiler-configuration",

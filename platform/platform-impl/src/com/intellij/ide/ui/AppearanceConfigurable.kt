@@ -41,13 +41,8 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.ex.WindowManagerEx
-import com.intellij.openapi.wm.impl.IdeFrameDecorator
-import com.intellij.openapi.wm.impl.MERGE_MAIN_MENU_WITH_WINDOW_TITLE_PROPERTY
-import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomWindowHeaderUtil
-import com.intellij.openapi.wm.impl.isMergeMainMenuWithWindowTitleOverridden
 import com.intellij.toolWindow.ResizeStripeManager
 import com.intellij.ui.*
 import com.intellij.ui.components.ActionLink
@@ -125,16 +120,10 @@ private val cdExpandNodesWithSingleClick
                              comment = message("checkbox.expand.node.with.single.click.comment"), groupName = uiOptionGroupName)
 private val cdDnDWithAlt
   get() = CheckboxDescriptor(message("dnd.with.alt.pressed.only"), settings::dndWithPressedAltOnly, groupName = uiOptionGroupName)
-private val cdSeparateMainMenu
-  get() = CheckboxDescriptor(message("checkbox.main.menu.separate.toolbar"), settings::separateMainMenu, groupName = uiOptionGroupName)
-
 private val cdUseTransparentMode
   get() = CheckboxDescriptor(message("checkbox.use.transparent.mode.for.floating.windows"), settings.state::enableAlphaMode)
 private val cdUseContrastToolbars
   get() = CheckboxDescriptor(message("checkbox.acessibility.contrast.scrollbars"), settings::useContrastScrollbars)
-private val cdMergeMainMenuWithWindowTitle
-  get() = CheckboxDescriptor(message("checkbox.merge.main.menu.with.window.title"), settings::mergeMainMenuWithWindowTitle,
-                             groupName = windowOptionGroupName)
 private val cdFullPathsInTitleBar
   get() = CheckboxDescriptor(message("checkbox.full.paths.in.window.header"), settings::fullPathsInWindowHeader)
 private val cdShowMenuIcons
@@ -159,10 +148,9 @@ internal fun getAppearanceOptionDescriptors(): Sequence<OptionDescription> {
     cdShowTreeIndents,
     cdDnDWithAlt,
     cdFullPathsInTitleBar,
-    cdSeparateMainMenu.takeUnless { SystemInfo.isMac },
     cdDifferentiateProjects,
     cdShowMenuIcons
-  ).filterNotNull().map(CheckboxDescriptor::asUiOptionDescriptor)
+  ).map(CheckboxDescriptor::asUiOptionDescriptor)
 }
 
 internal class AppearanceConfigurable : BoundSearchableConfigurable(message("title.appearance"), "preferences.lookFeel") {
@@ -244,7 +232,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
       group(message("title.accessibility")) {
         row(message("combobox.ide.scale.percent")) {
           val defaultScale = UISettingsUtils.defaultScale(false)
-          var resetZoom: Cell<ActionLink>? = null
+          lateinit var resetZoom: Cell<ActionLink>
 
           val model = IdeScaleTransformer.Settings.createIdeScaleComboboxModel()
           comboBox(model)
@@ -254,7 +242,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
 
               IdeScaleTransformer.Settings.scaleFromPercentStringValue(it.item, false)?.let { scale ->
                 logIdeZoomChanged(scale, false)
-                resetZoom?.visible(scale.percentValue != defaultScale.percentValue)
+                resetZoom.visible(scale.percentValue != defaultScale.percentValue)
                 settings.ideScale = scale
                 invokeLater {
                   // Invoke later to avoid NPE in JComboBox.repaint()
@@ -281,10 +269,10 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
           resetZoom = link(message("ide.scale.reset.link")) {
             model.selectedItem = defaultScale.percentStringValue
           }.apply { visible(settings.ideScale.percentValue != defaultScale.percentValue) }
-        }.topGap(TopGap.SMALL)
+        }
 
         row {
-          var resetCustomFont: (() -> Unit)? = null
+          lateinit var resetCustomFont: (() -> Unit)
 
           val useCustomCheckbox = checkBox(message("checkbox.override.default.laf.fonts"))
             .gap(RightGap.SMALL)
@@ -298,7 +286,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
               }
             }
             .onChanged { checkbox ->
-              if (!checkbox.isSelected) resetCustomFont?.invoke()
+              if (!checkbox.isSelected) resetCustomFont.invoke()
             }
 
           val fontFace = cell(FontComboBox())
@@ -411,21 +399,13 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
                 .comment(cdDifferentiateProjects.comment, 30)
             }
           }
-          if (!SystemInfo.isMac && ExperimentalUI.isNewUI()) {
-            yield {
-              checkBox(cdSeparateMainMenu).apply {
-                if (!SystemInfo.isWindows) {
-                  comment(message("ide.restart.required.comment"))
-                }
-              }
-            }
-          }
           if (SystemInfo.isMac && MacCustomAppIcon.available()) {
             yield {
               checkBox(message("checkbox.ide.mac.app.icon")).comment(message("ide.restart.required.comment"))
                 .bindSelected({ MacCustomAppIcon.isCustom() }, { MacCustomAppIcon.setCustom(it, true) })
             }
           }
+          yield { checkBox(cdKeepPopupsForToggles) }
         }
         val rightColumnControls = sequence<Row.() -> Unit> {
           if (ExperimentalUI.isNewUI()) {
@@ -439,24 +419,6 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
           yield { checkBox(cdEnableControlsMnemonics) }
           yield { checkBox(cdEnableMenuMnemonics) }
           yield { checkBox(cdShowMenuIcons) }
-          yield { checkBox(cdKeepPopupsForToggles) }
-          if (SystemInfoRt.isWindows && IdeFrameDecorator.isCustomDecorationAvailable || CustomWindowHeaderUtil.hideNativeLinuxTitleAvailable) {
-            yield {
-              val checkBox = checkBox(cdMergeMainMenuWithWindowTitle)
-                .gap(RightGap.SMALL)
-              if (SystemInfoRt.isWindows && isMergeMainMenuWithWindowTitleOverridden) {
-                checkBox.enabled(false)
-                contextHelp(message("option.is.overridden.by.jvm.property", MERGE_MAIN_MENU_WITH_WINDOW_TITLE_PROPERTY))
-              }
-              if (SystemInfo.isUnix && !SystemInfo.isMac && !CustomWindowHeaderUtil.hideNativeLinuxTitleSupported) {
-                checkBox.enabled(false)
-                checkBox.comment(message("checkbox.merge.main.menu.with.window.not.supported.comment"), 30)
-              }
-              else {
-                comment(message("ide.restart.required.comment"))
-              }
-            }
-          }
         }
 
         // Since some of the columns have variable number of items, enumerate them in a loop, while moving orphaned items from the right
@@ -495,6 +457,18 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
           }
         }
 
+        if (!SystemInfo.isMac && ExperimentalUI.isNewUI()) {
+          row  {
+            comboBox(model = CollectionComboBoxModel(MainMenuDisplayMode.entries))
+              .label(message("main.menu.combobox.label"))
+              .bindItem(settings::mainMenuDisplayMode.toNullableProperty())
+              .apply {
+                if (!SystemInfo.isWindows) {
+                  comment(message("ide.restart.required.comment"))
+                }
+              }
+          }.topGap(TopGap.SMALL).bottomGap(BottomGap.SMALL)
+        }
         val backgroundImageAction = ActionManager.getInstance().getAction("Images.SetBackgroundImage")
         if (backgroundImageAction != null) {
           row {
@@ -516,7 +490,12 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
 
       groupRowsRange(message("group.window.options")) {
         twoColumnsRow(
-          { checkBox(cdShowToolWindowBars) },
+          { checkBox(cdShowToolWindowBars).apply {
+            enabled(!NotRoamableUiSettings.getInstance().xNextStripe)
+            if(NotRoamableUiSettings.getInstance().xNextStripe) {
+              comment(message("xnext.comment.unavailable"))
+            }
+          } },
           { checkBox(cdLeftToolWindowLayout) },
         )
         if (ExperimentalUI.isNewUI()) {
@@ -660,7 +639,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
 
   override fun apply() {
     val oldIsSupportScreenReaders = generalSettings.isSupportScreenReaders
-    val oldSeparateMainMenu = settings.separateMainMenu
+    val oldMainMenuDisplayMode = settings.mainMenuDisplayMode
     val oldMergeMainMenuWithWindowTitle = settings.mergeMainMenuWithWindowTitle
 
     val uiSettingsChanged = isModified
@@ -671,7 +650,7 @@ internal class AppearanceConfigurable : BoundSearchableConfigurable(message("tit
     }
 
     if (oldIsSupportScreenReaders != generalSettings.isSupportScreenReaders ||
-        (!SystemInfo.isWindows && oldSeparateMainMenu != settings.separateMainMenu) ||
+        (!SystemInfo.isWindows && oldMainMenuDisplayMode != settings.mainMenuDisplayMode && listOf(oldMainMenuDisplayMode,  settings.mainMenuDisplayMode).contains(MainMenuDisplayMode.SEPARATE_TOOLBAR)) ||
         oldMergeMainMenuWithWindowTitle != settings.mergeMainMenuWithWindowTitle) {
       RestartDialogImpl.showRestartRequired()
     }

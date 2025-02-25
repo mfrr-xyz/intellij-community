@@ -4,11 +4,7 @@ package org.jetbrains.idea.maven.server
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.util.ExceptionUtil
-import org.jetbrains.idea.maven.model.MavenExplicitProfiles
-import org.jetbrains.idea.maven.model.MavenModel
 import org.jetbrains.idea.maven.server.MavenServerManager.Companion.getInstance
-import java.io.File
-import java.nio.file.Path
 import java.rmi.RemoteException
 import java.util.concurrent.ConcurrentHashMap
 
@@ -59,28 +55,6 @@ abstract class AbstractMavenServerConnector(override val project: Project?,  // 
     synchronized(embedderLock) {
       return getServerBlocking().createIndexer(MavenRemoteObjectWrapper.ourToken)
     }
-  }
-
-  override suspend fun interpolateAndAlignModel(model: MavenModel, basedir: Path, pomDir: Path): MavenModel {
-    val transformer = RemotePathTransformerFactory.createForProject(project!!)
-    val targetBasedir = File(transformer.toRemotePathOrSelf(basedir.toString()))
-    val targetPomDir = File(transformer.toRemotePathOrSelf(pomDir.toString()))
-    val m = getServer().interpolateAndAlignModel(model, targetBasedir, targetPomDir, MavenRemoteObjectWrapper.ourToken)
-    MavenServerResultTransformer.transformPaths(transformer, m)
-    return m
-  }
-
-  override suspend fun assembleInheritance(model: MavenModel, parentModel: MavenModel): MavenModel {
-    return getServer().assembleInheritance(model, parentModel, MavenRemoteObjectWrapper.ourToken)
-  }
-
-  override suspend fun applyProfiles(model: MavenModel,
-                                     basedir: Path,
-                                     explicitProfiles: MavenExplicitProfiles,
-                                     alwaysOnProfiles: Collection<String>): ProfileApplicationResult {
-    val transformer = RemotePathTransformerFactory.createForProject(project!!)
-    val targetBasedir = File(transformer.toRemotePathOrSelf(basedir.toString()))
-    return getServer().applyProfiles(model, targetBasedir, explicitProfiles, HashSet(alwaysOnProfiles), MavenRemoteObjectWrapper.ourToken)
   }
 
   protected abstract fun <R> perform(r: () -> R): R

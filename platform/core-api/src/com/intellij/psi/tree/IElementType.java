@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.psi.tree;
 
 import com.intellij.diagnostic.LoadingState;
@@ -13,6 +13,7 @@ import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.*;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -58,6 +59,7 @@ public class IElementType {
     }
   }
 
+  @ApiStatus.Internal
   public static void unregisterElementTypes(@NotNull ClassLoader loader, @NotNull PluginDescriptor pluginDescriptor) {
     for (int i = 0; i < ourRegistry.length; i++) {
       IElementType type = ourRegistry[i];
@@ -67,6 +69,7 @@ public class IElementType {
     }
   }
 
+  @ApiStatus.Internal
   public static void unregisterElementTypes(@NotNull Language language, @NotNull PluginDescriptor pluginDescriptor) {
     if (language == Language.ANY) {
       throw new IllegalArgumentException("Trying to unregister Language.ANY");
@@ -238,6 +241,28 @@ public class IElementType {
       }
     }
     return matches.toArray(new IElementType[0]);
+  }
+
+  /**
+   * todo IJPL-562 mark experimental?
+   *
+   * Map all registered token types that match the specified predicate.
+   *
+   * @param p the predicate which should be matched by the element types.
+   * @return the list of matching element types.
+   */
+  @ApiStatus.Internal
+  public static <R> @NotNull List<@NotNull R> mapNotNull(@NotNull Function<IElementType, ? extends R> p) {
+    List<R> matches = new ArrayList<>();
+    for (IElementType value : ourRegistry) {
+      if (value != null) {
+        R result = p.apply(value);
+        if (result != null) {
+          matches.add(result);
+        }
+      }
+    }
+    return matches;
   }
 
   private void checkSizeDoesNotExceedLimit() {

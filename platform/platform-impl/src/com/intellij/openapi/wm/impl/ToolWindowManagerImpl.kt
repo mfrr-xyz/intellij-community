@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceGetOrSet", "ReplacePutWithAssignment", "OverridingDeprecatedMember", "ReplaceNegatedIsEmptyWithIsNotEmpty",
                "PrivatePropertyName")
 @file:OptIn(FlowPreview::class)
@@ -62,6 +62,7 @@ import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.serviceContainer.NonInjectable
 import com.intellij.toolWindow.*
 import com.intellij.ui.*
+import com.intellij.ui.ExperimentalUI.Companion.isNewUI
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.util.*
 import com.intellij.util.concurrency.ThreadingAssertions
@@ -221,7 +222,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
           toolWindowManager.revalidateStripeButtons()
 
-          if (Registry.`is`("auto.hide.all.tool.windows.on.focus.change", false)) {
+          if (Registry.`is`("auto.hide.all.tool.windows.on.focus.change", true)) {
             hideAllUnfocusedAutoHideToolWindows(toolWindowManager, event.oppositeComponent)
           }
           else {
@@ -266,11 +267,20 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
           return
         }
 
+        // Not focused, but just requested focus, don't hide.
+        // This is important when switching from one sliding tool window to another:
+        // in this case, the editor temporarily gets focus, which may cause the newly shown tool window
+        // to hide before it's even shown.
+        if (activeEntry.toolWindow.isAboutToReceiveFocus) {
+          return
+        }
+
         // let's check that tool window actually loses focus
-        if (getToolWindowIdForComponent(focusedComponent) != toolWindowId) {
-          // a toolwindow lost focus
+        val focusedToolWindowId = getToolWindowIdForComponent(focusedComponent)
+        if (focusedToolWindowId != toolWindowId) {
           val focusGoesToPopup = JBPopupFactory.getInstance().getParentBalloonFor(focusedComponent) != null
-          if (!focusGoesToPopup) {
+          val focusGoesToDialog = focusedToolWindowId == null && ComponentUtil.getWindow(focusedComponent) is Dialog
+          if (!focusGoesToPopup && !focusGoesToDialog) {
             val info = toolWindowManager.getRegisteredMutableInfoOrLogError(toolWindowId)
             toolWindowManager.deactivateToolWindow(info, activeEntry)
           }
@@ -352,10 +362,15 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
             if (manager.currentState != KeyState.HOLD) {
               manager.resetHoldState()
             }
-            if (Registry.`is`("auto.hide.all.tool.windows.on.any.action", false)) {
+            if (Registry.`is`("auto.hide.all.tool.windows.on.any.action", true)) {
               val focusedComponent = IdeFocusManager.getInstance(manager.project).focusOwner
-              val actionToolWindowId = getToolWindowIdForComponent(event.inputEvent?.component)
-              if (focusedComponent != null) {
+              val actionComponent = event.getData(PlatformCoreDataKeys.CONTEXT_COMPONENT) ?: event.inputEvent?.component
+              val actionComponentWindow = ComponentUtil.getWindow(actionComponent)
+              // Not the best heuristics, but there seems to be no easy way to check "Is this a popup?".
+              // So we check for something like "javax.swing.Popup$HeavyweightWindow...".
+              val actionInvokedFromPopup = actionComponentWindow?.javaClass?.name?.startsWith("javax.swing.Popup") == true
+              val actionToolWindowId = getToolWindowIdForComponent(actionComponent)
+              if (focusedComponent != null && !actionInvokedFromPopup) {
                 hideAllUnfocusedAutoHideToolWindows(manager, focusedComponent) { id -> id != actionToolWindowId }
               }
             }
@@ -842,6 +857,10 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       .find { it.isVisible && it.isDocked && it.safeToolWindowPaneId == paneId && it.anchor == anchor && it.isSplit == side }
   }
 
+  override fun getShowInFindToolWindowIcon(): Icon {
+    return if (isNewUI()) AllIcons.General.OpenInToolWindow else getLocationIcon(ToolWindowId.FIND, AllIcons.General.Pin_tab)
+  }
+
   override fun getLocationIcon(id: String, fallbackIcon: Icon): Icon {
     val info = layoutState.getInfo(id) ?: return fallbackIcon
     val type = info.type
@@ -1002,7 +1021,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     toBeShownInfo.isVisible = true
     toBeShownInfo.isShowStripeButton = true
     if (toBeShownInfo.order == -1) {
-      toBeShownInfo.order = layoutState.getMaxOrder(toBeShownInfo.safeToolWindowPaneId, toBeShownInfo.anchor)
+      toBeShownInfo.order = layoutState.getNextOrder(toBeShownInfo.safeToolWindowPaneId, toBeShownInfo.anchor)
     }
 
     val snapshotInfo = toBeShownInfo.copy()
@@ -1130,7 +1149,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
       if (preparedTask.isButtonNeeded) {
         // we must allocate order - otherwise, on drag-n-drop, we cannot move some tool windows to the end
         // because sibling's order is equal to -1, so, always in the end
-        info.order = layout.getMaxOrder(paneId = info.safeToolWindowPaneId, anchor = task.anchor)
+        info.order = layout.getNextOrder(paneId = info.safeToolWindowPaneId, anchor = task.anchor)
         layout.addInfo(task.id, info)
       }
     }

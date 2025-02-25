@@ -12,6 +12,11 @@ import com.intellij.refactoring.ui.ConflictsDialog
 import com.intellij.refactoring.util.ConflictsUtil
 import com.intellij.usageView.UsageInfo
 import com.intellij.util.containers.MultiMap
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.resolution.*
+import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.idea.base.projectStructure.RootKindFilter
 import org.jetbrains.kotlin.idea.base.projectStructure.matches
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.KtPsiClassWrapper
@@ -198,6 +203,69 @@ fun <ListType : KtElement> replaceListPsiAndKeepDelimiters(
     }
 
     return originalList
+}
+
+context(KaSession)
+@ApiStatus.Internal
+fun KtCallExpression.canMoveLambdaOutsideParentheses(
+    skipComplexCalls: Boolean = true
+): Boolean {
+    if (skipComplexCalls && isComplexCallWithLambdaArgument()) {
+        return false
+    }
+
+    if (getStrictParentOfType<KtDelegatedSuperTypeEntry>() != null) {
+        return false
+    }
+    val lastLambdaExpression = getLastLambdaExpression() ?: return false
+
+    if (lastLambdaExpression.parentLabeledExpression()?.parentLabeledExpression() != null) {
+        return false
+    }
+
+    val callee = calleeExpression
+    if (callee !is KtNameReferenceExpression) return true
+
+    val resolveCall = callee.resolveToCall() ?: return false
+    val call = resolveCall.successfulFunctionCallOrNull()
+
+    fun KaType.isFunctionalType(): Boolean = this is KaTypeParameterType || isSuspendFunctionType || isFunctionType || isFunctionalInterface
+
+    if (call == null) {
+        val paramType = resolveCall.successfulVariableAccessCall()?.partiallyAppliedSymbol?.symbol?.returnType
+        if (paramType != null && paramType.isFunctionalType()) {
+            return true
+        }
+        val calls =
+            (resolveCall as? KaErrorCallInfo)?.candidateCalls?.filterIsInstance<KaSimpleFunctionCall>() ?:
+            emptyList()
+
+        return calls.isEmpty() || calls.all { functionalCall ->
+            val lastParameter = functionalCall.partiallyAppliedSymbol.signature.valueParameters.lastOrNull()
+            val lastParameterType = lastParameter?.returnType
+            lastParameterType != null && lastParameterType.isFunctionalType()
+        }
+    }
+
+    val lastParameter = call.argumentMapping[lastLambdaExpression]
+        ?: lastLambdaExpression.parentLabeledExpression()?.let(call.argumentMapping::get)
+        ?: return false
+
+    if (lastParameter.symbol.isVararg) {
+        // Passing value as a vararg is allowed only inside a parenthesized argument list
+        return false
+    }
+
+    return if (lastParameter.symbol != call.partiallyAppliedSymbol.signature.valueParameters.lastOrNull()?.symbol) {
+        false
+    } else {
+        lastParameter.returnType.isFunctionalType()
+    }
+}
+
+@ApiStatus.Internal
+fun KtExpression.parentLabeledExpression(): KtLabeledExpression? {
+    return getStrictParentOfType<KtLabeledExpression>()?.takeIf { it.baseExpression == this }
 }
 
 fun KtNamedDeclaration.getDeclarationBody(): KtElement? = when (this) {

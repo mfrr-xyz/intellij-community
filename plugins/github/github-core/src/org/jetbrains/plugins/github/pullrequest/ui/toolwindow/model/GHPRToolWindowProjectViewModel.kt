@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.github.pullrequest.ui.toolwindow.model
 
 import com.github.benmanes.caffeine.cache.Caffeine
@@ -10,6 +10,7 @@ import com.intellij.collaboration.util.ComputedResult
 import com.intellij.collaboration.util.computeEmitting
 import com.intellij.collaboration.util.onFailure
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
@@ -148,13 +149,13 @@ class GHPRToolWindowProjectViewModel internal constructor(
   }
 
   fun openPullRequestTimeline(id: GHPRIdentifier, requestFocus: Boolean) {
-    cs.launch(Dispatchers.Main) {
+    cs.launch(Dispatchers.EDT) {
       dataContext.filesManager.createAndOpenTimelineFile(id, requestFocus)
     }
   }
 
   fun openPullRequestDiff(id: GHPRIdentifier, requestFocus: Boolean) {
-    cs.launch(Dispatchers.Main) {
+    cs.launch(Dispatchers.EDT) {
       dataContext.filesManager.createAndOpenDiffFile(id, requestFocus)
     }
   }

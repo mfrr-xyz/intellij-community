@@ -10,10 +10,10 @@ import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.*;
 
-public class ExceptionUtils {
+public final class ExceptionUtils {
   static final String WRAPPED_MARKER = " [wrapped] ";
 
-  protected static String[] CAUSE_METHOD_NAMES = {
+  private static String[] CAUSE_METHOD_NAMES = {
     "getCause",
     "getNextException",
     "getTargetException",
@@ -24,10 +24,10 @@ public class ExceptionUtils {
     "getNested"
   };
 
-  protected ExceptionUtils() {}
+  private ExceptionUtils() {}
 
   public static void addCauseMethodName(String methodName) {
-    if (methodName != null && methodName.length() > 0) {
+    if (methodName != null && !methodName.isEmpty()) {
       List<String> list = new ArrayList<String>(Arrays.asList(CAUSE_METHOD_NAMES));
       list.add(methodName);
       CAUSE_METHOD_NAMES = list.toArray(new String[0]);
@@ -276,7 +276,7 @@ public class ExceptionUtils {
       String token = frames.nextToken();
       // Determine if the line starts with <whitespace>at
       int at = token.indexOf("at");
-      if (at != -1 && token.substring(0, at).trim().length() == 0) {
+      if (at != -1 && token.substring(0, at).trim().isEmpty()) {
         traceStarted = true;
         list.add(token);
       } else if (traceStarted) {

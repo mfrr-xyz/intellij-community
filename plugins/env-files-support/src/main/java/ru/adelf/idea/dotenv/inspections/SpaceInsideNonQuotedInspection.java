@@ -9,6 +9,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import ru.adelf.idea.dotenv.DotEnvBundle;
 import ru.adelf.idea.dotenv.DotEnvFactory;
 import ru.adelf.idea.dotenv.psi.DotEnvFile;
 import ru.adelf.idea.dotenv.psi.DotEnvTypes;
@@ -20,22 +21,20 @@ import java.util.stream.Stream;
 public class SpaceInsideNonQuotedInspection extends LocalInspectionTool {
     // Change the display name within the plugin.xml
     // This needs to be here as otherwise the tests will throw errors.
-    @NotNull
     @Override
-    public String getDisplayName() {
-        return "Space inside non-quoted value";
+    public @NotNull String getDisplayName() {
+        return DotEnvBundle.message("inspection.name.space.inside.non.quoted.value");
     }
 
-    private AddQuotesQuickFix addQuotesQuickFix = new AddQuotesQuickFix();
+    private final AddQuotesQuickFix addQuotesQuickFix = new AddQuotesQuickFix();
 
     @Override
     public boolean runForWholeFile() {
         return true;
     }
 
-    @Nullable
     @Override
-    public ProblemDescriptor[] checkFile(@NotNull PsiFile file, @NotNull InspectionManager manager, boolean isOnTheFly) {
+    public ProblemDescriptor @Nullable [] checkFile(@NotNull PsiFile file, @NotNull InspectionManager manager, boolean isOnTheFly) {
         if (!(file instanceof DotEnvFile)) {
             return null;
         }
@@ -43,8 +42,7 @@ public class SpaceInsideNonQuotedInspection extends LocalInspectionTool {
         return analyzeFile(file, manager, isOnTheFly).getResultsArray();
     }
 
-    @NotNull
-    private ProblemsHolder analyzeFile(@NotNull PsiFile file, @NotNull InspectionManager manager, boolean isOnTheFly) {
+    private @NotNull ProblemsHolder analyzeFile(@NotNull PsiFile file, @NotNull InspectionManager manager, boolean isOnTheFly) {
         ProblemsHolder problemsHolder = new ProblemsHolder(manager, file, isOnTheFly);
 
         PsiTreeUtil.findChildrenOfType(file, DotEnvValue.class).forEach(dotEnvValue -> {
@@ -52,7 +50,8 @@ public class SpaceInsideNonQuotedInspection extends LocalInspectionTool {
             // first child QUOTE -> quoted value
             if(dotEnvValue.getFirstChild().getNode().getElementType() == DotEnvTypes.VALUE_CHARS) {
                 if (dotEnvValue.getText().trim().contains(" ")) {
-                    problemsHolder.registerProblem(dotEnvValue, "Space inside allowed only for quoted values", addQuotesQuickFix);
+                    problemsHolder.registerProblem(dotEnvValue,
+                                                   DotEnvBundle.message("inspection.message.space.inside.allowed.only.for.quoted.values"), addQuotesQuickFix);
                 }
             }
         });
@@ -62,10 +61,9 @@ public class SpaceInsideNonQuotedInspection extends LocalInspectionTool {
 
     private static class AddQuotesQuickFix implements LocalQuickFix {
 
-        @NotNull
         @Override
-        public String getName() {
-            return "Add quotes";
+        public @NotNull String getName() {
+            return DotEnvBundle.message("intention.name.add.quotes");
         }
 
         /**
@@ -103,8 +101,7 @@ public class SpaceInsideNonQuotedInspection extends LocalInspectionTool {
         }
 
         @Override
-        @NotNull
-        public String getFamilyName() {
+        public @NotNull String getFamilyName() {
             return getName();
         }
     }

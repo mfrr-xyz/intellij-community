@@ -1,10 +1,9 @@
 ### auto-generated section `build intellij.platform.diagnostic.startUpPerformanceReporter` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   opt_in = ["kotlinx.serialization.ExperimentalSerializationApi"]
 )
 
@@ -12,10 +11,8 @@ jvm_library(
   name = "startUpPerformanceReporter",
   module_name = "intellij.platform.diagnostic.startUpPerformanceReporter",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
-  plugins = ["@lib//:serialization_plugin"],
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:jackson",
@@ -27,6 +24,7 @@ jvm_library(
     "//platform/platform-util-io-impl:ide-util-io-impl",
     "@lib//:opentelemetry",
     "@lib//:opentelemetry-semconv",
+    "//platform/util",
     "@lib//:kotlinx-coroutines-core",
     "@lib//:kotlinx-serialization-core",
     "@lib//:kotlinx-serialization-protobuf",

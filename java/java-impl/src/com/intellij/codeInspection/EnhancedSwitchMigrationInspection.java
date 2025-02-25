@@ -71,7 +71,9 @@ public final class EnhancedSwitchMigrationInspection extends AbstractBaseJavaLoc
         boolean onlyOneYieldAfterLabel = true;
         boolean isOldSwitchWithoutRule = true;
         int statementAfterLabelCount = 0;
-        for (PsiStatement statement : body.getStatements()) {
+        PsiStatement[] statements = body.getStatements();
+        if (statements.length == 0) return;
+        for (PsiStatement statement : statements) {
           if (statement instanceof PsiSwitchLabeledRuleStatement) {
             isOldSwitchWithoutRule = false;
             break;
@@ -391,8 +393,7 @@ public final class EnhancedSwitchMigrationInspection extends AbstractBaseJavaLoc
       switchExpression.replace(newSwitchExpression);
     }
 
-    @Nullable
-    private static PsiStatement findOneYieldOrThrowStatement(@Nullable PsiElement switchBlockChild) {
+    private static @Nullable PsiStatement findOneYieldOrThrowStatement(@Nullable PsiElement switchBlockChild) {
       if (switchBlockChild == null) return null;
       boolean isOldOrThrow = switchBlockChild instanceof PsiYieldStatement ||
                              switchBlockChild instanceof PsiThrowStatement;
@@ -702,7 +703,9 @@ public final class EnhancedSwitchMigrationInspection extends AbstractBaseJavaLoc
       PsiStatement statement = result[i];
       if (statement instanceof PsiReturnStatement returnStatement) {
         PsiExpression returnValue = returnStatement.getReturnValue();
-        if (returnValue == null || !returnValue.isValid() || PsiTreeUtil.hasErrorElements(returnValue) || returnValue.getType() == null) {
+        if (returnValue == null || !returnValue.isValid() || PsiTreeUtil.hasErrorElements(returnValue) ||
+            //skip PsiCall not to resolve and get exceptions
+            (!(returnValue instanceof PsiCall) && returnValue.getType() == null)) {
           return null;
         }
         result[i] = createYieldStatement(returnValue);
@@ -713,7 +716,7 @@ public final class EnhancedSwitchMigrationInspection extends AbstractBaseJavaLoc
       Collection<PsiReturnStatement> returnStatements = PsiTreeUtil.findChildrenOfType(copy, PsiReturnStatement.class);
       for (PsiReturnStatement returnStatement : returnStatements) {
         PsiExpression returnValue = returnStatement.getReturnValue();
-        if (returnValue == null || PsiTreeUtil.hasErrorElements(returnValue) || returnValue.getType() == null) {
+        if (returnValue == null || PsiTreeUtil.hasErrorElements(returnValue) || !returnValue.isValid() || returnValue.getType() == null) {
           return null;
         }
         returnStatement.replace(createYieldStatement(returnValue));
@@ -1117,8 +1120,7 @@ public final class EnhancedSwitchMigrationInspection extends AbstractBaseJavaLoc
       }
     }
 
-    @Nullable
-    private PsiElement getElementForComments(@Nullable PsiStatement element, int i) {
+    private @Nullable PsiElement getElementForComments(@Nullable PsiStatement element, int i) {
       PsiElement current = element;
       if (myOriginalResultStatements != null &&
           myOriginalResultStatements.length > i &&
@@ -1191,8 +1193,7 @@ public final class EnhancedSwitchMigrationInspection extends AbstractBaseJavaLoc
     }
   }
 
-  @NotNull
-  private static String grubCommentsBefore(@NotNull PsiElement untilComment, @NotNull CommentTracker ct, SwitchBranch branch) {
+  private static @NotNull String grubCommentsBefore(@NotNull PsiElement untilComment, @NotNull CommentTracker ct, SwitchBranch branch) {
     List<String> comments = new ArrayList<>();
     PsiElement current =
       (untilComment instanceof PsiComment || untilComment instanceof PsiWhiteSpace) ? untilComment : PsiTreeUtil.prevLeaf(untilComment);

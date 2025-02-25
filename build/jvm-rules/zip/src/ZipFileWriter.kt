@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ConstPropertyName", "DuplicatedCode")
 
 package org.jetbrains.intellij.build.io
@@ -22,6 +22,9 @@ import java.util.zip.ZipEntry
 import kotlin.math.min
 
 val W_CREATE_NEW: EnumSet<StandardOpenOption> = EnumSet.of(StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)
+@PublishedApi
+internal val WRITE: EnumSet<StandardOpenOption> = EnumSet.of(StandardOpenOption.WRITE)
+private val READ = EnumSet.of(StandardOpenOption.READ)
 
 // 1 MB
 private const val largeFileThreshold = 1_048_576
@@ -29,11 +32,23 @@ private const val compressThreshold = 8 * 1024
 // 8 MB (as JDK)
 private const val mappedTransferSize = 8L * 1024L * 1024L
 
+@Suppress("DuplicatedCode")
+fun ZipArchiveOutputStream.file(nameString: String, file: Path) {
+  val name = nameString.toByteArray()
+  FileChannel.open(file, READ).use { channel ->
+    val size = channel.size()
+    assert(size <= Int.MAX_VALUE)
+    writeEntryHeaderWithoutCrc(name = name, size = size.toInt())
+    transferFrom(channel, size)
+  }
+  return
+}
+
 fun transformZipUsingTempFile(file: Path, indexWriter: IkvIndexBuilder?, task: (ZipFileWriter) -> Unit) {
   val tempFile = Files.createTempFile(file.parent, file.fileName.toString(), ".tmp")
   try {
     ZipFileWriter(
-      channel = FileChannel.open(tempFile, EnumSet.of(StandardOpenOption.WRITE)),
+      channel = FileChannel.open(tempFile, WRITE),
       zipIndexWriter = ZipIndexWriter(indexWriter),
     ).use {
       task(it)
@@ -64,14 +79,12 @@ inline fun writeNewZipWithoutIndex(
 class ZipFileWriter(
   channel: GatheringByteChannel,
   private val deflater: Deflater? = null,
-  private val withCrc: Boolean = true,
   private val zipIndexWriter: ZipIndexWriter,
 ) : AutoCloseable {
   // size is written as part of optimized metadata - so, if compression is enabled, optimized metadata will be incorrect
   internal val resultStream = ZipArchiveOutputStream(channel = channel, zipIndexWriter = zipIndexWriter)
   private val crc32 = CRC32()
 
-  private val bufferAllocator = ByteBufferAllocator()
   private val deflateBufferAllocator = if (deflater == null) null else ByteBufferAllocator()
 
   val channelPosition: Long
@@ -82,23 +95,13 @@ class ZipFileWriter(
     var isCompressed = deflater != null && !nameString.endsWith(".png")
 
     val name = nameString.toByteArray()
-    if (!withCrc) {
-      FileChannel.open(file, EnumSet.of(StandardOpenOption.READ)).use { channel ->
-        val size = channel.size()
-        assert(size <= Int.MAX_VALUE)
-        resultStream.writeEntryHeaderWithoutCrc(name = name, size = size.toInt())
-        resultStream.transferFrom(fileChannel = channel, size.toLong())
-      }
-      return
-    }
-
     crc32.reset()
 
     val headerSize = 30 + name.size
     var input: ByteBuf? = null
     try {
       val size: Int
-      FileChannel.open(file, EnumSet.of(StandardOpenOption.READ)).use { channel ->
+      FileChannel.open(file, READ).use { channel ->
         size = channel.size().toInt()
         if (size == 0) {
           resultStream.writeEmptyFile(name = name)
@@ -288,7 +291,23 @@ class ZipFileWriter(
   }
 
   fun uncompressedData(nameString: String, data: String) {
-    uncompressedData(nameString = nameString, data = ByteBuffer.wrap(data.toByteArray()))
+    uncompressedData(nameString = nameString, data = data.toByteArray())
+  }
+
+  fun uncompressedData(nameString: String, data: ByteArray) {
+    val name = nameString.toByteArray()
+
+    val size = data.size
+    if (size == 0) {
+      resultStream.writeEmptyFile(name)
+      return
+    }
+
+    crc32.reset()
+    crc32.update(data)
+    val crc = crc32.value
+
+    resultStream.writeDataRawEntry(name = name, data = data, size = size, crc = crc)
   }
 
   fun uncompressedData(nameString: String, data: ByteBuffer) {
@@ -306,21 +325,15 @@ class ZipFileWriter(
     val crc = crc32.value
     data.reset()
 
-    resultStream.writeDataRawEntry(
-      data = data,
-      name = name,
-      size = size,
-      compressedSize = size,
-      method = ZipEntry.STORED,
-      crc = crc,
-    )
+    resultStream.writeDataRawEntry(data = data, name = name, size = size, compressedSize = size, method = ZipEntry.STORED, crc = crc)
   }
 
   fun uncompressedData(nameString: String, maxSize: Int, dataWriter: (ByteBuf) -> Unit) {
     val name = nameString.toByteArray()
     val headerSize = 30 + name.size
 
-    ByteBufAllocator.DEFAULT.directBuffer(headerSize + maxSize).use { data ->
+    val bufCapacity = headerSize + maxSize
+    ByteBufAllocator.DEFAULT.ioBuffer(bufCapacity, bufCapacity).use { data ->
       data.writerIndex(headerSize)
       dataWriter(data)
       val size = data.readableBytes() - headerSize
@@ -352,7 +365,6 @@ class ZipFileWriter(
   override fun close() {
     @Suppress("ConvertTryFinallyToUseCall")
     try {
-      bufferAllocator.close()
       deflateBufferAllocator?.close()
       deflater?.end()
     }

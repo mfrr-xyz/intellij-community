@@ -2,7 +2,6 @@
 package org.jetbrains.idea.maven.indices
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.util.io.FileUtil
 import org.jetbrains.idea.maven.indices.MavenIndicesManager.Companion.addArchetype
 import org.jetbrains.idea.maven.indices.MavenIndicesManager.Companion.getInstance
 import org.jetbrains.idea.maven.indices.MavenIndicesManager.MavenIndexerListener
@@ -16,6 +15,8 @@ import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.copyToRecursively
 
 class MavenIndicesManagerTest : MavenIndicesTestCase() {
   public override fun runInDispatchThread(): Boolean {
@@ -26,7 +27,7 @@ class MavenIndicesManagerTest : MavenIndicesTestCase() {
 
   override fun setUp() {
     super.setUp()
-    myIndicesFixture = MavenIndicesTestFixture(dir.toPath(), project, getTestRootDisposable())
+    myIndicesFixture = MavenIndicesTestFixture(dir, project, getTestRootDisposable())
     myIndicesFixture!!.setUp()
   }
 
@@ -68,10 +69,11 @@ class MavenIndicesManagerTest : MavenIndicesTestCase() {
   }
 
   @Test
+  @OptIn(ExperimentalPathApi::class)
   fun testAddingFilesToIndex() {
     val localRepo = myIndicesFixture!!.repositoryHelper.getTestData("local2")
 
-    MavenProjectsManager.getInstance(project).getGeneralSettings().setLocalRepository(localRepo.path)
+    MavenProjectsManager.getInstance(project).getGeneralSettings().setLocalRepository(localRepo.toString())
     myIndicesFixture!!.indicesManager.scheduleUpdateIndicesListAndWait()
     myIndicesFixture!!.indicesManager.waitForGavUpdateCompleted()
     val localIndex = myIndicesFixture!!.indicesManager.getCommonGavIndex()
@@ -79,7 +81,7 @@ class MavenIndicesManagerTest : MavenIndicesTestCase() {
 
     //copy junit to repository
     val artifactDir = myIndicesFixture!!.repositoryHelper.getTestData("local1/junit")
-    FileUtil.copyDir(artifactDir, localRepo)
+    artifactDir.copyToRecursively(localRepo, followLinks = false, overwrite = false)
 
     val artifactFile = myIndicesFixture!!.repositoryHelper.getTestData("local2/junit/junit/4.0/junit-4.0.pom")
 
@@ -95,8 +97,7 @@ class MavenIndicesManagerTest : MavenIndicesTestCase() {
         }
       })
 
-    val indexingScheduled =
-      getInstance(project).scheduleArtifactIndexing(null, artifactFile.toPath(), localRepo.absolutePath)
+    val indexingScheduled = getInstance(project).scheduleArtifactIndexing(null, artifactFile, localRepo.toString())
     assertTrue("Failed to schedule indexing", indexingScheduled)
 
     latch.await(1, TimeUnit.MINUTES)

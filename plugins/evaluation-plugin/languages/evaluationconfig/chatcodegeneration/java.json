@@ -7,7 +7,8 @@
   "strategy": {
     "behaviour": "REMOVE_METHOD_BODY_ASK_TO_GENERATE",
     "collectContextOnly": false,
-    "minimumInternalApiCallsToConsider": 1
+    "minimumInternalApiCallsToConsider": 1,
+    "enableRAG": true
   },
   "actions": {
     "evaluationRoots": [
@@ -21,7 +22,8 @@
     "sessionsLimit": 100,
     "filesLimit": 1,
     "order": "LINEAR",
-    "trainTestSplit": 70
+    "trainTestSplit": 70,
+    "registry": ""
   },
   "reports": {
     "evaluationTitle": "Default",

@@ -15,11 +15,11 @@
  */
 package com.siyeh.ig.psiutils;
 
-import com.intellij.codeInsight.daemon.impl.analysis.HighlightControlFlowUtil;
 import com.intellij.codeInsight.daemon.impl.analysis.LocalRefUseInfo;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.pom.java.JavaFeature;
 import com.intellij.psi.*;
+import com.intellij.psi.controlFlow.ControlFlowUtil;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -31,6 +31,7 @@ import com.intellij.util.Processor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -276,7 +277,7 @@ public final class VariableAccessUtils {
    * @param variable  the variable to find references for
    * @return a list of references, empty list if no references were found.
    */
-  public static List<PsiReferenceExpression> getVariableReferences(@NotNull PsiVariable variable) {
+  public static @Unmodifiable List<PsiReferenceExpression> getVariableReferences(@NotNull PsiVariable variable) {
     PsiFile file = variable.getContainingFile();
     if (file == null) return List.of();
     if (!file.isPhysical()) {
@@ -286,18 +287,41 @@ public final class VariableAccessUtils {
   }
 
   /**
+   * Finds all references to the specified variable in the declaration scope of the variable,
+   * i.e. everywhere the variable is accessible.
+   * NOTE: this method will only search in the containing file for the variable. This may lead to incorrect results for fields.
+   * <p>
+   *   This method behaves exactly like {@link #getVariableReferences(PsiVariable)} but it will not 
+   *   try to compute references data for the whole file, so in some specific scenarios 
+   *   (e.g., searching in many different files not opened in the editor) it might be faster.
+   * </p>
+   *
+   * @param variable  the variable to find references for
+   * @return a list of references, empty list if no references were found.
+   */
+  public static List<PsiReferenceExpression> getVariableReferencesNoCache(@NotNull PsiVariable variable) {
+    PsiElement scope = variable instanceof PsiField ? variable.getContainingFile() : PsiUtil.getVariableCodeBlock(variable, null);
+    if (scope == null) return List.of();
+    return getVariableReferencesNoCache(variable, scope);
+  }
+
+  /**
    * Finds all references to the specified variable in the specified context.
    * @param variable  the variable to find references for
    * @param context  the context to find references in
    * @return a list of references. When the specified context is {@code null}, the result will always be an empty list.
    */
-  public static List<PsiReferenceExpression> getVariableReferences(@NotNull PsiVariable variable, @Nullable PsiElement context) {
+  public static @Unmodifiable List<PsiReferenceExpression> getVariableReferences(@NotNull PsiVariable variable, @Nullable PsiElement context) {
     if (context == null) return Collections.emptyList();
     PsiFile file = context.getContainingFile();
     PsiFile variableFile = variable.getContainingFile();
     if (variableFile != null && file == variableFile && file.isPhysical()) {
       return LocalRefUseInfo.forFile(file).getVariableReferences(variable, context);
     }
+    return getVariableReferencesNoCache(variable, context);
+  }
+
+  private static @NotNull List<PsiReferenceExpression> getVariableReferencesNoCache(@NotNull PsiVariable variable, @NotNull PsiElement context) {
     List<PsiReferenceExpression> result = new ArrayList<>();
     PsiTreeUtil.processElements(context, e -> {
       if (e instanceof PsiReferenceExpression && ((PsiReferenceExpression)e).isReferenceTo(variable)) {
@@ -412,8 +436,7 @@ public final class VariableAccessUtils {
     return false;
   }
 
-  @Nullable
-  private static PsiElement getDirectChildWhichContainsElement(
+  private static @Nullable PsiElement getDirectChildWhichContainsElement(
     @NotNull PsiElement ancestor,
     @NotNull PsiElement descendant) {
     if (ancestor == descendant) {
@@ -431,7 +454,7 @@ public final class VariableAccessUtils {
     return child;
   }
 
-  public static Set<PsiVariable> collectUsedVariables(PsiElement context) {
+  public static @Unmodifiable Set<PsiVariable> collectUsedVariables(PsiElement context) {
     if (context == null) {
       return Collections.emptySet();
     }
@@ -440,7 +463,7 @@ public final class VariableAccessUtils {
     return visitor.getUsedVariables();
   }
 
-  public static boolean isAnyVariableAssigned(@NotNull Collection<? extends PsiVariable> variables, @Nullable PsiElement context) {
+  public static boolean isAnyVariableAssigned(@NotNull @Unmodifiable Collection<? extends PsiVariable> variables, @Nullable PsiElement context) {
     if (context == null) {
       return false;
     }
@@ -503,8 +526,8 @@ public final class VariableAccessUtils {
     final boolean finalVariableIntroduction =
       !initialization.hasModifierProperty(PsiModifier.FINAL) && variable.hasModifierProperty(PsiModifier.FINAL) ||
       PsiUtil.isAvailable(JavaFeature.EFFECTIVELY_FINAL, initialization) &&
-      !HighlightControlFlowUtil.isEffectivelyFinal(initialization, containingScope, null) &&
-      HighlightControlFlowUtil.isEffectivelyFinal(variable, containingScope, null);
+      !ControlFlowUtil.isEffectivelyFinal(initialization, containingScope) &&
+      ControlFlowUtil.isEffectivelyFinal(variable, containingScope);
     final boolean canCaptureThis = initialization instanceof PsiField && !initialization.hasModifierProperty(PsiModifier.STATIC);
 
     final PsiType variableType = variable.getType();

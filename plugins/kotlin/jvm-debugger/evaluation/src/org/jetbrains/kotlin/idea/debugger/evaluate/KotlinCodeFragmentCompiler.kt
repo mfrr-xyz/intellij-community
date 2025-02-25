@@ -6,6 +6,7 @@ import com.intellij.debugger.engine.evaluation.EvaluateExceptionUtil
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiRecursiveElementVisitor
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
@@ -14,8 +15,6 @@ import org.jetbrains.kotlin.analysis.api.compile.CodeFragmentCapturedValue
 import org.jetbrains.kotlin.analysis.api.components.*
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.JVMConfigurationKeys
-import org.jetbrains.kotlin.config.JvmClosureGenerationScheme
 import org.jetbrains.kotlin.idea.base.codeInsight.compiler.KotlinCompilerIdeAllowedErrorFilter
 import org.jetbrains.kotlin.idea.base.projectStructure.languageVersionSettings
 import org.jetbrains.kotlin.idea.base.util.module
@@ -32,6 +31,8 @@ import org.jetbrains.kotlin.psi.KtOperationReferenceExpression
 import java.util.concurrent.ExecutionException
 
 interface KotlinCodeFragmentCompiler {
+    val compilerType: CompilerType
+
     fun compileCodeFragment(context: ExecutionContext, codeFragment: KtCodeFragment): CompiledCodeFragmentData
 
     companion object {
@@ -40,6 +41,8 @@ interface KotlinCodeFragmentCompiler {
 }
 
 class K2KotlinCodeFragmentCompiler : KotlinCodeFragmentCompiler {
+    override val compilerType: CompilerType = CompilerType.K2
+
     @OptIn(KaExperimentalApi::class)
     override fun compileCodeFragment(
         context: ExecutionContext,
@@ -111,10 +114,12 @@ class K2KotlinCodeFragmentCompiler : KotlinCodeFragmentCompiler {
                 }
             } catch (e: ProcessCanceledException) {
                 throw e
+            } catch (e: IndexNotReadyException) {
+                throw e
             } catch (e: EvaluateException) {
                 throw e
             } catch (e: Throwable) {
-                reportErrorWithAttachments(context, codeFragment, e)
+                reportErrorWithAttachments(context, codeFragment, e, headerMessage = "K2 compiler internal error")
                 throw EvaluateExceptionUtil.createEvaluateException(e)
             }
         }

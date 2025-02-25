@@ -1,7 +1,5 @@
 ### auto-generated section `build intellij.eclipse` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
-load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_test")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources", "jvm_test")
 
 jvm_resources(
   name = "eclipse_resources",
@@ -13,13 +11,14 @@ jvm_library(
   name = "eclipse",
   module_name = "intellij.eclipse",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java", "gen/**/*.kt", "gen/**/*.java"], allow_empty = True),
   deps = [
     "//platform/util/jdom",
     "//java/openapi:java",
+    "//platform/platform-impl:ide-impl",
+    "//platform/diff-api:diff",
     "//java/compiler/openapi:java-compiler",
+    "//platform/ide-core-impl",
     "//java/idea-ui:ui",
     "//java/java-impl:impl",
     "//plugins/eclipse/jps-plugin:jps",
@@ -27,6 +26,7 @@ jvm_library(
     "//platform/editor-ui-ex:editor-ex",
     "//platform/core-ui",
     "//platform/workspace/jps",
+    "//xml/xml-frontback-impl:frontback-impl",
     "//platform/statistics",
     "@lib//:kotlin-reflect",
     "//platform/backend/workspace",
@@ -34,19 +34,23 @@ jvm_library(
   runtime_deps = [":eclipse_resources"]
 )
 
-kt_jvm_test(
-  name = "eclipse_test",
+jvm_library(
+  name = "eclipse_test_lib",
   visibility = ["//visibility:public"],
-  srcs = glob(["testSources/**/*.kt", "testSources/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["testSources/**/*.kt", "testSources/**/*.java"], allow_empty = True),
   associates = [":eclipse"],
   deps = [
     "//platform/util/jdom",
     "//java/openapi:java",
+    "//platform/platform-impl:ide-impl",
+    "//platform/platform-impl:ide-impl_test_lib",
+    "//platform/testFramework",
+    "//platform/testFramework:testFramework_test_lib",
     "@lib//:junit4",
     "//java/testFramework",
+    "//platform/diff-api:diff",
     "//java/compiler/openapi:java-compiler",
+    "//platform/ide-core-impl",
     "//java/idea-ui:ui",
     "//java/java-impl:impl",
     "//plugins/eclipse/jps-plugin:jps",
@@ -55,14 +59,21 @@ kt_jvm_test(
     "//platform/editor-ui-ex:editor-ex",
     "//platform/core-ui",
     "//platform/workspace/jps",
+    "//xml/xml-frontback-impl:frontback-impl",
     "@lib//:kotlinx-coroutines-core",
     "//platform/statistics",
+    "//platform/statistics:statistics_test_lib",
     "@lib//:junit5",
     "@lib//:kotlin-reflect",
     "//platform/testFramework/junit5",
-    "//platform/testFramework/junit5:junit5_test",
+    "//platform/testFramework/junit5:junit5_test_lib",
     "//platform/backend/workspace",
   ],
   runtime_deps = [":eclipse_resources"]
+)
+
+jvm_test(
+  name = "eclipse_test",
+  runtime_deps = [":eclipse_test_lib"]
 )
 ### auto-generated section `build intellij.eclipse` end

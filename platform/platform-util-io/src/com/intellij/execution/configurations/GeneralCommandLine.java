@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.configurations;
 
 import com.google.common.base.Strings;
@@ -6,12 +6,15 @@ import com.intellij.diagnostic.LoadingState;
 import com.intellij.execution.*;
 import com.intellij.execution.process.LocalPtyOptions;
 import com.intellij.execution.process.ProcessNotCreatedException;
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.vfs.encoding.EncodingManager;
 import com.intellij.platform.eel.EelApi;
+import com.intellij.platform.eel.provider.EelNioBridgeService;
 import com.intellij.platform.eel.provider.LocalEelDescriptor;
 import com.intellij.util.EnvironmentRestorer;
 import com.intellij.util.EnvironmentUtil;
@@ -27,7 +30,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.ref.Reference;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +37,8 @@ import java.util.*;
 import java.util.function.Function;
 
 import static com.intellij.execution.util.ExecUtil.startProcessBlockingUsingEel;
-import static com.intellij.platform.eel.provider.EelProviderUtil.*;
+import static com.intellij.platform.eel.provider.EelProviderUtil.getEelDescriptor;
+import static com.intellij.platform.eel.provider.EelProviderUtil.upgradeBlocking;
 
 /**
  * OS-independent way of executing external processes with complex parameters.
@@ -386,7 +389,17 @@ public class GeneralCommandLine implements UserDataHolder {
       var commands = myProcessCreator != null || tryGetEel() != null
                      ? ContainerUtil.concat(List.of(myExePath), myProgramParams.getList())
                      : validateAndPrepareCommandLineForLocalRun();
-      return startProcess(commands);
+      var process = startProcess(commands);
+      String pidString = null;
+      if (LOG.isDebugEnabled()) {
+        try {
+          pidString = Long.toString(process.pid());
+        }
+        catch (UnsupportedOperationException ignored) {
+        }
+        LOG.debug(String.format("Process %s started with pid %s", getCommandLineString(), pidString));
+      }
+      return process;
     }
     catch (IOException e) {
       if (SystemInfo.isWindows) {
@@ -421,8 +434,7 @@ public class GeneralCommandLine implements UserDataHolder {
    * Tries to get Eel backend for this GeneralCommandLine. If this function returns {@code null}, then the old implementation should be used.
    */
   @ApiStatus.Internal
-  @Nullable
-  public EelApi tryGetEel() {
+  public @Nullable EelApi tryGetEel() {
     Ref<EelApi> eelApiRef = myEelApi;
     if (eelApiRef != null) {
       return eelApiRef.get();
@@ -443,12 +455,17 @@ public class GeneralCommandLine implements UserDataHolder {
 
     final var exePath = Path.of(exe);
 
+    if (ApplicationManager.getApplication().getServiceIfCreated(EelNioBridgeService.class) == null) {
+      // some distributions of the IDE do not include `PlatformExtensions.xml`
+      return null;
+    }
+
     if (getEelDescriptor(exePath) != LocalEelDescriptor.INSTANCE) { // fast check
-      eelApi = getEelApiBlocking(exePath);
+      eelApi = upgradeBlocking(getEelDescriptor(exePath));
     }
     else if (workingDirectory != null) {
       if (getEelDescriptor(workingDirectory) != LocalEelDescriptor.INSTANCE) { // also try to compute non-local EelApi from working dir
-        eelApi = getEelApiBlocking(workingDirectory);
+        eelApi = upgradeBlocking(getEelDescriptor(workingDirectory));
       }
       else {
         eelApi = null;
@@ -479,8 +496,12 @@ public class GeneralCommandLine implements UserDataHolder {
 
     for (var entry : myEnvParams.entrySet()) {
       String name = entry.getKey(), value = entry.getValue();
-      if (!EnvironmentUtil.isValidName(name)) throw new IllegalEnvVarException(IdeUtilIoBundle.message("run.configuration.invalid.env.name", name));
-      if (!EnvironmentUtil.isValidValue(value)) throw new IllegalEnvVarException(IdeUtilIoBundle.message("run.configuration.invalid.env.value", name, value));
+      if (!EnvironmentUtil.isValidName(name)) {
+        throw new IllegalEnvVarException(IdeUtilIoBundle.message("run.configuration.invalid.env.name", name));
+      }
+      if (!EnvironmentUtil.isValidValue(value)) {
+        throw new IllegalEnvVarException(IdeUtilIoBundle.message("run.configuration.invalid.env.value", name, value));
+      }
     }
 
     String exePath = myExePath;
@@ -548,7 +569,7 @@ public class GeneralCommandLine implements UserDataHolder {
     var builder = new ProcessBuilder(escapedCommands);
     setupEnvironment(builder.environment());
     if (myWorkingDirectory != null) {
-      builder.directory(myWorkingDirectory.toFile());
+      builder.directory(new File(myWorkingDirectory.toString()));
     }
     builder.redirectErrorStream(myRedirectErrorStream);
     if (myInputFile != null) {
@@ -585,6 +606,20 @@ public class GeneralCommandLine implements UserDataHolder {
     }
 
     EnvironmentRestorer.restoreOverriddenVars(environment);
+    customizeEnv(environment);
+  }
+
+  /**
+   * Allow plugins/modules to define a service that can modify environment variables before process execution.
+   */
+  private void customizeEnv(@NotNull Map<String, String> environment) {
+    Application application = ApplicationManager.getApplication();
+    if (application != null) {
+      ExecutionEnvCustomizerService envCustomizer = application.getService(ExecutionEnvCustomizerService.class);
+      if (envCustomizer != null) {
+        envCustomizer.customizeEnv(this, environment);
+      }
+    }
   }
 
   /**

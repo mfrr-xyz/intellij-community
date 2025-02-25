@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.codeinsight.fixes;
 
@@ -122,6 +122,25 @@ public abstract class HighLevelQuickFixMultiFileTestGenerated extends AbstractHi
         }
 
         @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/quickfix/autoImports/callablesDeclaredInClasses")
+        public static class CallablesDeclaredInClasses extends AbstractHighLevelQuickFixMultiFileTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
+            }
+
+            @TestMetadata("noImportOfPartiallyPrivateCallables.test")
+            public void testNoImportOfPartiallyPrivateCallables() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/callablesDeclaredInClasses/noImportOfPartiallyPrivateCallables.test");
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
         @TestMetadata("../../../idea/tests/testData/quickfix/autoImports/innerClass")
         public static class InnerClass extends AbstractHighLevelQuickFixMultiFileTest {
             @java.lang.Override
@@ -139,14 +158,29 @@ public abstract class HighLevelQuickFixMultiFileTestGenerated extends AbstractHi
                 runTest("../../../idea/tests/testData/quickfix/autoImports/innerClass/innerClassInCallableReference.test");
             }
 
+            @TestMetadata("innerClassInCallableReference_fromJava.test")
+            public void testInnerClassInCallableReference_fromJava() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/innerClass/innerClassInCallableReference_fromJava.test");
+            }
+
             @TestMetadata("innerClassInExpression.test")
             public void testInnerClassInExpression() throws Exception {
                 runTest("../../../idea/tests/testData/quickfix/autoImports/innerClass/innerClassInExpression.test");
             }
 
+            @TestMetadata("innerClassInExpression_fromJava.test")
+            public void testInnerClassInExpression_fromJava() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/innerClass/innerClassInExpression_fromJava.test");
+            }
+
             @TestMetadata("innerClassInTypeReference.test")
             public void testInnerClassInTypeReference() throws Exception {
                 runTest("../../../idea/tests/testData/quickfix/autoImports/innerClass/innerClassInTypeReference.test");
+            }
+
+            @TestMetadata("innerClassInTypeReference_fromJava.test")
+            public void testInnerClassInTypeReference_fromJava() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/innerClass/innerClassInTypeReference_fromJava.test");
             }
         }
 
@@ -229,6 +263,11 @@ public abstract class HighLevelQuickFixMultiFileTestGenerated extends AbstractHi
             @TestMetadata("expectedTypeRequired.test")
             public void testExpectedTypeRequired() throws Exception {
                 runTest("../../../idea/tests/testData/quickfix/autoImports/mismatchingArgs/expectedTypeRequired.test");
+            }
+
+            @TestMetadata("expectedTypeRequired2.test")
+            public void testExpectedTypeRequired2() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/mismatchingArgs/expectedTypeRequired2.test");
             }
 
             @TestMetadata("extensionExplicitReceiver.test")
@@ -360,6 +399,16 @@ public abstract class HighLevelQuickFixMultiFileTestGenerated extends AbstractHi
                 runTest("../../../idea/tests/testData/quickfix/autoImports/constructorParameterAnnotation.test");
             }
 
+            @TestMetadata("containsOperator.test")
+            public void testContainsOperator() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/containsOperator.test");
+            }
+
+            @TestMetadata("containsOperator_withStdlib.test")
+            public void testContainsOperator_withStdlib() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/containsOperator_withStdlib.test");
+            }
+
             @TestMetadata("delegateExtensionBoth.test")
             public void testDelegateExtensionBoth() throws Exception {
                 runTest("../../../idea/tests/testData/quickfix/autoImports/delegateExtensionBoth.test");
@@ -390,6 +439,16 @@ public abstract class HighLevelQuickFixMultiFileTestGenerated extends AbstractHi
                 runTest("../../../idea/tests/testData/quickfix/autoImports/delegateNoOperator.test");
             }
 
+            @TestMetadata("delegateToBinaryExpression.test")
+            public void testDelegateToBinaryExpression() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/delegateToBinaryExpression.test");
+            }
+
+            @TestMetadata("delegateToStringLiteral.test")
+            public void testDelegateToStringLiteral() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/delegateToStringLiteral.test");
+            }
+
             @TestMetadata("divOperator.before.Main.kt")
             public void testDivOperator() throws Exception {
                 runTest("../../../idea/tests/testData/quickfix/autoImports/divOperator.before.Main.kt");
@@ -403,6 +462,31 @@ public abstract class HighLevelQuickFixMultiFileTestGenerated extends AbstractHi
             @TestMetadata("dslMarkersOnReceiver.before.Main.kt")
             public void testDslMarkersOnReceiver() throws Exception {
                 runTest("../../../idea/tests/testData/quickfix/autoImports/dslMarkersOnReceiver.before.Main.kt");
+            }
+
+            @TestMetadata("enumEntries_CallableReference.test")
+            public void testEnumEntries_CallableReference() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/enumEntries_CallableReference.test");
+            }
+
+            @TestMetadata("enumEntries_ExplicitReceiver.test")
+            public void testEnumEntries_ExplicitReceiver() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/enumEntries_ExplicitReceiver.test");
+            }
+
+            @TestMetadata("enumEntries_FromJava.test")
+            public void testEnumEntries_FromJava() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/enumEntries_FromJava.test");
+            }
+
+            @TestMetadata("enumEntries_FromJava_private.test")
+            public void testEnumEntries_FromJava_private() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/enumEntries_FromJava_private.test");
+            }
+
+            @TestMetadata("enumEntries_Private.test")
+            public void testEnumEntries_Private() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/enumEntries_Private.test");
             }
 
             @TestMetadata("extensionErroneousReceiver.test")
@@ -653,6 +737,11 @@ public abstract class HighLevelQuickFixMultiFileTestGenerated extends AbstractHi
             @TestMetadata("infixCall2.before.Main.kt")
             public void testInfixCall2() throws Exception {
                 runTest("../../../idea/tests/testData/quickfix/autoImports/infixCall2.before.Main.kt");
+            }
+
+            @TestMetadata("infixCallK1.before.Main.kt")
+            public void testInfixCallK1() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/autoImports/infixCallK1.before.Main.kt");
             }
 
             @TestMetadata("invokeExtension.test")
@@ -1213,6 +1302,40 @@ public abstract class HighLevelQuickFixMultiFileTestGenerated extends AbstractHi
         @TestMetadata("superTypeCall.before.Main.kt")
         public void testSuperTypeCall() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/deprecatedSymbolUsage/classUsages/wholeProject/superTypeCall.before.Main.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/override/overriddenJavaAccessor")
+    public static class OverriddenJavaAccessor extends AbstractHighLevelQuickFixMultiFileTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTestWithExtraFile, this, testDataFilePath);
+        }
+
+        @TestMetadata("getterWithDifferentType.test")
+        public void testGetterWithDifferentType() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overriddenJavaAccessor/getterWithDifferentType.test");
+        }
+
+        @TestMetadata("notAGetterSignature.test")
+        public void testNotAGetterSignature() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overriddenJavaAccessor/notAGetterSignature.test");
+        }
+
+        @TestMetadata("nothingToOverride.test")
+        public void testNothingToOverride() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overriddenJavaAccessor/nothingToOverride.test");
+        }
+
+        @TestMetadata("simpleGetter.test")
+        public void testSimpleGetter() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overriddenJavaAccessor/simpleGetter.test");
         }
     }
 }

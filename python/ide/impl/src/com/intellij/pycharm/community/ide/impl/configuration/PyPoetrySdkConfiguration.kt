@@ -1,7 +1,6 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.pycharm.community.ide.impl.configuration
 
-import com.intellij.codeInspection.util.IntentionName
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
@@ -14,18 +13,23 @@ import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.platform.ide.progress.withBackgroundProgress
+import com.intellij.pycharm.community.ide.impl.PyCharmCommunityCustomizationBundle
+import com.intellij.python.community.impl.poetry.poetryPath
 import com.intellij.ui.IdeBorderFactory
 import com.intellij.ui.components.JBLabel
-import com.intellij.util.ui.JBUI
-import com.intellij.pycharm.community.ide.impl.PyCharmCommunityCustomizationBundle
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
-import com.jetbrains.python.sdk.*
+import com.intellij.util.ui.JBUI
+import com.jetbrains.python.PyBundle
+import com.jetbrains.python.sdk.PythonSdkType
 import com.jetbrains.python.sdk.basePath
 import com.jetbrains.python.sdk.configuration.PyProjectSdkConfigurationExtension
+import com.jetbrains.python.sdk.findAmongRoots
 import com.jetbrains.python.sdk.poetry.*
 import com.jetbrains.python.sdk.poetry.ui.PyAddNewPoetryFromFilePanel
+import com.jetbrains.python.sdk.setAssociationToModule
+import com.jetbrains.python.util.runWithModalBlockingOrInBackground
+import com.jetbrains.python.venvReader.VirtualEnvReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.BorderLayout
@@ -35,28 +39,25 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 import kotlin.io.path.pathString
 
-class PyPoetrySdkConfiguration : PyProjectSdkConfigurationExtension {
+internal class PyPoetrySdkConfiguration : PyProjectSdkConfigurationExtension {
   companion object {
     private val LOGGER = Logger.getInstance(PyPoetrySdkConfiguration::class.java)
   }
 
+  override fun getIntention(module: Module): String? =
+    runWithModalBlockingOrInBackground(module.project, PyBundle.message("python.sdk.validating.environment")) {
+      val toml = findAmongRoots(module, PY_PROJECT_TOML)
+      if (toml == null) {
+        return@runWithModalBlockingOrInBackground null
+      }
 
-  override fun getIntention(module: Module): @IntentionName String? {
-    return runWithModalProgressBlocking(module.project, PyCharmCommunityCustomizationBundle.message("sdk.dialog.title.setting.up.poetry.environment")) {
-      val msg: String? = null
-        val toml = findAmongRoots(module, PY_PROJECT_TOML)
-        if (toml == null) {
-          return@runWithModalProgressBlocking null
-        }
+      val isPoetry = getPyProjectTomlForPoetry(toml) != null
+      if (!isPoetry) {
+        return@runWithModalBlockingOrInBackground null
+      }
 
-        val isPoetry = getPyProjectTomlForPoetry(toml) != null
-        if (!isPoetry) {
-          return@runWithModalProgressBlocking null
-        }
-
-        return@runWithModalProgressBlocking PyCharmCommunityCustomizationBundle.message("sdk.set.up.poetry.environment", toml.name)
+      return@runWithModalBlockingOrInBackground PyCharmCommunityCustomizationBundle.message("sdk.set.up.poetry.environment", toml.name)
     }
-  }
 
   @RequiresBackgroundThread
   override fun createAndAddSdkForConfigurator(module: Module): Sdk? = runBlockingCancellable { createAndAddSDk(module, false) }

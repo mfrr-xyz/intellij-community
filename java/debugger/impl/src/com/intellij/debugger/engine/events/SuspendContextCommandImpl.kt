@@ -13,14 +13,13 @@ private val LOG = Logger.getInstance(SuspendContextCommandImpl::class.java)
  */
 abstract class SuspendContextCommandImpl protected constructor(open val suspendContext: SuspendContextImpl?) : DebuggerCommandImpl() {
   private var mySuspendContextSetInProgress = false
+  private var shouldCancelCommandScopeOnSuspend = false
 
   @Throws(Exception::class)
-  open fun contextAction(suspendContext: SuspendContextImpl) {
-    throw AbstractMethodError()
-  }
+  open fun contextAction(suspendContext: SuspendContextImpl): Unit = throw AbstractMethodError()
 
   @ApiStatus.Experimental
-  open suspend fun contextActionSuspend(suspendContext: SuspendContextImpl) = contextAction(suspendContext)
+  open suspend fun contextActionSuspend(suspendContext: SuspendContextImpl): Unit = contextAction(suspendContext)
 
   final override suspend fun actionSuspend() {
     if (LOG.isDebugEnabled) {
@@ -36,16 +35,31 @@ abstract class SuspendContextCommandImpl protected constructor(open val suspendC
       return
     }
 
-    invokeWithChecks {
-      if (LOG.isDebugEnabled) {
-        LOG.debug("Executing suspend-context-command: $this")
+    try {
+      suspendContext.addUnfinishedCommand(this)
+      invokeWithChecks {
+        if (LOG.isDebugEnabled) {
+          LOG.debug("Executing suspend-context-command: $this")
+        }
+        contextActionSuspend(suspendContext)
       }
-      contextActionSuspend(suspendContext)
     }
-    check(resetContinuation(null) == null) { "Continuation is not null after resume" }
+    finally {
+      suspendContext.removeUnfinishedCommand(this)
+    }
   }
 
-  final override fun invokeContinuation() = invokeWithChecks {
+  /**
+   * When [SuspendContextImpl] is resumed, the command scope of the unfinished commands should be canceled.
+   * However, cancellation of the scope for the current command can affect its execution,
+   * so the cancellation of the current command is postponed upon its suspension.
+   */
+  @ApiStatus.Internal
+  fun cancelCommandScopeOnSuspend() {
+    shouldCancelCommandScopeOnSuspend = true
+  }
+
+  final override fun invokeContinuation(): Unit = invokeWithChecks {
     executeContinuation()
   }
 
@@ -85,7 +99,12 @@ abstract class SuspendContextCommandImpl protected constructor(open val suspendC
 
   final override fun onSuspendOrFinish() {
     if (mySuspendContextSetInProgress) {
+      mySuspendContextSetInProgress = false
       suspendContext?.myInProgress = false
+    }
+    if (shouldCancelCommandScopeOnSuspend) {
+      shouldCancelCommandScopeOnSuspend = false
+      cancelCommandScope()
     }
   }
 }

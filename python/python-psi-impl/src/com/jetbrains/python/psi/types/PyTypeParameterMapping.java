@@ -113,8 +113,12 @@ public final class PyTypeParameterMapping {
     EnumSet<Option> optionSet = EnumSet.noneOf(Option.class);
     optionSet.addAll(Arrays.asList(options));
 
-    NullTolerantDeque<PyType> expectedTypesDeque = new NullTolerantDeque<>(flattenUnpackedTupleTypes(expectedTypes));
-    NullTolerantDeque<PyType> actualTypesDeque = new NullTolerantDeque<>(flattenUnpackedTupleTypes(actualTypes));
+    List<PyType> normalizedExpectedTypes = flattenUnpackedTupleTypes(expectedTypes);
+    List<PyType> normalizedActualTypes =
+      replaceExpectedTypesWithParameterList(normalizedExpectedTypes, flattenUnpackedTupleTypes(actualTypes));
+
+    NullTolerantDeque<PyType> expectedTypesDeque = new NullTolerantDeque<>(normalizedExpectedTypes);
+    NullTolerantDeque<PyType> actualTypesDeque = new NullTolerantDeque<>(normalizedActualTypes);
 
     List<Couple<PyType>> leftMappedTypes = new ArrayList<>();
     List<Couple<PyType>> centerMappedTypes = new ArrayList<>();
@@ -204,7 +208,7 @@ public final class PyTypeParameterMapping {
                && expectedPositionalVariadic instanceof PyTypeVarTupleType typeVarTupleType
                && typeVarTupleType.getDefaultType() != null) {
         expectedTypesDeque.removeFirst();
-        centerMappedTypes.add(Couple.of(expectedPositionalVariadic, typeVarTupleType.getDefaultType()));
+        centerMappedTypes.add(Couple.of(expectedPositionalVariadic, Ref.deref(typeVarTupleType.getDefaultType())));
       }
       // [*Ts] <- [T1, *Ts[T2, ...], T2, ...]
       else {
@@ -227,11 +231,16 @@ public final class PyTypeParameterMapping {
     }
     else if (actualTypesDeque.size() == 0) {
       // [T1, T2, ...] <- []
+      boolean allMapped = true;
       for (PyType unmatchedType : expectedTypesDeque.toList()) {
         Couple<PyType> fallbackMapping = mapToFallback(unmatchedType, optionSet);
-        ContainerUtil.addIfNotNull(centerMappedTypes, fallbackMapping);
-        sizeMismatch = fallbackMapping == null;
+        allMapped = fallbackMapping != null;
+        if (!allMapped) {
+          break;
+        }
+        centerMappedTypes.add(fallbackMapping);
       }
+      sizeMismatch = !allMapped;
     }
     if (sizeMismatch) {
       return null;
@@ -243,11 +252,24 @@ public final class PyTypeParameterMapping {
     return new PyTypeParameterMapping(resultMapping);
   }
 
+  // [**P] <- [int, str, bool] is equivalent to [**P] <- [[int, str, bool]]
+  // See https://typing.readthedocs.io/en/latest/spec/generics.html#user-defined-generic-classes
+  private static @NotNull List<PyType> replaceExpectedTypesWithParameterList(@NotNull List<PyType> expectedTypes,
+                                                                             @NotNull List<PyType> actualTypes) {
+    if (ContainerUtil.getOnlyItem(expectedTypes) instanceof PyParamSpecType && 
+        !actualTypes.isEmpty() && !ContainerUtil.exists(actualTypes, o -> o instanceof PyVariadicType)) {
+      PyCallableParameterListType callableParameterListType =
+        new PyCallableParameterListTypeImpl(ContainerUtil.map(actualTypes, PyCallableParameterImpl::nonPsi));
+      return Collections.singletonList(callableParameterListType);
+    }
+    return actualTypes;
+  }
+
   private static @Nullable Couple<PyType> mapToFallback(@Nullable PyType unmatchedExpectedType, @NotNull EnumSet<Option> optionSet) {
     if (optionSet.contains(Option.USE_DEFAULTS) &&
         unmatchedExpectedType instanceof PyTypeParameterType typeParameterType &&
         typeParameterType.getDefaultType() != null) {
-      return Couple.of(unmatchedExpectedType, typeParameterType.getDefaultType());
+      return Couple.of(unmatchedExpectedType, Ref.deref(typeParameterType.getDefaultType()));
     }
     else if (optionSet.contains(Option.MAP_UNMATCHED_EXPECTED_TYPES_TO_ANY)) {
       return Couple.of(unmatchedExpectedType, null);

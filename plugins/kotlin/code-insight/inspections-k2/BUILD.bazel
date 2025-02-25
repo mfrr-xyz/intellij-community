@@ -1,11 +1,9 @@
 ### auto-generated section `build kotlin.code-insight.inspections.k2` start
-load("@rules_jvm//:compiler-options.bzl", "create_kotlinc_options")
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("//build:compiler-options.bzl", "create_kotlinc_options")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 create_kotlinc_options(
   name = "custom",
-  jvm_target = "17",
   context_receivers = True,
   opt_in = [
     "org.jetbrains.kotlin.analysis.api.permissions.KaAllowProhibitedAnalyzeFromWriteAction",
@@ -24,16 +22,15 @@ jvm_library(
   name = "kotlin-code-insight-inspections-k2",
   module_name = "kotlin.code-insight.inspections.k2",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   kotlinc_opts = ":custom",
   deps = [
     "@lib//:kotlin-stdlib",
     "@lib//:kotlin-reflect",
-    "@lib//:kotlinc_kotlin-compiler-common",
-    "@lib//:kotlinc_kotlin-compiler-fir",
-    "@lib//:kotlinc_analysis-api",
-    "@lib//:kotlinc_analysis-api-k2",
+    "@lib//:kotlinc-kotlin-compiler-common",
+    "@lib//:kotlinc-kotlin-compiler-fir",
+    "@lib//:kotlinc-analysis-api",
+    "@lib//:kotlinc-analysis-api-k2",
     "//plugins/kotlin/base/util:kotlin-base-util",
     "//plugins/kotlin/base/psi:kotlin-base-psi",
     "//plugins/kotlin/base/resources:kotlin-base-resources",
@@ -47,7 +44,8 @@ jvm_library(
     "//plugins/kotlin/code-insight/inspections-shared:kotlin-code-insight-inspections-shared",
     "//plugins/kotlin/code-insight/descriptions:kotlin-code-insight-descriptions",
     "//platform/lang-impl",
-    "//platform/editor-ui-api:editor",
+    "//platform/platform-impl:ide-impl",
+    "//platform/editor-ui-api:editor-ui",
     "//java/java-psi-api:psi",
     "@lib//:guava",
     "//plugins/kotlin/base/facet:kotlin-base-facet",

@@ -4,6 +4,8 @@ package com.intellij.ui.jcef;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.ui.JBColor;
+import com.intellij.ui.jcef.menu.CefContextMenuRunner;
+import com.intellij.util.messages.MessageBusConnection;
 import org.cef.browser.CefBrowser;
 import org.cef.handler.CefFocusHandler;
 import org.cef.handler.CefFocusHandlerAdapter;
@@ -86,6 +88,24 @@ public class JBCefBrowser extends JBCefBrowserBase {
         return false;
       }
     }, myCefBrowser);
+
+    if (isOffScreenRendering()) {
+      CefContextMenuRunner contextMenuRunner = new CefContextMenuRunner();
+      myCefClient.addContextMenuHandler(contextMenuRunner, myCefBrowser);
+
+      myCefBrowser.getUIComponent().addFocusListener(new FocusAdapter() {
+        @Override
+        public void focusGained(FocusEvent e) {
+            myCefBrowser.setFocus(true);
+        }
+        @Override
+        public void focusLost(FocusEvent e) {
+          if (!contextMenuRunner.isShowing())  {
+            myCefBrowser.setFocus(false);
+          }
+        }
+      });
+    }
   }
 
   private static final @NotNull List<Consumer<? super JBCefBrowser>> ourOnBrowserMoveResizeCallbacks =
@@ -93,13 +113,10 @@ public class JBCefBrowser extends JBCefBrowserBase {
 
   static final @NotNull Dimension DEF_PREF_SIZE = new Dimension(800, 600);
 
-
-
   private final @NotNull JPanel myComponent;
   private final @NotNull CefFocusHandler myCefFocusHandler;
-
-
   private volatile boolean myFirstShow = true;
+  private MessageBusConnection myMsgBusConnection;
 
   /**
    * Creates a browser builder.
@@ -209,9 +226,8 @@ public class JBCefBrowser extends JBCefBrowserBase {
       }
     });
 
-    ApplicationManager.getApplication().getMessageBus()
-      .connect()
-      .subscribe(JBCefHealthMonitor.JBCefHealthCheckTopic.TOPIC,
+    myMsgBusConnection = ApplicationManager.getApplication().getMessageBus().connect();
+    myMsgBusConnection.subscribe(JBCefHealthMonitor.JBCefHealthCheckTopic.TOPIC,
                  new JBCefHealthMonitor.JBCefHealthCheckTopic() {
                    @Override
                    public void onHealthHealthStatusChanged(JBCefHealthMonitor.@NotNull Status status) {
@@ -282,6 +298,8 @@ public class JBCefBrowser extends JBCefBrowserBase {
 
   @Override
   public void dispose() {
+    if (myMsgBusConnection != null)
+      myMsgBusConnection.disconnect();
     super.dispose(() -> {
       myCefClient.removeFocusHandler(myCefFocusHandler, myCefBrowser);
     });

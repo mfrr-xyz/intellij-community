@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.lookup.impl;
 
 import com.intellij.CommonBundle;
@@ -91,7 +91,9 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   private final Editor editor;
   private final Object uiLock = new Object();
   private final JBList<LookupElement> list = new LookupList();
-  final LookupCellRenderer cellRenderer;
+  @VisibleForTesting
+  @ApiStatus.Internal
+  public final LookupCellRenderer cellRenderer;
 
   private final List<LookupListener> myListeners = ContainerUtil.createLockFreeCopyOnWriteList();
   private final List<PrefixChangeListener> myPrefixChangeListeners = ContainerUtil.createLockFreeCopyOnWriteList();
@@ -120,6 +122,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   private final AtomicInteger myDummyItemCount = new AtomicInteger();
   private final EmptyLookupItem myDummyItem = new EmptyLookupItem(CommonBundle.message("tree.node.loading"), true);
   private boolean myFirstElementAdded = false;
+  private boolean myShowIfMeaningless = false;
 
   final CoroutineScope coroutineScope = CoroutineScopeKt.CoroutineScope(SupervisorJob(null).plus(Dispatchers.getDefault()));
 
@@ -325,6 +328,18 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
     }
   }
 
+  @ApiStatus.Experimental
+  @ApiStatus.Internal
+  public boolean isShowIfMeaningless() {
+    return myShowIfMeaningless;
+  }
+
+  @ApiStatus.Experimental
+  @ApiStatus.Internal
+  public void showIfMeaningless() {
+    myShowIfMeaningless = true;
+  }
+
   private static boolean containsDummyIdentifier(final @Nullable String s) {
     return s != null && s.contains(CompletionUtil.DUMMY_IDENTIFIER_TRIMMED);
   }
@@ -354,8 +369,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
   }
 
   @Override
-  @Unmodifiable
-  public List<LookupElement> getItems() {
+  public @Unmodifiable List<LookupElement> getItems() {
     synchronized (uiLock) {
       return ContainerUtil.findAll(getListModel().toList(), element -> !(element instanceof EmptyLookupItem));
     }
@@ -1184,8 +1198,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable,
 
 
   @Override
-  @Unmodifiable
-  public List<String> getAdvertisements() {
+  public @Unmodifiable List<String> getAdvertisements() {
     return myAdComponent.getAdvertisements();
   }
 

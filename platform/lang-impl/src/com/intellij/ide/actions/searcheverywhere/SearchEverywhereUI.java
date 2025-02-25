@@ -29,7 +29,10 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.actionSystem.impl.ActionMenu;
-import com.intellij.openapi.application.*;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ApplicationNamesInfo;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.ex.EditorEx;
@@ -55,7 +58,6 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.wm.ToolWindowId;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.PsiElement;
@@ -132,10 +134,6 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
   public static final int SINGLE_CONTRIBUTOR_ELEMENTS_LIMIT = 30;
   public static final int MULTIPLE_CONTRIBUTORS_ELEMENTS_LIMIT = 15;
 
-  private static Icon getShowInFindToolWindowIcon() {
-    return ExperimentalUI.isNewUI() ? AllIcons.General.OpenInToolWindow : AllIcons.General.Pin_tab;
-  }
-
   private final SEResultsListFactory myListFactory;
   private SearchListModel myListModel;
   private final SearchEverywhereHeader myHeader;
@@ -198,9 +196,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
 
     myMlService = SearchEverywhereMlService.getInstance();
 
-    myListFactory = Experiments.getInstance().isFeatureEnabled("search.everywhere.mixed.results")
-                    ? new MixedListFactory()
-                    : new GroupedListFactory();
+    myListFactory = new MixedListFactory();
 
     if (myMlService != null) {
       myMlService.onSessionStarted(myProject, new SearchEverywhereMixedListInfo(myListFactory));
@@ -229,11 +225,10 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     }
 
     myExternalSearchListeners.add(topicPublisher);
-    mySearcher = Experiments.getInstance().isFeatureEnabled("search.everywhere.mixed.results")
-                 ? new MixedResultsSearcher(wrapperListener, run -> ApplicationManager.getApplication().invokeLater(run),
-                                            equalityProviders)
-                 : new GroupedResultsSearcher(wrapperListener, run -> ApplicationManager.getApplication().invokeLater(run),
-                                              equalityProviders);
+    mySearcher = new MixedResultsSearcher(
+      wrapperListener,
+      run -> ApplicationManager.getApplication().invokeLater(run),
+      equalityProviders);
     addSearchListener(new SearchProcessLogger());
 
     initSearchActions();
@@ -380,7 +375,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     if (mySearchField == null) return;
 
     List<SearchEverywhereContributor<?>> contributors = myHeader.getSelectedTab().getContributors();
-    String advertisementText = getWarning(contributors);
+    String advertisementText = ReadAction.compute(() -> getWarning(contributors));
     if (advertisementText != null) {
       myHintHelper.setWarning(advertisementText);
       updateRightActions(contributors);
@@ -401,8 +396,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     }
   }
 
-  @Unmodifiable
-  private @NotNull List<AnAction> getRightActions(@NotNull List<? extends SearchEverywhereContributor<?>> contributors) {
+  private @Unmodifiable @NotNull List<AnAction> getRightActions(@NotNull List<? extends SearchEverywhereContributor<?>> contributors) {
     for (SearchEverywhereContributor<?> contributor : contributors) {
       if (!Objects.equals(getSelectedTabID(), contributor.getSearchProviderId()) ||
           !(contributor instanceof SearchFieldActionsContributor)) {
@@ -539,8 +533,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
       .collect(Collectors.toList());
   }
 
-  @Unmodifiable
-  public List<SearchEverywhereFoundElementInfo> getFoundElementsInfo() {
+  public @Unmodifiable List<SearchEverywhereFoundElementInfo> getFoundElementsInfo() {
     return myListModel.getFoundElementsInfo();
   }
 
@@ -1452,7 +1445,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
 
     ShowInFindToolWindowAction() {
       super(IdeBundle.messagePointer("show.in.find.window.button.name"),
-            IdeBundle.messagePointer("show.in.find.window.button.description"), getShowInFindToolWindowIcon());
+            IdeBundle.messagePointer("show.in.find.window.button.description"));
     }
 
     @Override
@@ -1604,10 +1597,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
       SETab selectedTab = myHeader != null ? myHeader.getSelectedTab() : null;
       boolean enabled = selectedTab == null || ContainerUtil.exists(selectedTab.getContributors(), c -> c.showInFindResults());
       e.getPresentation().setEnabled(enabled);
-      if (!ExperimentalUI.isNewUI()) {
-        e.getPresentation()
-          .setIcon(ToolWindowManager.getInstance(myProject).getLocationIcon(ToolWindowId.FIND, getShowInFindToolWindowIcon()));
-      }
+      e.getPresentation().setIcon(ToolWindowManager.getInstance(myProject).getShowInFindToolWindowIcon());
     }
 
     @Override

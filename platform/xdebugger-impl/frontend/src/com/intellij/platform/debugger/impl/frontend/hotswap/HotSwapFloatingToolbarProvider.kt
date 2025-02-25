@@ -11,16 +11,16 @@ import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.EditorKind
-import com.intellij.openapi.editor.toolbar.floating.AbstractFloatingToolbarComponent
 import com.intellij.openapi.editor.toolbar.floating.FloatingToolbarComponent
 import com.intellij.openapi.editor.toolbar.floating.FloatingToolbarProvider
 import com.intellij.openapi.editor.toolbar.floating.isInsideMainEditor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.PopupHandler
-import com.intellij.util.cancelOnDispose
 import com.intellij.util.ui.JBUI
 import com.intellij.xdebugger.XDebuggerBundle
 import com.intellij.xdebugger.impl.hotswap.HotSwapStatistics
@@ -29,10 +29,11 @@ import com.intellij.xdebugger.impl.hotswap.HotSwapVisibleStatus
 import com.intellij.xdebugger.impl.rpc.XDebugHotSwapCurrentSessionStatus
 import icons.PlatformDebuggerImplIcons
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.annotations.ApiStatus
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Insets
@@ -172,8 +173,17 @@ private fun JComponent.installPopupMenu() {
 
 private val logger = logger<HotSwapFloatingToolbarProvider>()
 
+@ApiStatus.Internal
 internal class HotSwapFloatingToolbarProvider : FloatingToolbarProvider {
-  override val autoHideable: Boolean get() = false
+
+  override val backgroundAlpha: Float = JBUI.CurrentTheme.FloatingToolbar.TRANSLUCENT_BACKGROUND_ALPHA
+
+  override val showingTime: Int = SHOWING_TIME_MS
+
+  override val hidingTime: Int = HIDING_TIME_MS
+
+  override val autoHideable: Boolean = false
+
   private val hotSwapAction by lazy { HotSwapWithRebuildAction() }
 
   override val actionGroup: ActionGroup by lazy {
@@ -190,64 +200,73 @@ internal class HotSwapFloatingToolbarProvider : FloatingToolbarProvider {
 
   override fun register(dataContext: DataContext, component: FloatingToolbarComponent, parentDisposable: Disposable) {
     val project = dataContext.getData(CommonDataKeys.PROJECT) ?: return
-
-    if (component is AbstractFloatingToolbarComponent) {
-      component.backgroundAlpha = 0.9f
-      component.showingTime = SHOWING_TIME_MS
-      component.hidingTime = HIDING_TIME_MS
-    }
+    val file = dataContext.getData(CommonDataKeys.VIRTUAL_FILE)
     if (component is JComponent) {
       component.installPopupMenu()
     }
     val manager = FrontendHotSwapManager.getInstance(project)
-    manager.coroutineScope.launch {
-      coroutineContext.job.cancelOnDispose(parentDisposable, disposeOnCompletion = false)
+    val job = manager.coroutineScope.launch {
       manager.currentStatusFlow.collectLatest { status ->
-        onStatusChanged(component, status?.status)
+        onStatusChanged(component, status?.status, file)
       }
     }
+    Disposer.register(parentDisposable, Disposable {
+      if (logger.isDebugEnabled) {
+        logger.debug("Floating toolbar disposed ($file)")
+      }
+      job.cancel("disposed")
+    })
   }
 
-  suspend fun onStatusChanged(component: FloatingToolbarComponent, status: HotSwapVisibleStatus?) = withContext(Dispatchers.EDT) {
-    fun updateActions() {
-      if (component is ActionToolbarImpl) {
-        component.updateActionsAsync()
+  private suspend fun onStatusChanged(component: FloatingToolbarComponent, status: HotSwapVisibleStatus?, file: VirtualFile?) =
+    withContext(Dispatchers.EDT) {
+      fun updateActions() {
+        if (component is ActionToolbarImpl) {
+          component.updateActionsAsync()
+        }
       }
-    }
 
-    if (!showFloatingToolbar()) {
-      if (logger.isDebugEnabled) {
-        logger.debug("Hide button because it is disabled")
-      }
-      component.scheduleHide()
-      return@withContext
-    }
-
-    if (logger.isDebugEnabled) {
-      logger.debug("Button status changed: $status")
-    }
-    when (status) {
-      HotSwapVisibleStatus.IN_PROGRESS -> {
-        hotSwapAction.status = HotSwapButtonStatus.IN_PROGRESS
-        updateActions()
-      }
-      HotSwapVisibleStatus.SUCCESS -> {
-        hotSwapAction.status = HotSwapButtonStatus.SUCCESS
-        updateActions()
-      }
-      HotSwapVisibleStatus.NO_CHANGES -> {
+      if (!showFloatingToolbar()) {
+        if (logger.isDebugEnabled) {
+          logger.debug("Hide button because it is disabled ($file)")
+        }
         component.scheduleHide()
-      }
-      HotSwapVisibleStatus.CHANGES_READY -> {
-        hotSwapAction.status = HotSwapButtonStatus.READY
-        updateActions()
-        component.scheduleShow()
-      }
-      HotSwapVisibleStatus.SESSION_COMPLETED, HotSwapVisibleStatus.HIDDEN, null -> {
-        component.hideImmediately()
+        return@withContext
       }
 
+      if (logger.isDebugEnabled) {
+        logger.debug("Button status changed: $status ($file)")
+      }
+      when (status) {
+        HotSwapVisibleStatus.IN_PROGRESS -> {
+          hotSwapAction.status = HotSwapButtonStatus.IN_PROGRESS
+          updateActions()
+        }
+        HotSwapVisibleStatus.SUCCESS -> {
+          hotSwapAction.status = HotSwapButtonStatus.SUCCESS
+          updateActions()
+        }
+        HotSwapVisibleStatus.NO_CHANGES -> {
+          component.scheduleHide()
+        }
+        HotSwapVisibleStatus.CHANGES_READY -> {
+          hotSwapAction.status = HotSwapButtonStatus.READY
+          updateActions()
+          component.scheduleShow()
+        }
+        HotSwapVisibleStatus.SESSION_COMPLETED, HotSwapVisibleStatus.HIDDEN, null -> {
+          component.hideImmediately()
+        }
+
+      }
     }
+
+  override fun onHiddenByEsc(dataContext: DataContext) {
+    val project = dataContext.getData(CommonDataKeys.PROJECT) ?: return
+    if (logger.isDebugEnabled) {
+      logger.debug("Button is hidden by Esc button: ${dataContext.getData(CommonDataKeys.VIRTUAL_FILE)}")
+    }
+    FrontendHotSwapManager.getInstance(project).notifyHidden()
   }
 
   companion object {
@@ -259,6 +278,9 @@ internal class HotSwapFloatingToolbarProvider : FloatingToolbarProvider {
 private class HideAction : AnAction() {
   override fun actionPerformed(e: AnActionEvent) {
     val project = e.project ?: return
+    if (logger.isDebugEnabled) {
+      logger.debug("Button is hidden by user: ${e.dataContext.getData(CommonDataKeys.VIRTUAL_FILE)}")
+    }
     FrontendHotSwapManager.getInstance(project).notifyHidden()
   }
 

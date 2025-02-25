@@ -108,6 +108,7 @@
       "generate_use_type_annotation_before_type": true,
       "if_brace_force": "never",
       "imports_layout": [
+        "@*",
         "*",
         "|",
         "javax.**",
@@ -165,6 +166,7 @@
       "place_assignment_sign_on_next_line": false,
       "prefer_longer_names": true,
       "prefer_parameters_wrap": false,
+      "preserve_module_imports": true,
       "record_components_wrap": "normal",
       "repeat_annotations": [
         "com.jetbrains.First",

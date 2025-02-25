@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.fir.parameterInfo;
 
@@ -138,6 +138,11 @@ public abstract class FirParameterInfoTestGenerated extends AbstractFirParameter
         @TestMetadata("Conflicting.kt")
         public void testConflicting() throws Exception {
             runTest("../../idea/tests/testData/parameterInfo/functionCall/Conflicting.kt");
+        }
+
+        @TestMetadata("ConstDefaultParameter.kt")
+        public void testConstDefaultParameter() throws Exception {
+            runTest("../../idea/tests/testData/parameterInfo/functionCall/ConstDefaultParameter.kt");
         }
 
         @TestMetadata("DataClassComponentFunction.kt")
@@ -333,6 +338,11 @@ public abstract class FirParameterInfoTestGenerated extends AbstractFirParameter
         @TestMetadata("NoCandidatesWrongReceiver.kt")
         public void testNoCandidatesWrongReceiver() throws Exception {
             runTest("../../idea/tests/testData/parameterInfo/functionCall/NoCandidatesWrongReceiver.kt");
+        }
+
+        @TestMetadata("NoDefaultValueForValParameter.kt")
+        public void testNoDefaultValueForValParameter() throws Exception {
+            runTest("../../idea/tests/testData/parameterInfo/functionCall/NoDefaultValueForValParameter.kt");
         }
 
         @TestMetadata("NoShadowedDeclarations.kt")

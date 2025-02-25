@@ -107,9 +107,25 @@ open class DriverImpl(host: JmxHost?, override val isRemoteIdeMode: Boolean) : D
     if (args == null) return emptyArray()
 
     return args
-      .map { if (it is PolymorphRef && polymorphRegistry != null) polymorphRegistry?.convert(it, rdTarget) else it }
-      .map { if (it is RefWrapper) it.getRef() else it }
+      .map { arg ->
+        when (arg) {
+          is Array<*> -> arg.map { convertArgToPass(it, rdTarget) }.toTypedArray()
+          is List<*> -> arg.map { convertArgToPass(it, rdTarget) }
+          else -> convertArgToPass(arg, rdTarget)
+        }
+      }
       .toTypedArray()
+  }
+
+  private fun convertArgToPass(arg: Any?, rdTarget: RdTarget): Any? {
+    var result = arg
+    if (result is PolymorphRef && polymorphRegistry != null) {
+      result = polymorphRegistry?.convert(result, rdTarget)
+    }
+    if (result is RefWrapper) {
+      result = result.getRef()
+    }
+    return result
   }
 
   private fun convertResult(callResult: RemoteCallResult, targetClass: Class<*>, pluginId: String?): Any? {
@@ -175,13 +191,14 @@ open class DriverImpl(host: JmxHost?, override val isRemoteIdeMode: Boolean) : D
         "toString" -> "@Service(APP) " + remote.value
         else -> {
           val rdTarget = mergeRdTargets(rdTarget, remote, project, *(args ?: emptyArray()))
-          val (sessionId, dispatcher, semantics) = sessionHolder.get() ?: NO_SESSION
+          val declaredLockSemantics = method.annotations.filterIsInstance<RequiresLockSemantics>().singleOrNull()?.lockSemantics
+          val (sessionId, dispatcher, sessionLockSemantics) = sessionHolder.get() ?: NO_SESSION
           val call = ServiceCall(
             sessionId,
             findTimedMeta(method)?.value,
             getPluginId(remote),
             dispatcher,
-            semantics,
+            declaredLockSemantics ?: sessionLockSemantics,
             remote.value,
             method.name,
             convertArgsToPass(rdTarget, args),
@@ -221,13 +238,14 @@ open class DriverImpl(host: JmxHost?, override val isRemoteIdeMode: Boolean) : D
         "toString" -> "Utility " + remote.value
         else -> {
           val rdTarget = mergeRdTargets(rdTarget, remote, *(args ?: emptyArray()))
-          val (sessionId, dispatcher, semantics) = sessionHolder.get() ?: NO_SESSION
+          val declaredLockSemantics = method.annotations.filterIsInstance<RequiresLockSemantics>().singleOrNull()?.lockSemantics
+          val (sessionId, dispatcher, sessionLockSemantics) = sessionHolder.get() ?: NO_SESSION
           val call = UtilityCall(
             sessionId,
             findTimedMeta(method)?.value,
             getPluginId(remote),
             dispatcher,
-            semantics,
+            declaredLockSemantics ?: sessionLockSemantics,
             remote.value,
             method.name,
             rdTarget,

@@ -1,5 +1,5 @@
 ### auto-generated section `local-libs` start
-load("@rules_java//java:defs.bzl", "java_import")
+load("@rules_java//java:defs.bzl", "java_import", "java_library")
 
 java_import(
   name = "ant-antlr",
@@ -31,6 +31,13 @@ java_import(
     "ant-xz.jar",
     "ant.jar",
   ],
+  visibility = ["//visibility:public"]
+)
+
+java_library(
+  name = "ant-antlr-provided",
+  exports = [":ant-antlr"],
+  neverlink = True,
   visibility = ["//visibility:public"]
 )
 ### auto-generated section `local-libs` end

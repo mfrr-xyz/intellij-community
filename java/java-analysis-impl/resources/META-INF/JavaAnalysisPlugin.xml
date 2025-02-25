@@ -34,6 +34,7 @@
     <extensionPoint qualifiedName="com.intellij.codeInsight.changeVariableTypeQuickFixProvider" interface="com.intellij.codeInsight.quickfix.ChangeVariableTypeQuickFixProvider" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.lang.jvm.annotationPackageSupport" interface="com.intellij.codeInsight.annoPackages.AnnotationPackageSupport" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.lang.jvm.ignoreAnnotationParamSupport" interface="com.intellij.codeInspection.DefaultAnnotationParamInspection$IgnoreAnnotationParamSupport" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.lang.jvm.ignoreVariableCanBeFinalSupport" interface="com.intellij.codeInspection.localCanBeFinal.IgnoreVariableCanBeFinalSupport" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.javaLanguageLevelPusherCustomizer" interface="com.intellij.openapi.roots.impl.JavaLanguageLevelPusherCustomizer" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.propertyAccessorDetector" interface="com.intellij.psi.util.PropertyAccessorDetector" dynamic="true"/>
 
@@ -41,6 +42,8 @@
                     beanClass="com.intellij.codeInsight.daemon.impl.analysis.InjectedLanguageJavaReferenceSupplier" dynamic="true"/>
     <extensionPoint qualifiedName="com.intellij.lang.jvm.annotations.marker.suppressor"
                     interface="com.intellij.codeInsight.NonCodeAnnotationsMarkerSuppressor" dynamic="true"/>
+    <extensionPoint qualifiedName="com.intellij.lang.jvm.bytecodeAnalysisSuppressor"
+                    interface="com.intellij.codeInspection.bytecodeAnalysis.BytecodeAnalysisSuppressor" dynamic="true"/>
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
@@ -88,6 +91,10 @@
                      groupPath="Java" groupBundle="messages.InspectionsBundle" groupKey="group.names.naming.conventions"
                      bundle="messages.JavaAnalysisBundle" key="inspection.java.module.naming"
                      implementationClass="com.intellij.codeInspection.java19modules.JavaModuleNamingInspection"/>
+    <localInspection language="JAVA" shortName="JavaModuleDefinition" enabledByDefault="true" level="WARNING"
+                     groupPath="Java" groupBundle="messages.InspectionsBundle" groupKey="group.names.declaration.redundancy"
+                     bundle="messages.JavaAnalysisBundle" key="inspection.java.module.definition"
+                     implementationClass="com.intellij.codeInspection.java19modules.JavaModuleDefinitionInspection"/>
     <localInspection language="JAVA" shortName="JavaRequiresAutoModule" enabledByDefault="true" level="WARNING"
                      groupPathKey="group.path.names.java.language.level.specific.issues.and.migration.aids"
                      groupBundle="messages.InspectionsBundle" groupKey="group.names.language.level.specific.issues.and.migration.aids9"
@@ -134,6 +141,16 @@
                      enabledByDefault="true" level="WARNING"
                      implementationClass="com.intellij.codeInspection.PossibleHeapPollutionVarargsInspection"
                      key="inspection.safe.varargs.detector.display.name" bundle="messages.JavaAnalysisBundle"/>
+    <localInspection groupPath="Java" language="JAVA" shortName="SafeVarargsHasNoEffect"
+                     groupKey="group.names.probable.bugs" groupBundle="messages.InspectionsBundle"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="com.intellij.codeInspection.SafeVarargsHasNoEffectInspection"
+                     key="safe.varargs.not.suppress.potentially.unsafe.operations" bundle="messages.JavaAnalysisBundle"/>
+    <localInspection groupPath="Java" language="JAVA" shortName="SafeVarargsOnNonReifiableType"
+                     groupKey="group.names.declaration.redundancy" groupBundle="messages.InspectionsBundle"
+                     enabledByDefault="true" level="WARNING"
+                     implementationClass="com.intellij.codeInspection.SafeVarargsOnNonReifiableTypeInspection"
+                     key="safe.varargs.on.reifiable.type" bundle="messages.JavaAnalysisBundle"/>
     <localInspection groupPathKey="group.path.names.java.language.level.specific.issues.and.migration.aids" language="JAVA" shortName="CodeBlock2Expr"
                      groupKey="group.names.language.level.specific.issues.and.migration.aids8" groupBundle="messages.InspectionsBundle" enabledByDefault="true" level="WARNING"
                      implementationClass="com.intellij.codeInspection.RedundantLambdaCodeBlockInspection"
@@ -336,5 +353,7 @@
                     serviceImplementation="com.intellij.lang.OuterModelsModificationTrackerManagerImpl"/>
     <optionController implementation="com.intellij.codeInspection.ex.EntryPointsManagerBase$Provider"/>
     <optionController implementation="com.intellij.codeInsight.NullableNotNullManagerImpl$Provider"/>
+
+    <lang.jvm.annotations.marker.suppressor implementation="com.intellij.java.JavaNonCodeAnnotationsMarkerSuppressor"/>
   </extensions>
 </idea-plugin>

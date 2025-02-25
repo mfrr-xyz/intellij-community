@@ -1,4 +1,4 @@
-// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.k2.inspections.tests;
 
@@ -195,6 +195,11 @@ public abstract class K2UnusedSymbolHighlightingTestGenerated extends AbstractK2
         @TestMetadata("annotationWithUseSiteTarget.kt")
         public void testAnnotationWithUseSiteTarget() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/annotationWithUseSiteTarget.kt");
+        }
+
+        @TestMetadata("arrayAccessOperator.kt")
+        public void testArrayAccessOperator() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/arrayAccessOperator.kt");
         }
 
         @TestMetadata("asDefaultConstructorParameter.kt")
@@ -462,6 +467,11 @@ public abstract class K2UnusedSymbolHighlightingTestGenerated extends AbstractK2
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/nonPrivateFields.kt");
         }
 
+        @TestMetadata("operatorParameters.kt")
+        public void testOperatorParameters() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/operatorParameters.kt");
+        }
+
         @TestMetadata("overrideProperty.kt")
         public void testOverrideProperty() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/overrideProperty.kt");
@@ -505,6 +515,21 @@ public abstract class K2UnusedSymbolHighlightingTestGenerated extends AbstractK2
         @TestMetadata("primaryConstructorParameterDataClass.kt")
         public void testPrimaryConstructorParameterDataClass() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/primaryConstructorParameterDataClass.kt");
+        }
+
+        @TestMetadata("privateDestructuringArrayComponentDeclaration.kt")
+        public void testPrivateDestructuringArrayComponentDeclaration() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/privateDestructuringArrayComponentDeclaration.kt");
+        }
+
+        @TestMetadata("privateDestructuringArrayComponentUnusedDeclaration.kt")
+        public void testPrivateDestructuringArrayComponentUnusedDeclaration() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/privateDestructuringArrayComponentUnusedDeclaration.kt");
+        }
+
+        @TestMetadata("privateDestructuringListComponentDeclaration.kt")
+        public void testPrivateDestructuringListComponentDeclaration() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/privateDestructuringListComponentDeclaration.kt");
         }
 
         @TestMetadata("privateFunction.kt")
@@ -570,6 +595,11 @@ public abstract class K2UnusedSymbolHighlightingTestGenerated extends AbstractK2
         @TestMetadata("secondaryConstructorCalledByTypeAlias.kt")
         public void testSecondaryConstructorCalledByTypeAlias() throws Exception {
             runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/secondaryConstructorCalledByTypeAlias.kt");
+        }
+
+        @TestMetadata("secondaryConstructorCalledFromSubclassSecondaryConstructor.kt")
+        public void testSecondaryConstructorCalledFromSubclassSecondaryConstructor() throws Exception {
+            runTest("../../../idea/tests/testData/inspectionsLocal/unusedSymbol/secondaryConstructorCalledFromSubclassSecondaryConstructor.kt");
         }
 
         @TestMetadata("secondaryConstructorUnused.kt")

@@ -39,7 +39,6 @@ import java.util.jar.JarInputStream
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import javax.xml.stream.XMLStreamException
-import kotlin.Throws
 
 private val LOG: Logger
   get() = PluginManagerCore.logger
@@ -230,7 +229,12 @@ fun initMainDescriptorByRaw(
       }
       else {
         val subRaw = pathResolver.resolveModuleFile(context, dataLoader, subDescriptorFile, readInto = null)
-        module.descriptor = descriptor.createSub(subRaw, subDescriptorFile, context, module)
+        val subDescriptor = descriptor.createSub(subRaw, subDescriptorFile, context, module)
+        module.descriptor = subDescriptor
+        val customRoots = pathResolver.resolveCustomModuleClassesRoots(module.name)
+        if (customRoots.isNotEmpty()) {
+          subDescriptor.jarFiles = customRoots
+        }
       }
     }
     else {
@@ -356,6 +360,9 @@ private fun loadFromPluginDir(
   return null
 }
 
+/**
+ * @return null if `lib` subdirectory does not exist, otherwise a list of paths to archives (.jar or .zip)
+ */
 private fun resolveArchives(path: Path): MutableList<Path>? {
   try {
     return Files.newDirectoryStream(path.resolve("lib")).use { stream ->
@@ -993,7 +1000,12 @@ private fun loadModuleDescriptors(
     }
 
     val raw = pathResolver.resolveModuleFile(readContext = context, dataLoader = dataLoader, path = subDescriptorFile, readInto = null)
-    module.descriptor = descriptor.createSub(raw = raw, descriptorPath = subDescriptorFile, context = context, module = module)
+    val subDescriptor = descriptor.createSub(raw = raw, descriptorPath = subDescriptorFile, context = context, module = module)
+    val customModuleClassesRoots = pathResolver.resolveCustomModuleClassesRoots(moduleName)
+    if (customModuleClassesRoots.isNotEmpty()) {
+      subDescriptor.jarFiles = customModuleClassesRoots
+    }
+    module.descriptor = subDescriptor
   }
 }
 
@@ -1163,10 +1175,9 @@ fun testLoadDescriptorsFromClassPath(loader: ClassLoader): List<IdeaPluginDescri
     productBuildNumber = { buildNumber },
   )
   val result = PluginLoadingResult(checkModuleDependencies = false)
-  @Suppress("SSBasedInspection")
   result.addAll(
     descriptors = toSequence(
-      list = runBlocking {
+      list = @Suppress("RAW_RUN_BLOCKING") runBlocking {
         val pool = ZipFilePool.POOL?.takeIf { !context.transient } ?: NonShareableJavaZipFilePool()
         urlToFilename.map { (url, filename) ->
           async(Dispatchers.IO) {
@@ -1254,7 +1265,7 @@ private fun loadDescriptorFromResource(
         }
         else {
           // support for unpacked plugins in classpath, e.g. .../community/build/dependencies/build/kotlin/Kotlin/lib/kotlin-plugin.jar
-          basePath = file.parent?.takeIf { !it.endsWith("lib") }?.parent ?: file
+          basePath = file.parent?.takeIf { it.endsWith("lib") }?.parent ?: file
           dataLoader = loader
         }
 

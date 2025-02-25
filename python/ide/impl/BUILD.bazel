@@ -1,6 +1,5 @@
 ### auto-generated section `build intellij.pycharm.community.ide.impl` start
-load("@rules_jvm//:jvm.bzl", "jvm_resources")
-load("@rules_jvm//:rules.bzl", "jvm_library")
+load("@rules_jvm//:jvm.bzl", "jvm_library", "jvm_resources")
 
 jvm_resources(
   name = "pycharm-community-ide-impl_resources",
@@ -12,9 +11,7 @@ jvm_library(
   name = "pycharm-community-ide-impl",
   module_name = "intellij.pycharm.community.ide.impl",
   visibility = ["//visibility:public"],
-  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True, exclude = ["**/module-info.java"]),
-  javac_opts = "@rules_jvm//:j17",
-  kotlinc_opts = "@rules_jvm//:k17",
+  srcs = glob(["src/**/*.kt", "src/**/*.java"], allow_empty = True),
   deps = [
     "//platform/platform-impl:ide-impl",
     "//python:python-community-impl",
@@ -25,21 +22,27 @@ jvm_library(
     "@lib//:guava",
     "@lib//:stream_ex",
     "//platform/xdebugger-api:debugger",
+    "//platform/usageView",
     "//platform/statistics",
     "//platform/core-ui",
+    "//python/python-sdk:sdk",
     "//platform/vcs-api:vcs",
     "//plugins/ide-features-trainer:featuresTrainer",
     "//python/python-features-trainer:featuresTrainer",
+    "//platform/util/progress",
     "@lib//:kotlinx-coroutines-core",
     "@lib//:http-client",
     "//platform/whatsNew",
     "//platform/util/coroutines",
     "//platform/experiment",
+    "@lib//:jna",
+    "//python/services/system-python:python-community-services-systemPython",
+    "//platform/eel",
+    "//python/services/shared:python-community-services-shared",
+    "//python/poetry:community-impl-poetry",
+    "//python/python-venv:community-impl-venv",
+    "@lib//:jetbrains-annotations",
   ],
-  runtime_deps = [
-    ":pycharm-community-ide-impl_resources",
-    "//xml/dom-impl",
-    "//python/ide/impl/intellij.pycharm.community.ide.impl.promotion:pycharm-community-ide-impl-promotion",
-  ]
+  runtime_deps = [":pycharm-community-ide-impl_resources"]
 )
 ### auto-generated section `build intellij.pycharm.community.ide.impl` end
